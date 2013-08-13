@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<config>
+
+		<!-- PHP PEAR DB INFO -->
+		<DB_DataObject>
+
+			<dsn>mysqli://molclass_user:YCuRzNoe@localhost/molclass</dsn>
+
+			<proxy>full</proxy>
+			<schema_location>/var/www/html/tools/DataObjects</schema_location>
+			<class_location>/var/www/html/tools/DataObjects</class_location>
+			<require_prefix>DataObjects/</require_prefix>
+			<class_prefix>DataObjects_</class_prefix>
+		</DB_DataObject>
+
+		<!-- General DB INFO -->
+
+		<database>molclass</database>
+		<hostname>localhost</hostname>
+		<rw_user>molclass_user</rw_user>
+		<rw_password>YCuRzNoe</rw_password>
+		<ro_user>molclass_user</ro_user>
+		<ro_password>YCuRzNoe</ro_password>
+
+
+
+		<!-- PHP parameters -->
+
+                <www_server>http://localhost/</www_server>
+		<website>http://localhost/molclass</website>
+		<url>localhost/molclass</url>
+                <molclassemail>MolClassEmailReport@localhost</molclassemail>
+
+
+                <php_upload>./uploads/</php_upload>
+		<toolsdir>./tools/sdftools/</toolsdir>
+		<site_header_image>./images/header.png</site_header_image>
+
+                <!-- Tables on MolClass website - how many to list -->
+                <ViewModelNumberPerPage>25</ViewModelNumberPerPage>
+                <ViewHitMoleculesPerPage>20</ViewHitMoleculesPerPage>
+                <ViewPredictionResultsPerPage>25</ViewPredictionResultsPerPage>
+                <ViewModelsPerMolecule>25</ViewModelsPerMolecule>
+                <ViewBatchTable>25</ViewBatchTable>
+                <ViewBatchDetailTable>25</ViewBatchDetailTable>
+                <ViewSingleMoleculePredictionTable>25</ViewSingleMoleculePredictionTable>
+      
+		
+		<!-- TABLES -->
+		<molstructable>moldb_molstruc</molstructable>
+		<moldatatable>moldb_moldata</moldatatable>
+		<molstattable>moldb_molstat</molstattable>
+		<molfgtable>moldb_molfg</molfgtable>
+		<molfgbtable>moldb_molfgb</molfgbtable>
+		<molbfptable>moldb_molbfp</molbfptable>
+		<fpdeftable>moldb_fpdef</fpdeftable>
+		<molhfptable>moldb_molhfp</molhfptable>
+		<strucinfotable>sdftags</strucinfotable>
+		<plateinfotable>plate_info</plateinfotable>
+		<cdkdesctable>cdk_descriptors</cdkdesctable>
+		<batchlisttable>batchlist</batchlisttable>
+		<batchmoltable>batchmols</batchmoltable>
+		<fingerprinttable>fingerprints</fingerprinttable>
+		<modeltable>class_models</modeltable>
+		<predtable>prediction_list</predtable>
+		<predmoltable>prediction_mols</predmoltable>
+		<timeouttable>timeout_mols</timeouttable>
+		<datatypetable>data_types</datatypetable>
+		<classschemetable>class_schemes</classschemetable>
+		<inchikeytable>inchi_key</inchikeytable>
+		<smilestable>smiles</smilestable>
+		<moltypetable>mol_type</moltypetable>
+		<tempbatchmoltesttable>temp_batchmol_test</tempbatchmoltesttable>
+		<tempbatchmollearntable>temp_batchmol_learn</tempbatchmollearntable>
+
+		<!-- MolDB parameters -->
+		<bitmapURLdir>bitmaps</bitmapURLdir>
+		<digits>8</digits>
+		<subdirdigits>4</subdirdigits>
+		<sitename>MolClass</sitename>
+		<CHECKMOL>/usr/local/bin/checkmol</CHECKMOL>
+		<MATCHMOL>/usr/local/bin/matchmol</MATCHMOL>
+		<StructureSearchMaxHits>500</StructureSearchMaxHits>
+		<StructureSearchMaxCandidates>2000</StructureSearchMaxCandidates>
+
+		<!-- Java only parameters for CDK and Weka -->	
+                <setCDKdescriptortimeout>600000</setCDKdescriptortimeout>
+                <setThreadPoolTimeout>130000</setThreadPoolTimeout>
+                <crossValidateModel>10</crossValidateModel>
+                <setDistributionSpread>5.0</setDistributionSpread>
+                <setTanimotoCutoff>0.85</setTanimotoCutoff>
+
+                <!-- depricated -->
+		<model_pred_dir>./tools/model_pred/</model_pred_dir>
+
+<Navigation_Board_Open>
+	<Home>/index.php</Home>
+	<Structure_Search>/structure_search.php</Structure_Search>
+	<Prediction_List>/prediction_list.php</Prediction_List>
+	<Download>/contact.php</Download>
+	<Login>/user_login.php</Login>
+	<SDF_Upload>/sdf_upload.php</SDF_Upload>
+	<Model_Creation>/model_creation.php</Model_Creation>
+</Navigation_Board_Open>
+
+<Global_Design_Parameters>
+	<author>Nicholas Fitzgerald, Ryusuke Kimura and Jan Wildenhain</author>
+	<content_type>text/html; charset=iso-8859-1</content_type>
+	<description>MolClass predicts bioactivity of small molecule by means of Machine Learning method with high throughput screening data.</description>
+	<keywords>screening, virtual screening, machine learning, highthrouput screening</keywords>
+	<page_width>671</page_width>
+	<footer_table_note>Wellcome Trust Centre for Cell Biology, University of Edinburgh</footer_table_note>
+	<filecache>cache/</filecache>
+	<plate_image_folder>plateimg/</plate_image_folder>
+	<tool_mol2png_application>/home/jw/tools/ChemAxon/MarvinBeans/bin/molconvert</tool_mol2png_application>
+	<tool_mol2png_options>png:w160</tool_mol2png_options>
+	<tool_upload_folder>./uploads/</tool_upload_folder>
+</Global_Design_Parameters>
+
+
+</config>
