@@ -10,7 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.BitSet;
 
-public class FingerprintReader {
+public class TestFingerprintReader {
 
 	/**
 	 * @param args

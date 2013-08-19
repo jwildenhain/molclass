@@ -17,7 +17,7 @@ import org.openscience.cdk.Molecule;
 import org.openscience.cdk.fingerprint.ExtendedFingerprinter;
 import org.openscience.cdk.fingerprint.MACCSFingerprinter;
 
-public class textFingerprinter {
+public class TestFingerprinter {
 
 	/**
 	 * @param args
