@@ -70,6 +70,27 @@ public class Similarity {
 
 		Connection con = DriverManager.getConnection(hostname, user, password);
 
+                // get max molecule number
+             
+		String nstmtdb = "SELECT max(mol_id) mol_id FROM batchmols";
+		//System.out.println(nstmt);
+		PreparedStatement stmtdb = con.prepareStatement(nstmtdb,
+                ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+                ResultSet rsdb = stmtdb.executeQuery();
+                
+                int maxMolID = 1;
+                int taniBatchSize = 1000;            
+                
+                while (rsdb.next()) {   
+                
+                    maxMolID = rsdb.getInt("mol_id");
+                    
+                }
+                
+                if (maxMolID < taniBatchSize) { taniBatchSize = maxMolID; }
+                            
+                double taniBatchId = Math.ceil(maxMolID/taniBatchSize) +1;
+                
 		//get all molecules with new batch_id .
 		String nstmt = new String("SELECT " + fptablename + ".mol_id, " + fptablename + ".EXT, " + fptablename + ".KR FROM " + fptablename + ", " + batchmoltable + " WHERE " + batchmoltable + ".mol_id = " + fptablename + ".mol_id AND " + batchmoltable
 				+ ".batch_id = ?");
@@ -79,28 +100,26 @@ public class Similarity {
 		stmt.setInt(1, batch_id);
 		ResultSet rs = stmt.executeQuery();
 
-
 		int x = 0;
 
 		while (rs.next()) {
-                    
-                        System.out.println(rs.getInt("mol_id"));
- 
-                        //get all batch_ids in MolClass
-		        String nstmtdb = new String("SELECT batch_id FROM batchlist");
-		        //System.out.println(nstmt);
-		        PreparedStatement stmtdb = con.prepareStatement(nstmtdb,
-                        ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-                        ResultSet rsdb = stmtdb.executeQuery();
-                                      
-                        while (rsdb.next()) {
+                       
+                       int batchMinBound = 1;
+                       int taniBatchTemp = 1;
+                       int batchMaxBound = taniBatchTemp * taniBatchSize;
+                            
+         
+                        while (taniBatchId > taniBatchTemp) {
+                            
+                            //System.out.println("Current: " + rs.getInt("mol_id") + " Max:" + maxMolID + " compute:" + taniBatchId + " between " + batchMinBound + " and " +batchMaxBound);
+
                             // read all molecules from batch 
                             String nstmtint = new String("SELECT " + fptablename + ".mol_id, " + fptablename + ".EXT, " + fptablename + ".KR FROM " + fptablename + ", " + batchmoltable + " WHERE " + batchmoltable + ".mol_id = " + fptablename + ".mol_id AND " + batchmoltable
-				+ ".batch_id = ?");
-                            //System.out.println(nstmt);
+				+ ".mol_id between " + batchMinBound + " and " + batchMaxBound );
+                            //System.out.println(nstmtint);
                             PreparedStatement stmtint = con.prepareStatement(nstmtint,
                             ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-                            stmtint.setInt(1, rsdb.getInt("batch_id"));
+                            //stmtint.setInt(1, batchMinBound);
                             ResultSet rsint = stmtint.executeQuery();
                             while (rsint.next()) {
                                 try {
@@ -140,7 +159,11 @@ public class Similarity {
                                     e.printStackTrace();
                                     continue;
                                 }
+
                             }
+                            batchMinBound = ( taniBatchTemp * taniBatchSize ) +1;
+                            taniBatchTemp++;
+                            batchMaxBound = taniBatchTemp * taniBatchSize;
                         }
 		}
 
