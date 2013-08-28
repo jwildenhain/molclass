@@ -43,6 +43,7 @@ public class Main {
 		System.out.println("\tUsage: java -jar MolClass.jar AutomaticCalcDriver <batch_id>");
 		System.out.println("\tUsage: java -jar MolClass.jar Fingerprinter <batch_id>");
 		System.out.println("\tUsage: java -jar MolClass.jar Similarity <batch_id>");
+                System.out.println("\tUsage: java -jar MolClass.jar MurckoFragments <batch_id>");
 		System.out.println("\tUsage: java -jar MolClass.jar ModelBuilder <model_id>");
 		System.out.println("\tUsage: java -jar MolClass.jar Predictor <pred_id>");
                 System.out.println("\n");
@@ -167,6 +168,34 @@ public class Main {
                }
                
                if (args[0].equals("Similarity"))
+               {
+                        String base = "fingerprints.";
+                        Class target = null;
+
+                        try {
+
+                                target = Class.forName(base + args[0]);
+                                Method main = target.getMethod("main", args.getClass());
+                                String[] innerargs = new String[args.length -1];
+                                System.arraycopy(args, 1, innerargs, 0, innerargs.length);
+                                main.invoke(null, new Object[]{innerargs});
+
+                            } catch (IllegalArgumentException ex) {
+                                Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+                            } catch (InvocationTargetException ex) {
+                                Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+                            } catch (NoSuchMethodException ex) {
+                                Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+                            } catch (SecurityException ex) {
+                                Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+                            } catch (ClassNotFoundException ex) {
+                                Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+                            } catch (IllegalAccessException ex) {
+                                Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+                            }
+               }
+               
+               if (args[0].equals("MurckoFragments"))
                {
                         String base = "fingerprints.";
                         Class target = null;

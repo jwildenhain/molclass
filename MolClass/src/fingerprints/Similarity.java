@@ -81,11 +81,9 @@ public class Similarity {
                 int maxMolID = 1;
                 int taniBatchSize = 1000;            
                 
-                while (rsdb.next()) {   
-                
-                    maxMolID = rsdb.getInt("mol_id");
-                    
-                }
+                rsdb.next();   
+                maxMolID = rsdb.getInt("mol_id");
+                rsdb.close();
                 
                 if (maxMolID < taniBatchSize) { taniBatchSize = maxMolID; }
                             
@@ -114,7 +112,7 @@ public class Similarity {
                             //System.out.println("Current: " + rs.getInt("mol_id") + " Max:" + maxMolID + " compute:" + taniBatchId + " between " + batchMinBound + " and " +batchMaxBound);
 
                             // read all molecules from batch 
-                            String nstmtint = new String("SELECT " + fptablename + ".mol_id, " + fptablename + ".EXT, " + fptablename + ".KR FROM " + fptablename + ", " + batchmoltable + " WHERE " + batchmoltable + ".mol_id = " + fptablename + ".mol_id AND " + batchmoltable
+                            String nstmtint = new String("SELECT " + fptablename + ".mol_id, " + fptablename + ".EXT, " + fptablename + ".KR FROM " + fptablename + ", " + batchmoltable + " WHERE " + batchmoltable + ".mol_id = " + fptablename + ".mol_id AND " + batchmoltable + ".batch_id <= " + batch_id + " AND " + batchmoltable
 				+ ".mol_id between " + batchMinBound + " and " + batchMaxBound );
                             //System.out.println(nstmtint);
                             PreparedStatement stmtint = con.prepareStatement(nstmtint,
@@ -144,9 +142,14 @@ public class Similarity {
                                             System.out.println(rs.getInt("mol_id") + " " + rsint.getInt("mol_id") + "Scores:" + extscore + " " + krscore);
                                         
                                             Statement sqlstmt = con.createStatement();
-                                            String sqladdsmile = "insert into `tanimoto` (`mol_id1`,`mol_id2`,`ext`,`kr`) VALUES (" + rs.getString("mol_id") + ",'" + rsint.getString("mol_id") + "'," + extscore +", " + krscore +" ) ON DUPLICATE KEY UPDATE ext=" + extscore + ", kr =" + krscore; 
+                                            //String sqladdsmile = "insert into `tanimoto` (`mol_id1`,`mol_id2`,`ext`,`kr`) VALUES (" + rs.getString("mol_id") + ",'" + rsint.getString("mol_id") + "'," + extscore +", " + krscore +" ) ON DUPLICATE KEY UPDATE ext=" + extscore + ", kr =" + krscore; 
                                             //System.out.println(sqladdsmile);
+                                            String sqladdsmile = "insert ignore into `tanimoto` (`mol_id1`,`mol_id2`,`ext`,`kr`) VALUES (" + rs.getString("mol_id") + ",'" + rsint.getString("mol_id") + "'," + extscore +", " + krscore +" )"; 
                                             int updateCount = sqlstmt.executeUpdate(sqladdsmile);
+                                            // is symmetric... after A, B do B, A
+                                            sqlstmt = con.createStatement();
+                                            sqladdsmile = "insert ignore into `tanimoto` (`mol_id1`,`mol_id2`,`ext`,`kr`) VALUES (" + rsint.getString("mol_id") + ",'" + rs.getString("mol_id") + "'," + extscore +", " + krscore +" )"; 
+                                            updateCount = sqlstmt.executeUpdate(sqladdsmile);
                                         }
                                         
                                     }
@@ -161,11 +164,14 @@ public class Similarity {
                                 }
 
                             }
+                            rsint.close();
                             batchMinBound = ( taniBatchTemp * taniBatchSize ) +1;
                             taniBatchTemp++;
                             batchMaxBound = taniBatchTemp * taniBatchSize;
                         }
 		}
+                rs.close();
+                
 
 	}
         

@@ -203,6 +203,33 @@ public class Predictor {
       numericToNominal.setInputFormat(unlabeled);
       unlabeled = Filter.useFilter(unlabeled, numericToNominal);
 
+    } else if (data_type.equals("GO")) {
+
+      select_query = new String("SELECT " + fptable + ".mol_id, " + fptable
+	  + ".GOFP FROM " + fptable + ", " + batchmoltable + " WHERE "
+	  + fptable + ".EXT IS NOT NULL AND " + batchmoltable + ".mol_id = "
+	  + fptable + ".mol_id AND " + batchmoltable + ".batch_id =" + batch_id);
+
+      query.setQuery(select_query);
+      unlabeled = query.retrieveInstances();
+
+      // convert CDK Graph Only (GO) Fingerprints to seperate attributes
+      options = new String[2];
+      options[0] = "-R";
+      options[1] = "2";
+      blobToBits.setOptions(options);
+      blobToBits.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, blobToBits);
+
+      // convert CDK Extended attributes to nominal
+      options = new String[2];
+      int maccInd = unlabeled.attribute("GOFP_0").index();
+      options[0] = "-R";
+      options[1] = new String(maccInd + "-last");
+      numericToNominal.setOptions(options);
+      numericToNominal.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, numericToNominal);
+
     } else if (data_type.equals("EXT")) {
 
       select_query = new String("SELECT " + fptable + ".mol_id, " + fptable
@@ -230,6 +257,78 @@ public class Predictor {
       numericToNominal.setInputFormat(unlabeled);
       unlabeled = Filter.useFilter(unlabeled, numericToNominal);
 
+    } else if (data_type.equals("KR")) {
+
+      select_query = new String("SELECT " + fptable + ".mol_id, " + fptable
+	  + ".KR FROM " + fptable + ", " + batchmoltable + " WHERE "
+	  + fptable + ".EXT IS NOT NULL AND " + batchmoltable + ".mol_id = "
+	  + fptable + ".mol_id AND " + batchmoltable + ".batch_id =" + batch_id);
+
+      query.setQuery(select_query);
+      unlabeled = query.retrieveInstances();
+
+      // convert CDK Klekota Roth Fingerprints to seperate attributes
+      options = new String[2];
+      options[0] = "-R";
+      options[1] = "2";
+      blobToBits.setOptions(options);
+      blobToBits.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, blobToBits);
+
+      // convert CDK Extended attributes to nominal
+      options = new String[2];
+      int maccInd = unlabeled.attribute("KR_0").index();
+      options[0] = "-R";
+      options[1] = new String(maccInd + "-last");
+      numericToNominal.setOptions(options);
+      numericToNominal.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, numericToNominal);
+
+    } else if (data_type.equals("EXTGO")) {
+
+      select_query = new String("SELECT " + fptable + ".mol_id, " + fptable
+	  + ".EXT " + fptable
+	  + ".GOFP FROM " + fptable + ", " + batchmoltable + " WHERE "
+	  + fptable + ".EXT IS NOT NULL AND " + batchmoltable + ".mol_id = "
+	  + fptable + ".mol_id AND " + batchmoltable + ".batch_id =" + batch_id);
+
+      query.setQuery(select_query);
+      unlabeled = query.retrieveInstances();
+
+      // convert CDK Extended Fingerprints to seperate attributes
+      options = new String[2];
+      options[0] = "-R";
+      options[1] = "2";
+      blobToBits.setOptions(options);
+      blobToBits.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, blobToBits);
+
+      // convert CDK Extended attributes to nominal
+      options = new String[2];
+      int maccInd = unlabeled.attribute("EXT_0").index();
+      options[0] = "-R";
+      options[1] = new String(maccInd + "-last");
+      numericToNominal.setOptions(options);
+      numericToNominal.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, numericToNominal);
+
+      // convert CDK Graph Only Fingerprints to seperate attributes
+      options = new String[2];
+      options[0] = "-R";
+      options[1] = "3";
+      blobToBits.setOptions(options);
+      blobToBits.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, blobToBits);
+
+      // convert CDK Graph Only attributes to nominal
+      options = new String[2];
+      maccInd = unlabeled.attribute("GOFP_0").index();
+      options[0] = "-R";
+      options[1] = new String(maccInd + "-last");
+      numericToNominal.setOptions(options);
+      numericToNominal.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, numericToNominal);
+      
     } else if (data_type.equals("ALL")) {
 
 
@@ -326,6 +425,234 @@ public class Predictor {
       numericToNominal.setInputFormat(unlabeled);
       unlabeled = Filter.useFilter(unlabeled, numericToNominal);
 
+    } else if (data_type.equals("MCAT")) {
+
+
+          select_query = new String("select * from " +  cdktable + " limit 1");
+          // create a statement
+          pstmt = conn.prepareStatement(select_query, ResultSet.TYPE_FORWARD_ONLY,
+	          ResultSet.CONCUR_READ_ONLY);
+          // execute query and return result as a ResultSet
+          rs = pstmt.executeQuery();
+          // get the column names from the ResultSet
+          String cdk_table_header = getColumnNames(rs);
+          //System.out.println(cdk_table_header);
+
+
+      select_query = new String("SELECT " + fptable + ".mol_id, " + fptable
+	  + ".MACCS, " + fptable + ".PubChem, " + fptable + ".ESFP, " + fptable + ".SUB, "
+          + fptable + ".KR, " 
+          + cdk_table_header + " FROM " + fptable + ", " + cdktable
+	  + ", " + batchmoltable + " WHERE " + cdktable + ".mol_id = "
+	  + fptable + ".mol_id AND " + cdktable + ".MW IS NOT NULL AND "
+	  + fptable + ".MACCS IS NOT NULL AND " + cdktable + ".mol_id = "
+	  + batchmoltable + ".mol_id AND " + batchmoltable + ".batch_id ="
+	  + batch_id);
+      // !!! EXT SUB PubChem not null (Klotho)
+      
+      //System.out.println(select_query);
+      query.setQuery(select_query);
+      unlabeled = query.retrieveInstances();
+
+      // convert MACCS to seperate attributes
+      options = new String[2];
+      options[0] = "-R";
+      options[1] = "2";
+      blobToBits.setOptions(options);
+      blobToBits.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, blobToBits);
+
+      // convert MACCS attributes to nominal
+      options = new String[2];
+      int maccInd = unlabeled.attribute("MACCS_0").index();
+      options[0] = "-R";
+      options[1] = new String(maccInd + "-last");
+      numericToNominal.setOptions(options);
+      numericToNominal.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, numericToNominal);
+
+      // convert PubChem to seperate attributes
+      options = new String[2];
+      options[0] = "-R";
+      options[1] = "3";
+      blobToBits.setOptions(options);
+      blobToBits.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, blobToBits);
+
+      // convert PubChem attributes to nominal
+      options = new String[2];
+      maccInd = unlabeled.attribute("PubChem_0").index();
+      options[0] = "-R";
+      options[1] = new String(maccInd + "-last");
+      numericToNominal.setOptions(options);
+      numericToNominal.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, numericToNominal);
+
+      // convert EXT to seperate attributes
+      options = new String[2];
+      options[0] = "-R";
+      options[1] = "4";
+      blobToBits.setOptions(options);
+      blobToBits.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, blobToBits);
+
+      // convert ESFP attributes to nominal
+      options = new String[2];
+      maccInd = unlabeled.attribute("ESFP_0").index();
+      options[0] = "-R";
+      options[1] = new String(maccInd + "-last");
+      numericToNominal.setOptions(options);
+      numericToNominal.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, numericToNominal);
+
+      // convert SUB to seperate attributes
+      options = new String[2];
+      options[0] = "-R";
+      options[1] = "5";
+      blobToBits.setOptions(options);
+      blobToBits.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, blobToBits);
+
+      // convert SUB attributes to nominal
+      options = new String[2];
+      maccInd = unlabeled.attribute("SUB_0").index();
+      options[0] = "-R";
+      options[1] = new String(maccInd + "-last");
+      numericToNominal.setOptions(options);
+      numericToNominal.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, numericToNominal);
+      
+      // convert KR to seperate attributes
+      options = new String[2];
+      options[0] = "-R";
+      options[1] = "6";
+      blobToBits.setOptions(options);
+      blobToBits.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, blobToBits);
+
+      // convert KR attributes to nominal
+      options = new String[2];
+      maccInd = unlabeled.attribute("KR_0").index();
+      options[0] = "-R";
+      options[1] = new String(maccInd + "-last");
+      numericToNominal.setOptions(options);
+      numericToNominal.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, numericToNominal);
+      
+    } else if (data_type.equals("JUMBO")) {
+
+
+          select_query = new String("select * from " +  cdktable + " limit 1");
+          // create a statement
+          pstmt = conn.prepareStatement(select_query, ResultSet.TYPE_FORWARD_ONLY,
+	          ResultSet.CONCUR_READ_ONLY);
+          // execute query and return result as a ResultSet
+          rs = pstmt.executeQuery();
+          // get the column names from the ResultSet
+          String cdk_table_header = getColumnNames(rs);
+          //System.out.println(cdk_table_header);
+
+
+      select_query = new String("SELECT " + fptable + ".mol_id, " + fptable
+	  + ".MACCS, " + fptable + ".PubChem, " + fptable + ".EXT, " + fptable + ".SUB, "
+          + fptable + ".KR, " 
+          + cdk_table_header + " FROM " + fptable + ", " + cdktable
+	  + ", " + batchmoltable + " WHERE " + cdktable + ".mol_id = "
+	  + fptable + ".mol_id AND " + cdktable + ".MW IS NOT NULL AND "
+	  + fptable + ".MACCS IS NOT NULL AND " + cdktable + ".mol_id = "
+	  + batchmoltable + ".mol_id AND " + batchmoltable + ".batch_id ="
+	  + batch_id);
+      // !!! EXT SUB PubChem not null (Klotho)
+      
+      //System.out.println(select_query);
+      query.setQuery(select_query);
+      unlabeled = query.retrieveInstances();
+
+      // convert MACCS to seperate attributes
+      options = new String[2];
+      options[0] = "-R";
+      options[1] = "2";
+      blobToBits.setOptions(options);
+      blobToBits.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, blobToBits);
+
+      // convert MACCS attributes to nominal
+      options = new String[2];
+      int maccInd = unlabeled.attribute("MACCS_0").index();
+      options[0] = "-R";
+      options[1] = new String(maccInd + "-last");
+      numericToNominal.setOptions(options);
+      numericToNominal.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, numericToNominal);
+
+      // convert PubChem to seperate attributes
+      options = new String[2];
+      options[0] = "-R";
+      options[1] = "3";
+      blobToBits.setOptions(options);
+      blobToBits.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, blobToBits);
+
+      // convert PubChem attributes to nominal
+      options = new String[2];
+      maccInd = unlabeled.attribute("PubChem_0").index();
+      options[0] = "-R";
+      options[1] = new String(maccInd + "-last");
+      numericToNominal.setOptions(options);
+      numericToNominal.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, numericToNominal);
+
+      // convert EXT to seperate attributes
+      options = new String[2];
+      options[0] = "-R";
+      options[1] = "4";
+      blobToBits.setOptions(options);
+      blobToBits.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, blobToBits);
+
+      // convert EXT attributes to nominal
+      options = new String[2];
+      maccInd = unlabeled.attribute("EXT_0").index();
+      options[0] = "-R";
+      options[1] = new String(maccInd + "-last");
+      numericToNominal.setOptions(options);
+      numericToNominal.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, numericToNominal);
+
+      // convert SUB to seperate attributes
+      options = new String[2];
+      options[0] = "-R";
+      options[1] = "5";
+      blobToBits.setOptions(options);
+      blobToBits.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, blobToBits);
+
+      // convert SUB attributes to nominal
+      options = new String[2];
+      maccInd = unlabeled.attribute("SUB_0").index();
+      options[0] = "-R";
+      options[1] = new String(maccInd + "-last");
+      numericToNominal.setOptions(options);
+      numericToNominal.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, numericToNominal);
+      
+      // convert KR to seperate attributes
+      options = new String[2];
+      options[0] = "-R";
+      options[1] = "6";
+      blobToBits.setOptions(options);
+      blobToBits.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, blobToBits);
+
+      // convert KR attributes to nominal
+      options = new String[2];
+      maccInd = unlabeled.attribute("KR_0").index();
+      options[0] = "-R";
+      options[1] = new String(maccInd + "-last");
+      numericToNominal.setOptions(options);
+      numericToNominal.setInputFormat(unlabeled);
+      unlabeled = Filter.useFilter(unlabeled, numericToNominal);
+      
     } else {
       throw new Exception("Unsupported data_type: " + data_type);
     }

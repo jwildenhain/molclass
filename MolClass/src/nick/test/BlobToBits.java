@@ -14,7 +14,7 @@ import weka.filters.*;
 public class BlobToBits extends SimpleBatchFilter {
 
 	protected int colToChange = 1;
-	protected int numNewCols = 2400;
+	protected int numNewCols = 7500; // with max. ALL 2400 was sufficient
 
 	public String globalInfo() {
 		return "A batch filter which converts MySQL Blobs which contain molecular fingerprints into a set of attributes, each a binary bit corresponding to a bit in the fingerprint.";
