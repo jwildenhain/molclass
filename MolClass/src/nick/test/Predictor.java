@@ -207,7 +207,7 @@ public class Predictor {
 
       select_query = new String("SELECT " + fptable + ".mol_id, " + fptable
 	  + ".GOFP FROM " + fptable + ", " + batchmoltable + " WHERE "
-	  + fptable + ".EXT IS NOT NULL AND " + batchmoltable + ".mol_id = "
+	  + fptable + ".GOFP IS NOT NULL AND " + batchmoltable + ".mol_id = "
 	  + fptable + ".mol_id AND " + batchmoltable + ".batch_id =" + batch_id);
 
       query.setQuery(select_query);
@@ -221,7 +221,7 @@ public class Predictor {
       blobToBits.setInputFormat(unlabeled);
       unlabeled = Filter.useFilter(unlabeled, blobToBits);
 
-      // convert CDK Extended attributes to nominal
+      // convert CDK Graph Only (GO) attributes to nominal
       options = new String[2];
       int maccInd = unlabeled.attribute("GOFP_0").index();
       options[0] = "-R";
@@ -261,7 +261,7 @@ public class Predictor {
 
       select_query = new String("SELECT " + fptable + ".mol_id, " + fptable
 	  + ".KR FROM " + fptable + ", " + batchmoltable + " WHERE "
-	  + fptable + ".EXT IS NOT NULL AND " + batchmoltable + ".mol_id = "
+	  + fptable + ".KR IS NOT NULL AND " + batchmoltable + ".mol_id = "
 	  + fptable + ".mol_id AND " + batchmoltable + ".batch_id =" + batch_id);
 
       query.setQuery(select_query);
@@ -287,9 +287,10 @@ public class Predictor {
     } else if (data_type.equals("EXTGO")) {
 
       select_query = new String("SELECT " + fptable + ".mol_id, " + fptable
-	  + ".EXT " + fptable
-	  + ".GOFP FROM " + fptable + ", " + batchmoltable + " WHERE "
-	  + fptable + ".EXT IS NOT NULL AND " + batchmoltable + ".mol_id = "
+	  + ".EXT, " + fptable + ".GOFP FROM " + fptable + ", " + batchmoltable 
+          + " WHERE "
+	  + fptable + ".EXT IS NOT NULL AND " + fptable + ".GOFP IS NOT NULL AND "
+          + batchmoltable + ".mol_id = "
 	  + fptable + ".mol_id AND " + batchmoltable + ".batch_id =" + batch_id);
 
       query.setQuery(select_query);

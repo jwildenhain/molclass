@@ -1060,7 +1060,7 @@ public class ModelBuilder {
       //((CVParameterSelection)classifier).setOptions(class_options);
       //((CVParameterSelection)classifier).setOptions(weka.core.Utils.splitOptions("-C 1.0 -L 0.0010 -P 1.0E-12 -N 0 -V -1 -W 1 -K \"weka.classifiers.functions.supportVector.PolyKernel -C 250007 -E 1.0\""));
       //((CVParameterSelection)classifier).setOptions(weka.core.Utils.splitOptions("-W weka.classifiers.functions.LibSVM -P \"G 1.0 10.0 11.0\" -- -Z -S 0 -C 2"));
-
+//      http://www.cs.iastate.edu/~yasser/wlsvm/
 //      http://weka.sourceforge.net/doc.stable/weka/classifiers/functions/LibSVM.html
 //      -S 2 -K 2 -D 3 -G 0.2 -R 0.0 -N 0.5 -M 40.0 -C 1.0 -E 0.0010 -P 0.1
 //      http://www.cs.iastate.edu/~yasser/wlsvm/
