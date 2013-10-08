@@ -17,10 +17,11 @@
     <br>
     <b><a href="http://www.ncbi.nlm.nih.gov/sites/entrez?db=pccompound&term={$inchi_key[0]}">In PubChem</a></b> |
     <b><a href=excelexport.php?mol_id={$mol_id[0]}>Data as xls</a></b> |
-    <b><a href=molecule_detail.php?mol_id={$mol_id[0]}&models=2,4>Pharmacology</a></b> |
-    <b><a href=molecule_detail.php?mol_id={$mol_id[0]}&models=1,2>Microbial</a></b> |
+    <b><a href=molecule_detail.php?mol_id={$mol_id[0]}&models=2,5,6,7,15>Pharmacology</a></b> |
+    <b><a href=molecule_detail.php?mol_id={$mol_id[0]}&models=1,3,4,8,10,11,12>Screens</a></b> |
     <b><a href=molecule_detail.php?mol_id={$mol_id[0]}>All</a></b> |
-    <b><a href=hit_molecules.php?tanimoto={$mol_id[0]}>Similars</a></b>
+    <b><a href=hit_molecules.php?tanimoto={$mol_id[0]}>Similars</a></b> |
+    <b><a href=hit_molecules.php?murcko={$mol_id[0]}>Murcko</a></b>
   </div>
 
   <div style="left: 50px; top:13px; position: relative; ">

@@ -1,6 +1,6 @@
 
   <h2>
-      {$title} More details: <a href={$wikilink}{$batchwikilink} >{$batchinfo}</a> 
+      {$title} More details: <a href={$wikilink}{$batchwikilink} >{$batchinfo}</a> Download: <a href=excelexport.php?batch_id={$batch_id} >xls</a>
   </h2>
   <table class="geneform">
     <th>
