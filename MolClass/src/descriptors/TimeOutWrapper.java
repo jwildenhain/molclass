@@ -55,6 +55,8 @@ public class TimeOutWrapper implements Runnable {
 				PreparedStatement pstmt = con.prepareStatement(stmt);
 				pstmt.setInt(1, new Integer(mol_id));
 				pstmt.executeUpdate();
+                                pstmt.close();
+                                con.close();
 
 			} catch (SQLException e) {
 				System.out.println("SQL Error");

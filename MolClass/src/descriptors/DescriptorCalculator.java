@@ -65,12 +65,13 @@ public class DescriptorCalculator {
 
 			pool.submit(to);
 		}
+  
 		System.out.println("All Submitted.");
 		pool.shutdown();
 		pool.awaitTermination(setThreadPoolTimeout, TimeUnit.SECONDS);
 		pool.shutdownNow();
 		return;
-
+                
 	}
 
 }
