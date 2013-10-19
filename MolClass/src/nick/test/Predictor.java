@@ -774,7 +774,7 @@ public class Predictor {
     pstmt.setString(1, text.toString());
     pstmt.setInt(2, pred_id);
     pstmt.executeUpdate();
-
+    pstmt.close();
     conn.close();
 
     // System.out.println(text.toString());

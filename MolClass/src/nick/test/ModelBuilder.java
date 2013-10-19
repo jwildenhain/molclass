@@ -1225,6 +1225,7 @@ public class ModelBuilder {
     pstmt.setString(4, classes.toString());
     pstmt.setInt(5, model_id);
     pstmt.executeUpdate();
+    pstmt.close();
 
     // ////////////
     // Send Email
