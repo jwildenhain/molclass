@@ -178,9 +178,9 @@ if (param$R_P_TYPE == "Model") {
   PRED_ID <- toString(getAllPredictions)
   PRED_ID
   #PRED_ID <- as.character(paste(getAllPredictions, collapse=","))
-  #PRED_ID <- gsub("c", "",PRED_ID)
-  #PRED_ID <- gsub(")", "",PRED_ID)
-  #PRED_ID <- substring(PRED_ID,2)
+  PRED_ID <- gsub("c", "",PRED_ID)
+  PRED_ID <- gsub(")", "",PRED_ID)
+  PRED_ID <- substring(PRED_ID,2)
   PRED_ID <- gsub(":",",",PRED_ID)
   head(PRED_ID)
 }
