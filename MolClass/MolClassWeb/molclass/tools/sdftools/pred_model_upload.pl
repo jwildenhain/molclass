@@ -26,7 +26,7 @@ $pred_name = $ARGV[2];
 $email = $ARGV[3];
 
 ### Create Model ###
-$cmd = "java -cp lib/cdk-1.4.18.jar:lib/weka2.jar:lib/libsvm.jar:lib/hiddenNaiveBayes.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar  nick.test.ModelBuilder ".$model_id." 1>> ./log/output_modelbuilder.log"." 2>> ./log/error_modelbuilder.log";
+$cmd = "java $setHeapSize -cp lib/cdk-1.4.18.jar:lib/weka2.jar:lib/libsvm.jar:lib/hiddenNaiveBayes.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar  nick.test.ModelBuilder ".$model_id." 1>> ./log/output_modelbuilder.log"." 2>> ./log/error_modelbuilder.log";
 
 system $cmd;
 #system $cmd;
@@ -59,7 +59,7 @@ while(@row = $sth2->fetchrow_array())
   $sth = $dbh->prepare($query);
   $sth->execute;
   $pred_id = $dbh->last_insert_id(undef, undef, qw(a_table a_table_id));
-  $cmd = "java -cp lib/cdk-1.4.18.jar:lib/weka2.jar:lib/libsvm.jar:lib/hiddenNaiveBayes.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar  nick.test.Predictor $pred_id 1>> ./log/output_predictor.log"." 2>> ./log/error_predictor.log";
+  $cmd = "java $setHeapSize -cp lib/cdk-1.4.18.jar:lib/weka2.jar:lib/libsvm.jar:lib/hiddenNaiveBayes.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar  nick.test.Predictor $pred_id 1>> ./log/output_predictor.log"." 2>> ./log/error_predictor.log";
 
 
 

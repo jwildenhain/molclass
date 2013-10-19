@@ -63,6 +63,8 @@ $toolsdir 		= $data->{toolsdir};
 $model_pred_dir		= $data->{model_pred_dir};
 $web_server_location	= $data->{website};
 
+$setHeapSize = $data->{setHeapCacheSize};
+
 
 
 
