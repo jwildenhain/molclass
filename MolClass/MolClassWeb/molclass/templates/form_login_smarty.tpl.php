@@ -6,7 +6,7 @@
       <tr>
         <th class="form_login_label">{$loginForm_data.username.label}</th>
         <th class="form_login_label">{$loginForm_data.password.label}</th>
-        <th>&nbsp;</th>
+        <th>&nbsp;</th> 
       </tr>
       <tr>
         <td>{$loginForm_data.username.html}</td>
