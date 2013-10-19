@@ -90,8 +90,8 @@ public class Similarity {
                 double taniBatchId = Math.ceil(maxMolID/taniBatchSize) +1;
                 
 		//get all molecules with new batch_id .
-		String nstmt = new String("SELECT " + fptablename + ".mol_id, " + fptablename + ".EXT, " + fptablename + ".KR FROM " + fptablename + ", " + batchmoltable + " WHERE " + batchmoltable + ".mol_id = " + fptablename + ".mol_id AND " + batchmoltable
-				+ ".batch_id = ?");
+		String nstmt = "SELECT " + fptablename + ".mol_id, " + fptablename + ".EXT, " + fptablename + ".KR FROM " + fptablename + ", " + batchmoltable + " WHERE " + batchmoltable + ".mol_id = " + fptablename + ".mol_id AND " + batchmoltable
+                     + ".batch_id = ?";
 		//System.out.println(nstmt);
 		PreparedStatement stmt = con.prepareStatement(nstmt,
 				ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
@@ -164,13 +164,16 @@ public class Similarity {
                                 }
 
                             }
+                            stmtint.close();
                             rsint.close();
                             batchMinBound = ( taniBatchTemp * taniBatchSize ) +1;
                             taniBatchTemp++;
                             batchMaxBound = taniBatchTemp * taniBatchSize;
                         }
 		}
+                stmt.close();
                 rs.close();
+                con.close();
                 
 
 	}

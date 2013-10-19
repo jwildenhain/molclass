@@ -105,6 +105,8 @@ public class Fingerprinter {
                             rs2.next();
 
                             Blob struc = rs.getBlob("struc");
+                            pstmt.close();
+                            rs2.close();
                             byte[] bdata = struc.getBytes(1, (int) struc.length());
                             String sdf_structure = new String(bdata);
 
@@ -227,6 +229,9 @@ public class Fingerprinter {
 				continue;
 			}
 		}
-
+                // close database connection
+                rs.close();
+                stmt.close();
+                con.close();
 	}
 }

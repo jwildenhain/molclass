@@ -164,6 +164,9 @@ public class InChiGenerator {
 				continue;
 			}
 		}
+                rs.close();
+                stmt.close();
+                con.close();
 
 	}
 }

@@ -1,16 +1,14 @@
 /*
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
- * 
  */
 package fingerprints;
-
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.Iterator;
+import java.util.concurrent.Callable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.openscience.cdk.DefaultChemObjectBuilder;
@@ -20,77 +18,52 @@ import org.openscience.cdk.fragment.MurckoFragmenter;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.smiles.SmilesParser;
 
+
 /**
  *
- * @author jan wildenhain
+ * @author zahir
  */
-public class MurckoFragments {
+
+class SingleMurckoCalcTask implements Callable<String> {
     
-    /**
-	 * @param args
-	 * @throws Exception
-	 */
-    public static void main(String[] args) throws Exception {
-         int batch_id = new Integer(1);
-         if (args.length != 1)
-         {
-		System.out.println("Usage: java -jar MolClass.jar Similarity <batch_id>");
-                System.out.println("...... Running test with batch_id = " + batch_id);
-	 } else {
-                batch_id = new Integer(args[0]);
-                System.out.println("...... Running test with batch_id = " + batch_id);
-         }
-
-	 String host = XMLReader.getTag("hostname");
-	 String database = XMLReader.getTag("database");
-	 String user = XMLReader.getTag("rw_user");
-	 String password = XMLReader.getTag("rw_password");
-	 String inchikeytable = XMLReader.getTag("inchikeytable");
-	 String structablename = XMLReader.getTag("molstructable");
-	 String batchmoltable = XMLReader.getTag("batchmoltable");
-
-	 String hostname = new String("jdbc:mysql://" + host + "/" + database);
-
+    private String mol_id = null;
+    private String inchikeytable = null;
+    private String structablename = null;
+    private String batchmoltable = null;
+    private String hostname = null;
+    private String user = null;
+    private String password = null;   
+    
+    SingleMurckoCalcTask(String hostname, String user, String password,
+            String inchikeytable, String structablename, String batchmoltable, String mol_id) {
+        this.mol_id = mol_id;
+        this.inchikeytable = inchikeytable;
+        this.structablename = structablename;
+        this.batchmoltable = batchmoltable;
+        this.hostname = hostname;
+        this.user = user;
+        this.password = password;
+    }
+    
+    @Override
+    public String call() throws Exception {
+        //Thread.sleep(4000); // Just to demo a long running task of 4 seconds.
+         String returnCallable = "";
+                
 	 Connection con = DriverManager.getConnection(hostname, user, password);
 
-         // get batch molecules with smiles
-         
-         /*
-          * 
-         CREATE TABLE IF NOT EXISTS `murcko` (
-            `murcko_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-            `smiles` text NOT NULL,
-            `count` int(10) unsigned NOT NULL,
-            PRIMARY KEY (`murcko_id`),
-            UNIQUE KEY `umurcko` (`smiles`(500))
-         ) ENGINE=MyISAM  DEFAULT CHARSET=latin1;
-         
-         CREATE TABLE IF NOT EXISTS `murcko_mol` (
-            `mol_id` int(10) unsigned NOT NULL,
-            `murcko_id` int(10) unsigned NOT NULL,
-            PRIMARY KEY (`murcko_id`,`mol_id`)
-         ) ENGINE=MyISAM DEFAULT CHARSET=latin1;              
-         *
-         */
-        
-         //int current_molid = 1; 
-         //String smiles = "COc1ccc2cc(ccc2(c1))C(C)C(O)=O";
-         //String smiles = "COc2cc1ccccc1cc2CCC3CCNC3";
-         
          String stmt1 = new String("SELECT " + inchikeytable + ".mol_id, " + inchikeytable + ".smiles FROM " + inchikeytable + ", " + batchmoltable + " WHERE " + batchmoltable + ".mol_id = " + inchikeytable + ".mol_id AND " + batchmoltable
-				+ ".batch_id = ?");
+				+ ".mol_id = ?");
          
          PreparedStatement stmt = con.prepareStatement(stmt1, ResultSet.TYPE_FORWARD_ONLY,
 								ResultSet.CONCUR_UPDATABLE);
-         stmt.setInt(1, batch_id);           
+      
+         stmt.setInt(1, Integer.parseInt(mol_id));           
          ResultSet rs1 = stmt.executeQuery();
         
          SmilesParser smilesParser = new SmilesParser(DefaultChemObjectBuilder.getInstance());
       
-         int it = 1;
          while (rs1.next()) {
-             
-        
 
          String smiles = rs1.getString("smiles");
          
@@ -103,7 +76,7 @@ public class MurckoFragments {
              try {      
                  mf.generateFragments(molecule);
              } catch (CDKException ex) {
-                Logger.getLogger(MurckoFragments.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(TestMurckoFragments.class.getName()).log(Level.SEVERE, null, ex);
              }
       
              String[] murckoFrame = mf.getFrameworks();
@@ -113,7 +86,7 @@ public class MurckoFragments {
              // if new murcko store it in murcko table
              //System.out.println("Fragments:");
              for (int i = 0; i <= murckoFrame.length - 1; i++) {
-                    System.out.println(it + " ID:" + current_molid + " Murcko:" + murckoFrame[i]);
+                    //System.out.println(murckoFrame[i]);
                     
                     // if murcko already exists count ++ and update
                     String stmt2 = "SELECT * FROM murcko WHERE smiles like '"
@@ -132,7 +105,7 @@ public class MurckoFragments {
                                 
                     } else {
                         Statement sqlstmt = con.createStatement();
-                        String sqladdsmile = "insert ignore into `murcko` (`smiles`,`count`) VALUES ('" + murckoFrame[i] + "', 1)";  
+                        String sqladdsmile = "insert into `murcko` (`smiles`,`count`) VALUES ('" + murckoFrame[i] + "', 1)";  
                         //System.out.println(sqladdsmile);
                         int updateCount = sqlstmt.executeUpdate(sqladdsmile);
                         
@@ -157,7 +130,7 @@ public class MurckoFragments {
                     }
    
              
-                    
+                  returnCallable = mol_id + ":" +murckoFrame[i];  
              }
              
 
@@ -171,11 +144,13 @@ public class MurckoFragments {
              */
         
          } catch (InvalidSmilesException ex) {
-             Logger.getLogger(MurckoFragments.class.getName()).log(Level.SEVERE, null, ex);
+             Logger.getLogger(TestMurckoFragments.class.getName()).log(Level.SEVERE, null, ex);
          }
         
-         it++;
+        
          }
+         
+        con.close();
+        return (returnCallable);
     }
-            
 }
