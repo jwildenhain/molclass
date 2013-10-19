@@ -131,7 +131,7 @@ while ($row =& $res->fetchRow())
   $smarty->append( 'LipinskiFailures', $row[7] );
   $smarty->append( 'apol', $row[8] );
   $smarty->append( 'bpol', $row[9] );
-  $smarty->append( 'smiles', $row[10] );
+  $smarty->append( 'smiles', wordwrap( $row[10],60,"<br>",true) );
 }
 
 $db->disconnect();

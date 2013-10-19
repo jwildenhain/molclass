@@ -73,7 +73,12 @@ if (isset($_GET['SVG'])) {
 }
 $p->addBodyContent($tpl->fetch('templates/savant_display_top.tpl.php'));
 
-
+if (!isset($_GET['type'])) {
+      $_GET['type'] = "Model";
+}
+        
+$FilenameA = "./cache/hist_".$_GET['type']."_density_".$_GET['id'].".pdf";
+$FilenameB = "./cache/hist_".$_GET['type']."_count_".$_GET['id'].".pdf";
 
 // <A HREF="javascript:history.go(-1)">
 //print_r($_GET);
@@ -86,9 +91,9 @@ if (isset($_GET['large_img'])) {
         
 } else {
 $p->addBodyContent("<table><tr><td>");
-        $p->addBodyContent("<img class=\"imagecenter\" align=\"middle\" width = \"330\" src=\""."plot.php"."?view=density&".http_build_query($_GET)."\" >");
+        $p->addBodyContent("<a href=\"".$FilenameA."\"><img class=\"imagecenter\" align=\"middle\" width = \"330\" src=\""."plot.php"."?view=density&".http_build_query($_GET)."\" alt=\"download pdf\"></a>");
 $p->addBodyContent("</td><td>");
-$p->addBodyContent("<img class=\"imagecenter\" align=\"middle\" width = \"330\" src=\""."plot.php"."?view=count&".http_build_query($_GET)."\" >");
+$p->addBodyContent("<a href=\"".$FilenameB."\"><img class=\"imagecenter\" align=\"middle\" width = \"330\" src=\""."plot.php"."?view=count&".http_build_query($_GET)."\"  alt=\"download pdf\"></a>");
 $p->addBodyContent("</td></tr></table>");
 }
 

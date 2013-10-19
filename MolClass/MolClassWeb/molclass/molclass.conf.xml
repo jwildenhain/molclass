@@ -122,6 +122,7 @@
                 <crossValidateModel>10</crossValidateModel>
                 <setDistributionSpread>5.0</setDistributionSpread>
                 <setTanimotoCutoff>0.85</setTanimotoCutoff>
+                <setHeapCacheSize>-Xmx2G</setHeapCacheSize>
 
                 <!-- depricated -->
 		<model_pred_dir>./tools/model_pred/</model_pred_dir>
@@ -130,7 +131,7 @@
 	<Home>/index.php</Home>
 	<Structure_Search>/structure_search.php</Structure_Search>
 	<Prediction_List>/prediction_list.php</Prediction_List>
-	<Download>/contact.php</Download>
+	<Details>/contact.php</Details>
 	<Login>/user_login.php</Login>
 	<SDF_Upload>/sdf_upload.php</SDF_Upload>
 	<Model_Creation>/model_creation.php</Model_Creation>

@@ -35,8 +35,17 @@ $XLSfilename = 'MolClassMoleculeExportMolID_'.$mol_id.'.xls';
 if (isset($_GET['pred_id'])) 
 {
 	$pred_id = $_GET['pred_id'];
-	$sql ="SELECT mol_id, mol_name, main_class, distribution, lhood, apol, TopoPSA, LipinskiFailures, XLogP, ALogP, `inchi_key`, `smiles`, `inchi`, sdftags.* FROM ".$settings['root']['config']['database'].".sdftags JOIN ".$settings['root']['config']['database'].".inchi_key USING ( mol_id ) JOIN ".$settings['root']['config']['database'].".prediction_mols USING ( mol_id ) JOIN ".$settings['root']['config']['database'].".moldb_moldata USING ( mol_id ) join ".$settings['root']['config']['database'].".cdk_descriptors using (mol_id) where pred_id = ".$pred_id;
+	$sql ="SELECT mol_id, mol_name, main_class, distribution, lhood, apol, TopoPSA, LipinskiFailures, XLogP, ALogP, inchi_key.inchi_key, inchi_key.smiles, inchi_key.inchi, sdftags.* FROM ".$settings['root']['config']['database'].".sdftags JOIN ".$settings['root']['config']['database'].".inchi_key USING ( mol_id ) JOIN ".$settings['root']['config']['database'].".prediction_mols USING ( mol_id ) JOIN ".$settings['root']['config']['database'].".moldb_moldata USING ( mol_id ) join ".$settings['root']['config']['database'].".cdk_descriptors using (mol_id) where pred_id = ".$pred_id;
+//print_r($sql);
+$XLSfilename = 'MolClassPredictionExportPredID_'.$pred_id.'.xls';
 
+}
+
+if (isset($_GET['batch_id'])) 
+{
+	$pred_id = $_GET['batch_id'];
+	$sql ="SELECT mol_id, mol_name, main_class, apol, TopoPSA, LipinskiFailures, XLogP, ALogP, inchi_key.inchi_key, inchi_key.smiles, inchi_key.inchi, sdftags.* FROM ".$settings['root']['config']['database'].".sdftags JOIN ".$settings['root']['config']['database'].".inchi_key USING ( mol_id ) JOIN ".$settings['root']['config']['database'].".prediction_mols USING ( mol_id ) JOIN ".$settings['root']['config']['database'].".moldb_moldata USING ( mol_id ) join ".$settings['root']['config']['database'].".cdk_descriptors using (mol_id) where pred_id = ".$pred_id;
+//print_r($sql);
 $XLSfilename = 'MolClassPredictionExportPredID_'.$pred_id.'.xls';
 
 }

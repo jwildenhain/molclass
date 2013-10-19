@@ -37,10 +37,10 @@ $p = new HTML_Page2();
 $p->setTitle("MolClass");
 // it can be added as an object
 $p->addStyleDeclaration($css, 'text/css');
-$p->setMetaData("Author", "Jan Wildenhain & Ryusuke Kimura");
+$p->setMetaData("Author", "Jan Wildenhain");
 $p->setMetaData("Content-Type", "text/html; charset=iso-8859-1");
 $p->setMetaData("Description", "MolClass predicts bioactivity using Machine Learning methods from high throughput screening data.");
-$p->setMetaData("Keywords", "highthroughput screening, protein, machine learning");
+$p->setMetaData("Keywords", "cheminformatics, highthroughput screening, protein, machine learning");
 
 // Add template for Website Header - later on also for the Footer
 // include class

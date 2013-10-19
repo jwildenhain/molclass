@@ -112,10 +112,12 @@ if ($form->validate())
     // retrieve submitted data as array
     $data = $form->exportValues();
     $data['r_uid'] = md5(uniqid(session_id().time().$data['r_fn'].$data['r_ln'].$data['r_as'].$data['r_loc']));
+    // get user IP
+    $data['r_ip'] = VisitorIP();
 
     // if Password empty or different create new passwd.
     $pw_email = '';
-
+        
     if ((strcmp($data['r_pw'],$data['r_pw_conf']) == 0) && strlen($data['r_pw']) > 0) 
     {
         $pw_email = $data['r_pw'];
@@ -138,10 +140,13 @@ if ($form->validate())
 
     $db->setFetchMode(DB_FETCHMODE_ASSOC);
     $table_name = 'auth';
+    print_r($data);
     $res = $db->autoExecute($table_name, $data, DB_AUTOQUERY_INSERT);
+    print_r($res);
     if (PEAR::isError($res)) 
     {
-          die($res->getMessage());
+        print_r($res);  
+	die($res->getMessage());
     }
 
 
@@ -152,7 +157,7 @@ if ($form->validate())
                       "Subject" =>"Registration MolClass"
                     );
     $text = "Thank you for using MolClass. Please click the following link to activate your account.";
-    $html = '<html><body>Hello '.$data['r_fn'].',<br>thank you for using MolClass. Please click the following link to activate your account: <a href="http://'.$settings['root']['config']['url']."/".$_POST_PHP_SCRIPT."?key=".$data['r_uid']."&status=active".'"> Activate User</a>.<br><br>Your Login: '.$data['r_email'].'<br>Your Password: '.        $pw_email .' <br><br> Sincerely, <br><br> Your MolClass team</body></html>';
+    $html = '<html><body>Hello '.$data['r_fn'].',<br>thank you for using MolClass. Please click the following link to activate your account: <a href="http://'.$settings['root']['config']['url']."/".$_POST_PHP_SCRIPT."?key=".$data['r_uid']."&status=active".'"> Activate User</a>.<br><br>Your Login:'.$data['r_email'].'<br>Your Password:'.$pw_email .'<br><br> Sincerely, <br><br> Your MolClass team</body></html>';
     $crlf = "\n";
 
     $mime = new Mail_mime($crlf);

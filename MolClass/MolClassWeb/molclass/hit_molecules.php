@@ -70,9 +70,11 @@ $smarty = new Smarty;
 
 ////////////////////////////////////////////////////////////////////////////////////
 
-if (!isset($_GET['tanimoto'])) {
+if (!isset($_GET['tanimoto'])  && !isset($_GET['murcko'])) {
     $smarty->assign( 'title', 'Molecular Search Results' );
 } else {
+    if (!isset($_GET['murcko'])) {
+    
     $smarty->assign( 'title', 'Similar molecules in MolClass' );
     // sql query to get similar molecules to
     $getmID = $_GET['tanimoto'];
@@ -104,8 +106,17 @@ if (!isset($_GET['tanimoto'])) {
 	// pass on to hit_molecules
         //print_r($mol_id_set);
         $_SESSION['arraytable'] = $mol_id_set;
+    } else {
+        $smarty->assign( 'title', 'Molecules with common Murcko fragment in MolClass' );
+        // sql query to get similar molecules to
+        $getmID = $_GET['murcko'];
+ 
+        $mol_id_set = array();
+        array_push($mol_id_set, $getmID);
+   
+        $_SESSION['arraytable'] = $mol_id_set;
     
-       
+    }
 }
 $array = $_SESSION['arraytable']; 
 $p->addBodyContent($smarty->fetch('templates/hit_molecules.tpl.php'));
@@ -122,10 +133,41 @@ $dboptions = array('dsn' => $settings['root']['config']['DB_DataObject']['dsn'])
 
 $hit_molecule_set = implode(',',array_values($array));
 
-if (!isset($_GET['tanimoto'])) {
+if (!isset($_GET['tanimoto']) && !isset($_GET['murcko'])) {
      $sql = "SELECT mol_name, concat('http://www.ncbi.nlm.nih.gov/sites/entrez?db=pccompound&term=',`inchi_key`) as linkpubchem, mol_id id, mol_id, MW, nRotB, nHBAcc, nHBDon,  ROUND(XLogP,6) XLogP, LipinskiFailures, concat('molecule_detail.php?mol_id=',`mol_id`) as link FROM cdk_descriptors JOIN inchi_key USING (mol_id) JOIN moldb_moldata USING ( mol_id ) WHERE mol_id IN (".$hit_molecule_set.")";
 } else {
-     $sql = "SELECT mol_name, concat('http://www.ncbi.nlm.nih.gov/sites/entrez?db=pccompound&term=',`inchi_key`) as linkpubchem, mol_id id, mol_id, MW, nRotB, nHBAcc, nHBDon,  ROUND(XLogP,6) XLogP, LipinskiFailures, ext, kr, concat('molecule_detail.php?mol_id=',`mol_id`) as link FROM cdk_descriptors JOIN inchi_key USING (mol_id) JOIN moldb_moldata USING ( mol_id ) JOIN tanimoto on mol_id = mol_id2 WHERE  mol_id1 = ".$getmID." group by inchi_key order by ext desc";   
+     if (!isset($_GET['murcko'])) {
+          $sql = "SELECT mol_name, concat('http://www.ncbi.nlm.nih.gov/sites/entrez?db=pccompound&term=',`inchi_key`) as linkpubchem, mol_id id, mol_id, MW, nRotB, nHBAcc, nHBDon,  ROUND(XLogP,6) XLogP, LipinskiFailures, ext, kr, concat('molecule_detail.php?mol_id=',`mol_id`) as link FROM cdk_descriptors JOIN inchi_key USING (mol_id) JOIN moldb_moldata USING ( mol_id ) JOIN tanimoto on mol_id = mol_id2 WHERE  mol_id1 = ".$getmID." group by inchi_key";   
+         
+     } else {
+           require_once 'DB.php';
+	$db = DB::connect($settings['root']['config']['DB_DataObject']['dsn']);
+	if (PEAR::isError($db))
+	{
+		  die($db->getMessage());
+	}
+         $getmurkoID = 0;         
+         $sql = "select murcko_id from murcko_mol where mol_id =".$getmID; 
+         //print_r($sql);
+   	 $res =& $db->query($sql);
+	 if (PEAR::isError($res))
+	 {
+		  die($res->getMessage());
+	 }      
+	 while ($row =& $res->fetchRow()) 
+	 {
+                  $getmurkoID = $row[0];
+	 }
+         
+         // display Murcko-Fragment as image
+         // pull out Murcko smile
+         
+         
+         
+                 
+         $sql = "SELECT mol_name, concat('http://www.ncbi.nlm.nih.gov/sites/entrez?db=pccompound&term=',`inchi_key`) as linkpubchem, mol_id id, mol_id, MW, nRotB, nHBAcc, nHBDon,  ROUND(XLogP,6) XLogP, LipinskiFailures, concat('molecule_detail.php?mol_id=',`mol_id`) as link FROM cdk_descriptors JOIN inchi_key USING (mol_id) JOIN moldb_moldata USING ( mol_id ) JOIN murcko_mol USING ( mol_id ) WHERE  murcko_id = ".$getmurkoID." group by inchi_key";
+     }
+     
 }
 /*
 $first = 1;
@@ -154,16 +196,16 @@ if (PEAR::isError($test))
 $datagrid->generateColumns(); //important!!
 $position = 'first';
 $datagrid->addColumn(
-        new Structures_DataGrid_Column('mol_pic','mol_pic','mol_pic', null, null, 'test_tooltip(type=id)')
+        new Structures_DataGrid_Column('mol_pic','mol_pic','mol_id', null, null, 'test_tooltip(type=id)')
 );
 $datagrid->addColumn(
-        new Structures_DataGrid_Column('descriptors','descriptors','descriptors', null, null, 'printDesc(type=id)')
+        new Structures_DataGrid_Column('descriptors','descriptors','mw', null, null, 'printDesc(type=id)')
 );
 $datagrid->addColumn(
         new Structures_DataGrid_Column('mol_id','mol_id','mol_id', null, null, 'printLink(type=id)')
 );
 $datagrid->addColumn(
-        new Structures_DataGrid_Column('linkpubchem','linkpubchem','linkpubchem', null, null, 'printLink2(type=id)')
+        new Structures_DataGrid_Column('linkpubchem','linkpubchem','mol_name', null, null, 'printLink2(type=id)')
 );
 
 // We want to remove the ID field, so we retrieve a reference to the Column:

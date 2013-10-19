@@ -423,6 +423,12 @@ $HTTP_GET_VARS[
 XMeans.jar missing in Netbeansproject
 
 
+== Before you start using it ==
+
+cd /var/www/molclass
+chgrp www-data . -R
+
+
 === Make deep learning ===
 
 http://fastml.com/deep-learning-made-easy/
@@ -430,3 +436,50 @@ http://fastml.com/deep-learning-made-easy/
 http://chem-bla-ics.blogspot.co.uk/2012/10/cdk-151-changes-authors-and-reviewers.html
 
 http://sourceforge.net/apps/mediawiki/cdk/index.php?title=Development_with_Git
+
+
+== ChemGRID install ==
+
+setting links to MolClass
+
+
+ln -s ../molclass/css .
+ln -s ../molclass/sysplugins/ .
+ln -s ../molclass/Smarty.class.php .
+
+ln -s ../molclass/molclass.conf.xml .
+ln -s ../molclass/functions.php .
+
+cd templates
+ln -s ../../molclass/templates/index.tpl.php .
+ln -s ../../molclass/templates/savant_header.tpl.php .
+ln -s ../../molclass/templates/savant_incenter_table_top.tpl.php .
+ln -s ../../molclass/templates/savant_incenter_table_bottom.tpl.php .
+
+
+cp ../molclass/templates/index.tpl.php templates/
+cp ../molclass/templates/savant_header.tpl.php templates/
+cp ../molclass/templates/savant_incenter_table_top.tpl.php templates/
+cp ../molclass/templates/savant_incenter_table_bottom.tpl.php templates/
+
+cp ../molclass/molclass.conf.xml chemgrid.conf.xml
+
+
+=== Netbeans Project ===
+
+cp ../molclass/molclass.conf.xml ~/NetBeansProjects/ChemGRID/chemgrid.conf.xml
+
+mkdir ~/NetBeansProjects/ChemGRID/templates/
+cp ../molclass/templates/index.tpl.php ~/NetBeansProjects/ChemGRID/templates/
+cp ../molclass/templates/savant_header.tpl.php ~/NetBeansProjects/ChemGRID/templates/
+cp ../molclass/templates/savant_incenter_table_top.tpl.php ~/NetBeansProjects/ChemGRID/templates/
+cp ../molclass/templates/savant_incenter_table_bottom.tpl.php ~/NetBeansProjects/ChemGRID/templates/
+cp ../molclass/templates/savant_footer.tpl.php ~/NetBeansProjects/ChemGRID/templates/
+
+
+== ToDo ==
+* Make ChemGRID banner
+* Write short description of ChemGRID
+* Login Logout
+* Header: Logout, user information, Search, Structure Search, Platemap Upload, Screen Data Upload, A vs B, Statistics
+* Setup chemgrid.conf.xml file and incorporate it into index.php

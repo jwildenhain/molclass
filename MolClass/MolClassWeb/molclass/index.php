@@ -35,13 +35,13 @@ $css->parseFile("css/tyersstylesheet001.css");
 
 // create a new HTML page
 $p = new HTML_Page2();
-$p->setTitle("MolClass");
+$p->setTitle("MolClass version 1.5 (release October 2013)");
 // it can be added as an object
 $p->addStyleDeclaration($css, 'text/css');
-$p->setMetaData("Author", "Jan Wildenhain & Ryusuke Kimura");
+$p->setMetaData("Author", "Jan Wildenhain");
 $p->setMetaData("Content-Type", "text/html; charset=iso-8859-1");
-$p->setMetaData("Description", "MolClass predicts bioactivity of small molecule by means of Machine Learning method with high throughput screening data.");
-$p->setMetaData("Keywords", "highthroughput screening, protein, machine learning");
+$p->setMetaData("Description", "MolClass predicts bioactivity of small molecules from machine learning models and high throughput data.");
+$p->setMetaData("Keywords", "cheminformatics, HTS, highthroughput screening, protein, machine learning");
 
 // Add template for Website Header - later on also for the Footer
 // include class
@@ -68,12 +68,13 @@ $smarty = new Smarty;
 
 ////////////////////////////////////////////////////////////////////////////////////
 
-$smarty->assign( 'title', 'MolClass' );
+$smarty->assign( 'title', 'MolClass version 1.5 (October 2013 release)' );
 $smarty->assign( 'sub_title', 'Rapid Molecule Classification Based on Structure and Activity' );
 $smarty->assign( 'abstract', 'MolClass generates computational models from small molecule datasets using structural features identified in hit and non-hit molecules. In contrast to existing experimental resources like PubChem and Chembank, MolClass aims to present the user with a likelihood value for each molecule entry. This creates an activity fingerprint that currently includes models for <a href="http://www.ncbi.nlm.nih.gov/pubmed/19702240">Ames mutagenicity</a>, <a href="http://www.ncbi.nlm.nih.gov/pubmed/16180914"> blood brain barrier penetration</a>, CaCo2 penetration <a href="http://www.ncbi.nlm.nih.gov/pubmed/15446816">(derived from Hou <i>et al</i>.)</a>, stem cell neurosphere proliferation <a href="http://www.ncbi.nlm.nih.gov/pubmed/17417631"> (derived from Diamandis <i>et al</i>.)</a>, Autofluorescence Model <a href="http://chembank.broadinstitute.org/">(derived from ChemBank data)</a>, Flucanozole synergy predictive model <a href="http://www.ncbi.nlm.nih.gov/pubmed/21694716">(derived from Spitzer <i>et al</i>.)</a> and <a href="http://www.ncbi.nlm.nih.gov/pubmed/19702240">a toxcicity benchmark</a>.<br>
 In addition we uploaded some example datasets build on experimental data from Pubchem to build a <i>P. falicarum</i> Sensitivity data model <a href="http://www.ncbi.nlm.nih.gov/pubmed/19734910"> (derived from Yuan <i> et al</i>.)</a> and a <a href="http://www.ncbi.nlm.nih.gov/sites/entrez?db=pcassay&term=595"> Hsp90 co-chaperone disrupter screen</a>.
 The second source is the NCI funded database ChemBank, here we incorporated from a <a href="http://chembank.broadinstitute.org/assays/view-project.htm?id=1000423"> Cell Cycle Inhibitor Screen</a>, <a href="http://chembank.broadinstitute.org/assays/view-project.htm?id=1001644">a Beta Cell Transdifferentiation model</a>, <a href="http://chembank.broadinstitute.org/assays/view-project.htm?id=1000359"><i>Xenopus</i> Actin Polymerization dataset</a> and a Thrombin Acitivity Predictive Model <a href="https://www.ebi.ac.uk/chembldb/target/inspect/CHEMBL204"> (derived from ChEMBL data)</a>.<br>
-Those and future models can help to guide compound selection for follow up screens and library design. Most computer-aided ventures overlook promiscuous binding to off-target proteins that results in side effect of a drug. Those compounds will be visible in the approach we have taken. We hope that our portlet will help to guide scientists in the systems- and chemical biology community.' );
+Recently added models do cover the <a href="http://chembank.broadinstitute.org/assays/view-project.htm?id=1000423">metabolikeness</a> of molecules and <a href="http://chembank.broadinstitute.org/assays/view-project.htm?id=1000423">compound aggregation</a> effects in screens.<br> 
+Those and future models can help to guide compound selection for follow up screens and library design. Most computer-aided ventures overlook promiscuous binding to off-target proteins that results in side effect of a drug. Those compounds will be visible in the approach we have taken. We hope that our portlet will help to guide scientists in the systems- and chemical biology community. The current dataset contains about 30000 molecules with predictions to 16 models.' );
 
 $p->addBodyContent($smarty->fetch('templates/index.tpl.php'));
 
