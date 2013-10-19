@@ -39,6 +39,7 @@ public class Main {
 
         if (args.length < 1)
         {
+                System.out.println("MolClass version 1.5.32\n");
                 System.out.println("\n");
 		System.out.println("\tUsage: java -jar MolClass.jar AutomaticCalcDriver <batch_id>");
 		System.out.println("\tUsage: java -jar MolClass.jar Fingerprinter <batch_id>");
@@ -47,8 +48,8 @@ public class Main {
 		System.out.println("\tUsage: java -jar MolClass.jar ModelBuilder <model_id>");
 		System.out.println("\tUsage: java -jar MolClass.jar Predictor <pred_id>");
                 System.out.println("\n");
-                System.out.println("Hint when in struggle:");
-                System.out.println("java -cp lib/cdk-1.4.18.jar:MolClass.jar descriptors.AutomaticCalcDriver <batch_id>");
+                System.out.println("Hint when in CLASSPATH struggle this should work:");
+                System.out.println("java -cp lib/*.jar:MolClass.jar descriptors.AutomaticCalcDriver <batch_id>");
                 
 
 	}
