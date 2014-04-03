@@ -492,7 +492,7 @@ fwrite($def, "#\n");
 
   foreach ($values as $key=>$value)
   {
-    if($key=='INT_mol_name'||$key=='INT_plate_num'||$key=='INT_plate_row'||$key=='INT_plate_col')
+    if($key=='INT_mol_name'||$key=='INT_plate_number'||$key=='INT_plate_row'||$key=='INT_plate_row_char'||$key=='INT_library'||$key=='INT_chemgrid'||$key=='INT_plate_column')
     {
 
     }
