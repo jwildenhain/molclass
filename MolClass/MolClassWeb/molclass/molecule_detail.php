@@ -250,7 +250,7 @@ function drawBar($params, $args = array())
 {
     extract($params);
     extract($args);
-    return '<a href="display.php?PNG&type=Prediction&id='.$record['pred_id'].'"><img src="' . $record['llhbar'] . '"/> alt="show distribution of prediction likelihoods" </a>';
+    return '<a href="display.php?PNG&type=Prediction&id='.$record['pred_id'].'"><img src="' . $record['llhbar'] . '" alt="show distribution of prediction likelihoods"/></a>';
 }
 
 function roundlhood($params, $args = array())
