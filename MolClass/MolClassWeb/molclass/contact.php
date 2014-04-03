@@ -106,13 +106,17 @@ Please note that external tools and libraries are not included, please download 
 
 
 
-$smarty->assign( 'downloadfile', 'http://tyerslab.bio.ed.ac.uk/molclass/download/VMfusionMolClass.tar.gz' );
-$smarty->assign( 'downloadinfo', '<b>MolClass version 1.5 VMware Fusion 5 image (tar.gz:5GB will use a virtual image of 32GB)');
+$smarty->assign( 'dlmolclass', $settings['root']['config']['website'].'/download/MolClass_v1u5.tar.gz' );
+$smarty->assign( 'dlmolclassinfo', 'MolClass version 1.5 with installation instructions');
 
-//$smarty->assign( 'downloadfile', $settings['root']['config']['website'].'/download/molclass_v1.1.tar.gz' );
-//$smarty->assign( 'downloadinfo', 'MolClass version 1.1');
-$smarty->assign( 'downloadsourcecodefile', 'http://tyerslab.bio.ed.ac.uk/molclass/download/molclass_v1.5.tar.gz' );
-$smarty->assign( 'downloadsourcecodeinfo', 'MolClass version 1.5 with installation instructions');
+$smarty->assign( 'dlvmware', $settings['root']['config']['website'].'/download/MolClass_v1u5_VMFusion.tar.gz' );
+$smarty->assign( 'dlvmwareinfo', '<b>MolClass version 1.5 VMware Fusion 5 image (tar.gz:8GB will use a virtual image of 32GB)</b>');
+$smarty->assign( 'dlvbox', $settings['root']['config']['website'].'/download/MolClass_1u5_VBox.tar.gz' );
+$smarty->assign( 'dlvboxinfo', '<b>MolClass version 1.5 VBox image (tar.gz:9GB will use a virtual image of 32GB)</b>');
+$smarty->assign( 'dlmolclassdb', $settings['root']['config']['website'].'/download/MolClass_v1u5_ds19.sql.gz' );
+$smarty->assign( 'dlmolclassdbinfo', 'MolClass v1.5 database with 19 datasets');
+$smarty->assign( 'dlmolclasswiki', $settings['root']['config']['website'].'/download/MolClass_v1u5_wiki.sql.gz' );
+$smarty->assign( 'dlmolclasswikiinfo', 'MolClass v1.5 wiki - November 2013 update');
 $smarty->assign( 'tutorialfile', $settings['root']['config']['website'].'/download/molclass_tutorial_v1.0.pdf' );
 $smarty->assign( 'tutorialinfo', 'MolClass tutorial version 1');
 
