@@ -68,10 +68,16 @@
     var smiles = document.JME.smiles();
     var jme = document.JME.jmeFile(); 
     var mol = document.JME.molFile();
-    if (smiles.length < 1) {
-      alert("No molecule! If you are using the text search option add a single click draw and you will be able to execute the search. We are currently reviewing options to change this behaviour.");
+    var javatextsearch = "<?php echo $textsearch ?>";   
+    if (javatextsearch.length > 1 && smiles.length < 1) {
+        smiles = "ccc";
+        
+    }
+    if (smiles.length < 1 && javatextsearch.length < 1) {
+      alert("$javatextsearch !No molecule! If you are using the text search option add a single click draw and you will be able to execute the search. We are currently reviewing options to change this behaviour.");
     }
     else {
+      /* var javatextsearch = textsearch; */
       document.form.smiles.value = smiles;
       document.form.jme.value = jme;
       document.form.mol.value = mol;
