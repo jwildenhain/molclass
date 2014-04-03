@@ -12,11 +12,22 @@
     {$downloadtitle}
   </h4>
   <p>
-    <a href="{$downloadfile}">{$downloadinfo}</a>
+    <a href="{$dlmolclass}">{$dlmolclassinfo}</a>
   </p>
   <p>
-    <a href="{$downloadsourcecodefile}">{$downloadsourcecodeinfo}</a>
+    <a href="{$dlvmware}">{$dlvmwareinfo}</a>
   </p>
+  <p>
+    <a href="{$dlvbox}">{$dlvboxinfo}</a>
+  </p>
+  <p>
+    <a href="{$dlmolclassdb}">{$dlmolclassdbinfo}</a>
+  </p>
+  <p>
+    <a href="{$dlmolclasswiki}">{$dlmolclasswikiinfo}</a>
+  </p>
+
+
   <p>
     <a href="{$tutorialfile}">{$tutorialinfo}</a>
   </p>
