@@ -278,6 +278,7 @@ $p->addBodyContent($tpl->fetch('templates/savant_incenter_table_bottom.tpl.php')
 // Display a template using the assigned values.
 $tpl->assign('footertablenote',$settings['root']['config']['Global_Design_Parameters']['footer_table_note']);
 $p->addBodyContent($tpl->fetch('templates/savant_footer.tpl.php'));
+$p->addScript("jsme/jsme.nocache.js");
 $p->addScript(("../lisa/libjs/google_webtracker_part1_jstag.js"));
 $p->addScript(("../lisa/libjs/google_webtracker_part2_jstag.js"));
 $p->display();
