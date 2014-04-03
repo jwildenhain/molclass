@@ -6,11 +6,11 @@
 <table cellpadding="2" cellspacing="2" border="0" width="100%">
   <tr>
     <td>
-      <applet name="JME" code="JME.class" codebase="./classes" archive="JME.jar" width="400" height="300">
+      <div name="JME" code="JME.class" codebase="./classes" archive="JME.jar" width="400" height="300">
       <param name="jme" value="$jme">
       <param name="options" value="xbutton, hydrogens">
-      You have to enable Java in your browser.
-      </applet>
+      You have to enable JavaScript in your browser.
+      </div>
     </td>
     <td>
       <small>
