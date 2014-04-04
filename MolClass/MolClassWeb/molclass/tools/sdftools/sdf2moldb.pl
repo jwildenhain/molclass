@@ -414,7 +414,7 @@ $createcmd = "CREATE TABLE IF NOT EXISTS $molstructable (
 $dbh->do($createcmd);
 
 #
-# MolClass/ChemGRID modification to store sdftags seperately
+# MolClass/ChemGRID modification to store sdftags separately
 #
 $createcmd = "CREATE TABLE IF NOT EXISTS $moldatatable (
   mol_id INT($digits) ZEROFILL NOT NULL DEFAULT '0',\n" ;
@@ -426,7 +426,7 @@ for ($i = 0; $i <= $#afield; $i++) {
   $l3  = $afield[$i][2];
 	if($l2 eq 'mol_name') ##########################
   		{$createcmd = $createcmd . "  $l2 $l3,\n";}
-	elsif($l2 eq 'plate_number'||$l2 eq 'plate_row'||$l2 eq 'plate_col'){}
+	elsif($l2 eq 'plate_number'||$l2 eq 'plate_row'||$l2 eq 'plate_column'||$l2 eq 'plate_row_char'||$l2 eq 'library'|| $afield[$j][1] eq 'sublibrary'||$l2 eq 'chemgrid'){}
 	else
 		{$createcmd2 = $createcmd2 . "  $l2 $l3,\n";}
 } 
@@ -664,7 +664,7 @@ foreach (@infocols) {
 } 
 
 $sdffilename = $inbase;
-$sdffilename =~ s/$id//i; 
+$sdffilename =~ s/\d{15,25}//i; 
 $dbh->do("INSERT INTO $batchlisttable (username, filename, tags, mol_type, pmid, info, uploaded) VALUES ('$username', '$sdffilename', '$infocolstring', '$mol_type', '$pmid', '$info', '0' )");
 	 $batchnum = $dbh->last_insert_id(undef, undef, qw(a_table a_table_id));
 
@@ -766,53 +766,38 @@ if ($verbose > 0) {
   print "$badmols records ignored\n\n";
 }
 
+$dbh->disconnect();
+
 #
 # Calculate descriptos for a uploaded set of molecules can be used by MolClass and ChemGRID
 #
 # you need to have ~/wekafiles/props/DatabaseUtils.props
 # find it in molclass/prerequisites
 
-#Calculate fingerprint & descriptor
+#Fingerprinter: Calculate fingerprints 
 #print "Calculating finger printers...\n\n\n";
-$cmd = "java $setHeapSize -cp lib/cdk-1.4.18.jar:MolClass.jar fingerprints.Fingerprinter $batchnum";
+$cmd = "java -cp lib/cdk-1.4.18.jar:MolClass.jar fingerprints.Fingerprinter $batchnum";
 system($cmd. " 1>> ./log/output_fingerprinter.log"." 2>> ./log/error_fingerprinter.log"); 
-
-
-print "Calculating descriptors...\n\n\n";
-
-$cmd = "java $setHeapSize -cp lib/cdk-1.4.18.jar:MolClass.jar  descriptors.AutomaticCalcDriver $batchnum";
+#CDK Descriptor print "Calculating descriptors...\n\n\n";
+$cmd = "java -cp lib/cdk-1.4.18.jar:MolClass.jar  descriptors.AutomaticCalcDriver $batchnum";
 system($cmd. " 1>> ./log/output_descriptors.log"." 2>> ./log/error_descriptors.log"); 
-
 # dirty fix:
 # run CDK descriptor calculation; weird failure issues workaround to get all calculations (only recalculates missed)
 system $cmd;
 system $cmd;
 system $cmd;
-system $cmd;
-system $cmd;
 system $cmd; # this should be enough for a large molecule library
-
-# Calculate Smiles and InChi's
-#$cmd = "java -jar MolClass.jar InChiGenerator $batchnum";
-#$cmd = "java -cp lib/cdk-1.4.18.jar:./MolClass.jar fingerprints.InChiGenerator $batchnum";
-
-# get InChi, InChiKeys and Smiles
-$cmd = "java $setHeapSize -cp lib/cdk-1.4.18.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar fingerprints.InChiGenerator  $batchnum";
+#InChiGenerator get InChi, InChiKeys and Smiles
+$cmd = "java -cp lib/cdk-1.4.18.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar fingerprints.InChiGenerator  $batchnum";
 system($cmd. " 1>> ./log/output_InChiGenerator.log"." 2>> ./log/error_InChiGenerator.log"); 
 
-# generate Murcko Fragments
-$cmd = "java $setHeapSize -cp lib/cdk-1.4.18.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar fingerprints.MurckoFragments $batchnum";
-system($cmd. " 1>> ./log/output_Murcko.log"." 2>> ./log/error_Murcko.log"); 
-
-# generate Tanimoto scores for > 0.85
-$cmd = "java $setHeapSize -cp lib/cdk-1.4.18.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar fingerprints.Similarity  $batchnum";
-system($cmd. " 1>> ./log/output_Similarity.log"." 2>> ./log/error_Similarity.log"); 
-
-
-#EMAIL NOTIFICATION (added by Nicholas FitzGerald for chemgrid)
+#EMAIL NOTIFICATION (added by nfg, adjusted by jw)
 print $email;
 
-
+$dbh = DBI->connect("DBI:mysql:database=$database;host=$hostname",
+                    $user, $password,
+                    { RaiseError => 1}
+                    ) || die("ERROR: database connection failed: $DBI::errstr");
 $url = $web_server_location."/view_batch_detail.php?batch_id=".$batchnum;
 sendEmail($email, "MolClass", "SDF Upload Complete", "Upload of file ".$sdffilename." is complete. You can check uploaded file at $url");
 print "Sending email for notifying finish of SDF Upload...\n\n\n";
@@ -829,6 +814,13 @@ print "Sending email for notifying finish of Prediction...\n\n\n";
 $dbh->do("UPDATE $batchlisttable SET uploaded = '1' WHERE batch_id = $batchnum");
 #Disconnect mysql DB
 $dbh->disconnect();
+
+#MurkoFragments generate Murcko Fragments
+$cmd = "java -cp lib/cdk-1.4.18.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar fingerprints.MurckoFragments $batchnum";
+system($cmd. " 1>> ./log/output_Murcko.log"." 2>> ./log/error_Murcko.log"); 
+#Similarity - generate Tanimoto scores for Klekota-Roth and ECFP eg. > 0.85
+$cmd = "java $setHeapSize -cp lib/cdk-1.4.18.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar fingerprints.Similarity  $batchnum";
+system($cmd. " 1>> ./log/output_Similarity.log"." 2>> ./log/error_Similarity.log"); 
 
 
 
@@ -847,9 +839,13 @@ sub pred_test()
   {
       $model_id = $row[0];
       $query = "INSERT INTO $predtable (username, batch_id, model_id, pred_name, email) VALUES ('$username', '$batch_id', '$model_id', '$pred_name', '$email_dummy')";
-      $sth = $dbh->prepare($query);
+      $dbh2 = DBI->connect("DBI:mysql:database=$database;host=$hostname",
+                    $user, $password,
+                    { RaiseError => 1}
+                    ) || die("ERROR: database connection failed: $DBI::errstr");
+      $sth = $dbh2->prepare($query);
       $sth->execute;
-      $pred_id = $dbh->last_insert_id(undef, undef, qw(a_table a_table_id));
+      $pred_id = $dbh2->last_insert_id(undef, undef, qw(a_table a_table_id));
       #$cmd = "java -cp ".$model_pred_dir."weka.jar:".$model_pred_dir."lib:/usr/share/java/mysql-connector-java.jar:".$model_pred_dir."weka:. nick/test/Predictor ".$pred_id;
       #$cmd = "java -jar MolClass.jar Predictor ".$pred_id;
       #$cmd = "java -cp lib/cdk-git-20110515.jar:lib/weka2.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar  nick.test.Predictor $pred_id";
@@ -862,6 +858,7 @@ sub pred_test()
       system($cmd. " 1>> ./log/output_predictors_sdf2moldb.log"." 2>> ./log/error_predictors_sdf2moldb.log"); 
 
       $sth->finish();
+      $dbh2->disconnect();
   }
   $sth2->finish();
 }
@@ -869,7 +866,7 @@ sub pred_test()
 sub sendEmail
 {
 my ($to, $from, $subject, $message) = @_;
-my $sendmail = '/usr/lib/sendmail';
+my $sendmail = $SENDMAIL;
 open(MAIL, "|$sendmail -oi -t");
 print MAIL "From: $from\n";
 print MAIL "To: $to\n";
@@ -968,7 +965,7 @@ sub insert_data() {
 	 if($afield[$j][1] eq 'mol_name'){ #insert into stat if mol_name
 		$insertcmd = $insertcmd . ",\n  \"$item\"";
 	}
-	 elsif($afield[$j][1] eq 'plate_num'|| $afield[$j][1] eq 'plate_row'|| $afield[$j][1] eq 'plate_col') #insert into plateinf if
+	 elsif($afield[$j][1] eq 'plate_number'|| $afield[$j][1] eq 'plate_row'|| $afield[$j][1] eq 'plate_column'|| $afield[$j][1] eq 'plate_row_char'|| $afield[$j][1] eq 'library'|| $afield[$j][1] eq 'sublibrary'|| $afield[$j][1] eq 'chemgrid') #insert into plateinf if
 	 {
 		$label = $afield[$j][1];
 		$label =~ s/\"/\\\"/g;
