@@ -84,7 +84,7 @@ if (isset($_GET['compound'])) {
 
 	$mol_id = $_GET['compound'];
 	/* Fetch Molecule Name */
-	$sql = "SELECT mol_id FROM moldb_moldata JOIN inchi_key USING (mol_id) JOIN sdftags USING (mol_id) WHERE mol_id ='".$mol_id."' or inchi_key like '".$mol_id."' or inchi like '".$mol_id."' or compound_name like '".$mol_id."' or smiles like '".$mol_id."' or mol_name like '".$mol_id."' limit 1";
+	$sql = "SELECT mol_id FROM moldb_moldata JOIN inchi_key USING (mol_id) JOIN sdftags USING (mol_id) WHERE mol_id ='".$mol_id."' or inchi_key.inchi_key like '".$mol_id."' or inchi_key.inchi like '".$mol_id."' or compound_name like '".$mol_id."' or inchi_key.smiles like '".$mol_id."' or mol_name like '".$mol_id."' limit 1";
         //echo $sql;
 	$res =& $db->getOne($sql);
 	if (PEAR::isError($res))
