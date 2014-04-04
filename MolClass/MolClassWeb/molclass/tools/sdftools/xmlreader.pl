@@ -58,6 +58,7 @@ $MATCHMOL      = $data->{MATCHMOL};
 $MOL2SVG       = $data->{MOL2SVG};
 $MOL2PS        = $data->{MOL2PS};
 $GHOSTSCRIPT   = $data->{GHOSTSCRIPT};
+$SENDMAIL      = $data->{SENDMAIL};
 
 $toolsdir 		= $data->{toolsdir};
 $model_pred_dir		= $data->{model_pred_dir};
