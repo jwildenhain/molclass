@@ -85,6 +85,8 @@
 		<MATCHMOL>./tools/matchmol</MATCHMOL>
 		<MOL2SVG>./tools/mol2svg</MOL2SVG>
                 <MOL2PS>./tools/mol2ps</MOL2PS>
+                <SENDMAIL>/usr/sbin/sendmail</SENDMAIL>
+                
 		<GHOSTSCRIPT>gs</GHOSTSCRIPT>
                 <!-- may be "latin1", "latin2" or "utf8" -->
                 <charset>latin1</charset>
@@ -119,6 +121,7 @@
 		<!-- Java only parameters for CDK and Weka -->	
                 <setCDKdescriptortimeout>600000</setCDKdescriptortimeout>
                 <setThreadPoolTimeout>130000</setThreadPoolTimeout>
+                <setTaniBatchSizeComputation>2000</setTaniBatchSizeComputation>
                 <crossValidateModel>10</crossValidateModel>
                 <setDistributionSpread>5.0</setDistributionSpread>
                 <setTanimotoCutoff>0.85</setTanimotoCutoff>
