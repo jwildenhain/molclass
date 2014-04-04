@@ -35,7 +35,10 @@ $info = $ARGV[6];
 # sdf2moldb_alt.pl - This script reads an SDF file which was previously analyzed 
 # by the script "sdfcheck.pl" and adds its content (structures and data) into a MySQL-based MolDB database.
 $cmd = "/usr/bin/perl ".$toolsdir."sdf2moldb.pl '$sdf_target' '$username' '$email' '$mol_type' '$pmid' '$info' '$id'";
-system "echo ".$cmd." >> ./log/call_sdf2moldb.log";
+$cmd4log = "/usr/bin/perl ".$toolsdir."sdf2moldb.pl \'$sdf_target\' \'$username\' \'$email\' $mol_type $pmid \'$info\' $id";
+system 'echo \# add single quotes to variables, delete # from line you want to run >> ./log/call_sdf2moldb.log';
+system 'echo \# source file from molclass folder >> ./log/call_sdf2moldb.log';
+system "echo ".$cmd4log." >> ./log/call_sdf2moldb.log";
 system $cmd;
 
 # Remove all uploaded files
