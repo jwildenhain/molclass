@@ -126,6 +126,8 @@ $stereo = "n";
 $maxhits = $settings['root']['config']['StructureSearchMaxHits'];                // maximum number of hits we want to allow
 $maxcand = $settings['root']['config']['StructureSearchMaxCandidates'];               // maximum number of candidate structures we want to allow
 
+
+$textsearch = $_POST['structuretextsearch'];
 $smiles  = $_POST['smiles'];
 $jme     = $_POST['jme'];
 $mol     = $_POST['mol'];
@@ -232,6 +234,8 @@ function getMolName($id)
 
   if(isset($_POST['structuretextsearch']) && strlen($STS))
   {
+      
+        //$smiles  = 'ccc';
         // query
 	require_once 'DB.php';
 	$db = DB::connect($settings['root']['config']['DB_DataObject']['dsn']);
