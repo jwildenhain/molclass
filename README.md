@@ -1,6 +1,5 @@
 # Molclass version 1.5
-##### MolClass generates computational models from small molecule datasets using structural features identified in hit and non-hit
-molecules.
+##### MolClass generates computational models from small molecule datasets using structural features identified in hit and non-hit molecules.
 
 The online version can be found on: http://sysbiolab.bio.ed.ac.uk/molclass/
 
