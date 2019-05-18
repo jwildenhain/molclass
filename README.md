@@ -1,5 +1,25 @@
-# Molclass version 1.7
-##### MolClass holds relevant pharmacological and physiological models to improve high throughput of small molecules. Further it allows users to generate supervised machine learning models from small molecule datasets. To do so it is using structural features identified in hit and non-hit molecules. Currently there is full support of multi class models. The histogram display of models is currently restricted to two classes only.
+# Molclass version 1.71
+##### MolClass contains relevant pharmacological and physiological models to evaluate the performance of candidates in small molecule high throughput screens. Further it can build supervised machine learning models from small molecule datasets. It uses structural features and chemical properties identified in hit and non-hit molecule populations. It supports binary and multi class models. However the histogram display of models only displays two classes. IWe are planning to add regression models in the next release. 
+
+## Folder Structure
+
+build - contains the MolClass Java classes
+dist - contains the MolClass.jar and depedencies needed to run MolClass from command line
+html/molclass/api - contains the SLIM REST written in php5 
+html/molclass/sdftools - tools that update and maintain the MolClass MySQL database
+html/molclass/flask - contains the Python FLASK rest service 
+src - contains the source code for MolClass 
+lib - the new dependencies for MolClass version 1.5
+nbproject - the Netbeans project configuration.
+
+
+## Update May 2019 (version 1.71)
+- MolClass is going to be moved to chemgrid.org/molclass as the original servers have been taken down due to age related instability.
+- Because of memory limitations on chemgrid.org, model building will be restricted to libraries with up to thousand molecules.
+- The instruction on how to install, run and use MolClas are being moved to the Github Wiki. https://github.com/jwildenhain/molclass/wiki/1.-MolClass-Wiki
+- A virtual machine with MolClass is available on request.
+- You can install the MolClass database and the FLASK REST service to access the data using R. 
+- MolClass will get a supporting R package to use the current data models to design and benchmark your own activity predictions
 
 ## Update 17th September 2018
 - New Models include Hepatocyte toxcicity, Log D prediction, Plasma Protein Binding, Solubility and Microsome toxcicity
