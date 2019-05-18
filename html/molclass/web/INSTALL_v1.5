@@ -1,0 +1,485 @@
+/**
+ * INSTALLATION INSTRUCTION for MolClass
+ *
+ * NOTICE OF LICENSE
+ *
+ * This software package is subject to the Academic Free License (AFL 3.0).
+ * The License is  available through the world-wide-web at this URL:
+ *   http://www.opensource.org/licenses/AFL-3.0
+ * If you did not receive a copy of the license and are unable to
+ * obtain it through the world-wide-web, please try few days later or send
+ * an email to the authors so we can send you a copy asap.
+ *
+ * DISCLAIMER
+ *
+ * Do not edit or add to this file if you wish to upgrade Magento to newer
+ * versions in the future. If you wish to customize Magento for your
+ * needs please refer to http://www.magentocommerce.com for more information.
+ *
+ * @category    config file
+ * @developer	Jan Wildenhain, Nicholas Fitzgerald
+ * @package     MolClass version 1.08
+ * @copyright   2012 Wellcome Trust Cell Biology, University of Edinburgh Biological Sciences
+ * @license     http://www.opensource.org/licenses/AFL-3.0  Academic Free License (AFL 3.0)
+ */
+
+MolClass is a Webserver Application to allow you collect an analyse small molecule screen
+data. If you just want to analyse few datasets please use our MolClass webportal on:
+
+  // Website //  
+  http://tyerslab.bio.ed.ac.uk/molclass
+
+  example file is in ./example_sdf/
+
+  The /*virtual webserver*/ : http://localhost/molclass/
+  to login use root@localhost.org password is M07c7A22
+  
+  The /* database */ is here: http://localhost/phpmyadmin/index.php
+  login as root with password: M07c7A22
+
+   /*RestService*/:  http://localhost/molclass/api/compound/5
+
+
+If you are interested in running your own MolClass webserver please read on:
+/*
+#
+# General Introduction:
+#
+*/
+MolClass generates computational models from small molecule datasets using structural features identified in hit and non-hit molecules. In contrast to existing experimental resources like PubChem and Chembank, MolClass aims to present the user with a likelihood value for each molecule entry. This creates an activity fingerprint that currently includes models for Ames mutagenicity, blood brain barrier penetration, CaCo2 penetration (derived from Hou et al.), stem cell neurosphere proliferation (derived from Diamandis et al.), Autofluorescence Model (derived from ChemBank data), Flucanozole synergy predictive model (derived from Spitzer et al.) and a toxcicity benchmark.
+In addition we uploaded some example datasets build on experimental data from Pubchem to build a P. falicarum Sensitivity data model (derived from Yuan et al.) and a Hsp90 co-chaperone disrupter screen. The second source is the NCI funded database ChemBank, here we incorporated from a Cell Cycle Inhibitor Screen, a Beta Cell Transdifferentiation model, Xenopus Actin Polymerization dataset and a Thrombin Acitivity Predictive Model (derived from ChEMBL data).
+Those and future models can help to guide compound selection for follow up screens and library design. Most computer-aided ventures overlook promiscuous binding to off-target proteins that results in side effect of a drug. Those compounds will be visible in the approach we have taken. We hope that our portlet will help to guide scientists in the systems- and chemical biology community.
+
+#
+# Prerequisites to get the MolClass Webservice running:
+#
+Molclass is based on several programming languages, Java, Perl and PHP. It needs 
+a LAMP framework to run. MolClass has been tested with Fedora versions 8, 9,
+12 and 15. We are confident that a skilled user can get it to work in any unix
+environment. It will work with MySQL >= 5.0, Apache >=2.2 and PHP >= 5.1. 
+We recommend to install SUN Java as there might be issues with the Open source 
+Java packages like OpenJDK. 
+
+To run MolClass on your server you have to install LAMP and further you will
+need to follow those steps below.
+
+1. Please visit sun java website to download Java JDK/JRE version 6 (version 7 has not been tested). Version (TM) SE Runtime Environment (build 1.6.0_25-b06) works on our server for us.
+
+   http://java.sun.com/javase/downloads/index.jsp
+
+   Find a JAVA installation guide for your system, google eg. 'Fedora Java Installation Guide'
+
+2. Install Sendmail via yum (Fedora)
+   > sudo yum install sendmail.
+
+3. You need to install MolClass MySQL database:
+
+   In case you do not have any user or mysql server please create one:
+   
+   Google: 'your system MySQL install' e.g. Fedora you can do 'sudo yum install mysql'
+
+   This command should create a Molclass database for you.   
+	(it's important to change the my.cnf (max_allowed_packet = 640M) in case its lower).
+   gunzip -c ./MySQL/molclass_14models.sql.gz | mysql -h localhost -u xyz -pXYZ
+
+   Execute SQL code to create a DB user for molclass eg:
+   GRANT SELECT, INSERT, UPDATE, DELETE, ALTER, INDEX, CREATE, LOCK TABLES ON 
+        molclass.* TO 'molclass'@'%' IDENTIFIED BY 'YCuRzNoe';
+
+
+4. Install PHP and PEAR in fedora 'sudo yum install php' will do, use google to find a guide
+   for your system.
+
+5. Install the additional PHP Pear packages needed for the webfrontend:
+
+   sudo pear channel-update pear.php.net
+
+   sudo pear install Auth
+   sudo pear install Cache
+   sudo pear install Config
+   sudo pear install DB
+   sudo pear install DB_DataObject
+   sudo pear install DB_Table
+   sudo pear install Date
+   sudo pear install HTML_CSS         
+   sudo pear install HTML_Common
+   sudo pear install HTML_Javascript
+   sudo pear install channel://pear.php.net/HTML_Page-2.0.0RC2  
+   sudo pear install channel://pear.php.net/HTML_Page2-0.6.3
+   sudo pear install HTML_QuickForm 
+   sudo pear install HTML_Table     
+   sudo pear install HTTP_Request   
+   sudo pear install MDB
+   sudo pear install MDB2
+   sudo pear install MDB2_Driver_mysql
+   sudo pear install MDB2_Driver_mysqli
+   sudo pear install Mail
+   sudo pear install Mail_Mime
+   sudo pear install Net_URL                                   
+   sudo pear install Net_URL2                                  
+   sudo pear install PEAR                                      
+   sudo pear install Pager 
+   sudo pear install channel://pear.php.net/OLE-1.0.0RC2
+   sudo pear install channel://pear.php.net/Spreadsheet_Excel_Writer-0.9.3
+   sudo pear install Structures_DataGrid                       
+   sudo pear install channel://pear.php.net/Structures_DataGrid_DataSource_Array-0.2.0dev1
+   sudo pear install channel://pear.php.net/Structures_DataGrid_DataSource_CSV-0.1.6
+   sudo pear install channel://pear.php.net/Structures_DataGrid_DataSource_DB-0.1.1
+
+   sudo pear install channel://pear.php.net/Structures_DataGrid_DataSource_DBQuery-0.1.1   
+   sudo pear install channel://pear.php.net/Structures_DataGrid_DataSource_DBTable-0.1.7    
+   sudo pear install channel://pear.php.net/Structures_DataGrid_DataSource_DataObject-0.2.2dev1
+   sudo pear install channel://pear.php.net/Structures_DataGrid_DataSource_MDB2-0.1.11     
+   sudo pear install channel://pear.php.net/Structures_DataGrid_DataSource_RSS-0.1.1   
+   sudo pear install channel://pear.php.net/Structures_DataGrid_DataSource_XML-0.2.1dev1      
+   sudo pear install channel://pear.php.net/Structures_DataGrid_Renderer_CSV-0.1.5dev1         
+   sudo pear install channel://pear.php.net/Structures_DataGrid_Renderer_HTMLTable-0.1.6     
+   sudo pear install channel://pear.php.net/Structures_DataGrid_Renderer_Pager-0.1.3
+   sudo pear install channel://pear.php.net/Structures_DataGrid_Renderer_HTMLTable-0.1.6   
+   sudo pear install channel://pear.php.net/Structures_DataGrid_Renderer_Smarty-0.1.5        
+   sudo pear install Structures_DataGrid_Renderer_Smarty       
+   sudo pear install Structures_DataGrid_Renderer_XLS          
+   sudo pear install Structures_Graph                          
+   sudo pear install Text_Password                             
+   sudo pear install channel://pear.php.net/Validate-0.8.5                                
+   sudo pear install XML_Parser                                
+   sudo pear install XML_RPC                                   
+   sudo pear install XML_RSS                                   
+   sudo pear install XML_Util 
+   sudo pear install channel://pear.php.net/Structures_DataGrid-0.9.3
+   sudo pear install channel://pear.php.net/Structures_DataGrid_Renderer_Console-0.1.1                            
+   sudo pear install channel://pear.php.net/Structures_DataGrid_Renderer_HTMLSortForm-0.1.3
+   sudo pear install channel://pear.php.net/Structures_DataGrid_Renderer_XLS-0.1.3
+   sudo pear channel-discover phpsavant.com
+   sudo pear install savant/Savant3
+
+5.5 Install Perl and Perl Packages
+
+    e.g. Fedora: sudo yum install perl
+
+    sudo perl -MCPAN -e shell
+    install Bundle::CPAN
+    reload CPAN
+
+    sudo cpan -i DBI
+
+in Ubuntu you might need to install apt-get install libmysql* expat* 
+
+    sudo cpan -i DBD::mysql
+    sudo cpan -i XML::Parser
+    sudo cpan -i XML::Simple
+
+
+
+In the rare case you get this error:
+/usr/local/lib64/perl5/auto/version/vxs/vxs.so: undefined symbol: PerlGthrkey_ptr
+
+do: sudo rm /usr/local/lib64/perl5/auto/version/vxs/vxs.so
+sudo rm /usr/local/lib64/perl5/auto/Text/CSV_XS/CSV_XS.so
+6. Extract MolClass.tar.gz to your webfolder 
+   
+   /var/www/html/molclass or ~USER/public_html/molclass
+exi
+7. Change folder settings: 
+
+   cd molclass_folder
+   sudo chmod user:apache . -R
+   sudo chmod user:apache ./cache -R 
+   sudo chmod user:apache ./uploads -R
+
+   # the symbolic links are depricated:
+   #ln -s ./lib ./tools/sdftools/lib
+   #link molclass.conf.xml tools/sdftools/molclass.conf.xml
+
+   # add folders for apache as httpd user:
+   #
+   # a BUG in Weka 3.7.5 does not allow to set database prop variable
+   # so we need to place it:
+   cd ./tools
+   sudo cp -a wekafiles ~/
+   sudo cp -a wekafiles/ /var/www/
+   
+   for ubuntu:
+   sudo chgrp www-data /var/www/wekafiles -R
+   for apache:
+   sudo chgrp apache /var/www/wekafiles/ -R
+   
+   # a hardcoded restriction in a commercial InChi package
+   # (extension of cdk 1.5) makes those
+   # lines/files important to place:
+
+   cd ./tools
+   cp -a .jnati/ ~/
+   sudo cp -a .jnati/ /var/www/
+   for ubuntu:
+   sudo chgrp www-data /var/www/.jnati -R
+   for fedora
+   sudo chgrp apache /var/www/.jnati -R
+   
+ 
+7. Edit the molclass config file in the main folder 
+   
+   ./molclass.conf.xml
+
+    <dsn>mysqli://molclassuser:YCBuR@yourserver.org/molclass</dsn>
+
+    <!-- General DB INFO -->
+	<database>molclass_ed</database>
+	<hostname>prohits.bio.ed.ac.uk</hostname>
+	<rw_user>molclassuser</rw_user>
+	<rw_password>YCBuRzNb</rw_password>
+	<ro_user>molclassuser</ro_user>
+	<ro_password>YCBuRzNb</ro_password>
+
+     <!-- PHP parameters -->
+        <www_server>http://yourserver.org/</www_server>
+	<website>http://yourserver.org/molclass</website>
+	<url>tyerslab.bio.ed.ac.uk/molclass</url>
+        <molclassemail>MolClass@yourserver</molclassemail>
+     <!-- Global_Design_Parameters -->      
+	<tool_mol2png_application>/var/www/molclass/tools/MarvinBeans/bin/molconvert</tool_mol2png_application>
+
+     Either copy files or set full path to those two tools:
+        sudo cp ./tool/checkmol /usr/local/bin        
+	<CHECKMOL>/usr/local/bin/checkmol</CHECKMOL>
+        sudo cp ./tool/matchmol /usr/local/bin        
+	<MATCHMOL>/usr/local/bin/matchmol</MATCHMOL>
+
+
+ChemAxon http://www.chemaxon.com/ provides free academic licenses for its software tools. You will need MarvinBeans only to visualize molecules. There is some open source code for molecule image creation in ./tools/smi2png_modified.py in case you would like to use that one instead.
+
+
+7. Setup the REST service:
+
+
+ make changes in the apache httpd conf activate (Fedora):
+
+ <IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+ </IfModule>
+ <Directory /var/www/html/molclass/api>
+    AllowOverride ALL
+    Options MultiViews Indexes FollowSymLinks
+ </Directory>
+
+ make changes in the apache httpd conf activate (Ubuntu):
+  
+ a2enmod rewrite
+
+ <IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+ </IfModule>
+ <Directory /var/www/molclass/api>
+    AllowOverride ALL
+    Options MultiViews Indexes FollowSymLinks
+ </Directory>
+
+ possibly edit the .htaccess file in the rest api folder
+
+ # Some hosts may require you to use the `RewriteBase` directive.
+ # If you need to use the `RewriteBase` directive, it should be the
+ # absolute physical path to the directory that contains this htaccess file.
+ # RewriteBase /
+ RewriteEngine On
+ RewriteCond %{REQUEST_FILENAME} !-f
+ RewriteRule ^(.*)$ index.php [QSA,L]
+
+ restart httpd service usually 'sudo service httpd restart'
+ 
+ test rest service:
+
+curl -i -X GET http://localhost/molclass/api/dataset
+curl -i -X GET http://localhost/molclass/api/dataset/2
+curl -i -X GET http://localhost/molclass/api/dataset/2/compounds
+curl -i -X GET http://localhost/molclass/api/compound/1
+
+curl -i -X GET http://localhost/molclass/api/compound/1
+curl -i -X GET http://localhost/molclass/api/compound/'NCCCNCCSP(=O)(O)O'
+curl -i -X GET http://localhost/molclass/api/compound/'Amifostine'
+curl -i -X GET http://localhost/molclass/api/compound/'JKOQGQFVAUAYPM-UHFFFAOYSA-N'
+
+IMPORTANT replace '/' within InChI with '_' e.g. InChI=1S/C2H5NO3/c3-6-1-2(4)5/h1,3H2,(H,4,5)
+
+curl -i -X GET http://localhost/molclass/api/compound/'InChI=1S_C2H5NO3_c3-6-1-2(4)5_h1,3H2,(H,4,5)'
+
+curl -i -X GET http://localhost/molclass/api/compound/6/models
+curl -i -X GET http://localhost/molclass/compound/6/model/2
+
+curl -i -X GET http://localhost/molclass/api/model
+
+
+Important Requirement for weka having in DatabaseUtils.props (ubuntu):
+	-	/var/www/wekafiles/props/DatabaseUtils.props
+	-	cp /var/www/wekafiles/props/DatabaseUtils.props ~/wekafiles/props/
+
+# Debugging:
+
+If you have issues after following the installation procedure. Please do not hesitate to let us know. To speed up the process of fixing the issue we need executing php file (see hyperlink text field at the top of your browser). In case you are running your own server please execute the PHP file at the command line eg:
+
+php /home/user/public_html/molclass/view_details.php 
+
+And send us the error message that will follow.
+
+The WEKA and CDK debug lines are tracked in ./cache/output_* and ./cache/error_*
+
+You can test the JAVA MolClass code from your commandline:
+
+In case of computation errors:
+
+If descriptors are not calculated:
+java -cp lib/cdk-1.4.18.jar:MolClass.jar  descriptors.AutomaticCalcDriver 1
+
+java -cp dist/lib/cdk-1.4.18.jar:dist/MolClass.jar  descriptors.AutomaticCalcDriver 1
+
+
+    java -jar MolClass.jar:lib/* AutomaticCalcDriver _Batch_ID_
+
+http://pele.farmbio.uu.se/nightly/api/org/openscience/cdk/annotations/class-use/TestClass.html#org.openscience.cdk.qsar.descriptors.molecular
+
+If fingerprints are not calculated:
+    java -jar MolClass.jar:lib/* Fingerprinter _Batch_ID_
+
+If a smiles and inchikeys are not generated:
+    java -jar MolClass.jar InChiGenerator _Batch_ID_
+
+If a model has not been build:
+    java -jar MolClass.jar ModelBuilder _Model_ID_
+
+If a Prediction has not been calculated:
+    java -jar MolClass.jar Predictor _Prediction_ID_
+
+
+start cmmmsrv
+
+run mem molecules for fast structure search
+
+rund from molclass home
+
+perl tools/cp2mem.pl
+$configfile = "./tools/sdftools/xmlreader.pl";
+
+test R
+
+sudo R
+sudo apt-get install r-cran-*
+install.packages("DAAG")
+
+R CMD BATCH MolClassDistribution.R
+
+
+Truncate MolClass
+
+TRUNCATE TABLE `cdk_descriptors`;
+TRUNCATE TABLE `class_models`; 
+TRUNCATE TABLE `batchmols`;
+TRUNCATE TABLE `batchlist`;
+TRUNCATE TABLE `fingerprints`;
+TRUNCATE TABLE `inchi_key`; 
+TRUNCATE TABLE `moldb_molcfp`;
+TRUNCATE TABLE `moldb_pic2d`;
+TRUNCATE TABLE `moldb_moldata`;
+TRUNCATE TABLE `moldb_molfgb`;
+TRUNCATE TABLE `moldb_molstat`;
+TRUNCATE TABLE `moldb_molstruc`;
+TRUNCATE TABLE `plate_info`;
+TRUNCATE TABLE `sdftags`;
+TRUNCATE TABLE `timeout_mols`;
+TRUNCATE TABLE `prediction_list`;
+TRUNCATE TABLE `prediction_mols`;
+TRUNCATE TABLE `moldb_meta`;
+TRUNCATE TABLE `moldb_molstat_mem`;
+TRUNCATE TABLE `moldb_molcfp_mem`;
+TRUNCATE TABLE `tanimoto`;
+
+TRUNCATE TABLE `moldb_molbfp`;
+TRUNCATE TABLE `moldb_molhfp`;
+
+== Useful Documentation ==
+* CDK API: http://cheminfo.informatics.indiana.edu/~rguha/code/java/nightly/api/
+* WEKA API: http://weka.sourceforge.net/doc.dev/
+* CDK Descriptor list: [[Structure_info_database_descriptors]]
+* WEKA Wiki: http://weka.sourceforge.net/wiki/index.php/Main_Page
+** [http://weka.sourceforge.net/wiki/index.php/Writing_your_own_Filter_(post_3.5.3) Writing your own Filter]
+** [http://weka.sourceforge.net/wiki/index.php/Programmatic_Use Programmatic Use]
+** [http://weka.sourceforge.net/wiki/index.php/Use_Weka_in_your_Java_code Using weka in your Java code]
+** [http://weka.sourceforge.net/wiki/index.php/FAQ FAQ]
+
+
+== Develop/Extend MolClass==
+
+If you are interested to help us develop MolClass please contact our group. Please familiarize yourself with the the database model (folder ./MySQL) The Java source code is in the folder ./NetBeansProject.
+
+
+set in php.ini
+
+sendmail_path = /usr/sbin/sendmail -t -i
+
+$HTTP_GET_VARS[
+
+XMeans.jar missing in Netbeansproject
+
+
+== Before you start using it ==
+
+cd /var/www/molclass
+chgrp www-data . -R
+
+
+=== Make deep learning ===
+
+http://fastml.com/deep-learning-made-easy/
+
+http://chem-bla-ics.blogspot.co.uk/2012/10/cdk-151-changes-authors-and-reviewers.html
+
+http://sourceforge.net/apps/mediawiki/cdk/index.php?title=Development_with_Git
+
+
+== ChemGRID install ==
+
+setting links to MolClass
+
+
+ln -s ../molclass/css .
+ln -s ../molclass/sysplugins/ .
+ln -s ../molclass/Smarty.class.php .
+
+ln -s ../molclass/molclass.conf.xml .
+ln -s ../molclass/functions.php .
+
+cd templates
+ln -s ../../molclass/templates/index.tpl.php .
+ln -s ../../molclass/templates/savant_header.tpl.php .
+ln -s ../../molclass/templates/savant_incenter_table_top.tpl.php .
+ln -s ../../molclass/templates/savant_incenter_table_bottom.tpl.php .
+
+
+cp ../molclass/templates/index.tpl.php templates/
+cp ../molclass/templates/savant_header.tpl.php templates/
+cp ../molclass/templates/savant_incenter_table_top.tpl.php templates/
+cp ../molclass/templates/savant_incenter_table_bottom.tpl.php templates/
+
+cp ../molclass/molclass.conf.xml chemgrid.conf.xml
+
+
+=== Netbeans Project ===
+
+cp ../molclass/molclass.conf.xml ~/NetBeansProjects/ChemGRID/chemgrid.conf.xml
+
+mkdir ~/NetBeansProjects/ChemGRID/templates/
+cp ../molclass/templates/index.tpl.php ~/NetBeansProjects/ChemGRID/templates/
+cp ../molclass/templates/savant_header.tpl.php ~/NetBeansProjects/ChemGRID/templates/
+cp ../molclass/templates/savant_incenter_table_top.tpl.php ~/NetBeansProjects/ChemGRID/templates/
+cp ../molclass/templates/savant_incenter_table_bottom.tpl.php ~/NetBeansProjects/ChemGRID/templates/
+cp ../molclass/templates/savant_footer.tpl.php ~/NetBeansProjects/ChemGRID/templates/
+
+
+== ToDo ==
+* Make ChemGRID banner
+* Write short description of ChemGRID
+* Login Logout
+* Header: Logout, user information, Search, Structure Search, Platemap Upload, Screen Data Upload, A vs B, Statistics
+* Setup chemgrid.conf.xml file and incorporate it into index.php

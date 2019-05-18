@@ -1,0 +1,38 @@
+#! /bin/sh
+#
+# /etc/init.d/cmmm-server
+#
+# Minimal startup script which can be used to start/stop the
+# checkmol/matchmol server (cmmmsrv) on a Linux system. It should
+# work on a Debian Linux system, other distribution may use 
+# startproc or start_daemon instead of start-stop-daemon.
+
+
+CMMM_BIN="/var/www/html/molclass/tools/cmmmsrv"
+
+# check for missing binary
+if [ ! -x ${CMMM_BIN} ]; then
+	echo -n >&2 "checkmol/matchmol server, ${CMMM_BIN} is not installed. "
+	exit 5
+fi
+
+case "$1" in
+	start)
+		echo -n "Starting checkmol/matchmol server "
+		start-stop-daemon --start --background --chuid nobody --exec ${CMMM_BIN} -- -q -l
+		;;
+	stop)
+		echo -n "Shutting down checkmol/matchmol server "
+		start-stop-daemon --stop --exec ${CMMM_BIN}
+		;;
+	restart)
+		$0 stop
+		$0 start
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+		;;
+esac
+echo
+

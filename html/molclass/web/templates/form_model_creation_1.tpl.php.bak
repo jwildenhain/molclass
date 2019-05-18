@@ -1,0 +1,26 @@
+
+  <h2>
+    {$form_data.header.hdrTesting}
+  </h2>
+  <p>
+    {$description}   
+  </p>
+ <form {$form_data.attributes}>
+    <!-- Display the fields -->
+
+    <table class="geneform">
+               <tr>
+                    <td>{$form_data.batch_id.label}</td>
+                    <td>{$form_data.batch_id.html}</td>
+               </tr>
+      <!-- Display the buttons -->
+      <tr>
+        <td align="center" colspan="0">
+          {$form_data.btnSubmit.html}
+        </td>
+      </tr>
+    </table>
+  </form>
+
+
+  

@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<config>
+
+		<!-- PHP PEAR DB INFO -->
+		<DB_DataObject>
+			<dsn>mysqli://molclass_admin:twDehbP3jJmeQGLa@prohits.bio.ed.ac.uk/molclass_v15</dsn>
+			<proxy>full</proxy>
+			<schema_location>/var/www/html/tools/DataObjects</schema_location>
+			<class_location>/var/www/html/tools/DataObjects</class_location>
+			<require_prefix>DataObjects/</require_prefix>
+			<class_prefix>DataObjects_</class_prefix>
+		</DB_DataObject>
+
+		<!-- General DB INFO -->
+		<database>molclass_v15</database>
+		<hostname>prohits.bio.ed.ac.uk</hostname>
+		<rw_user>molclass_admin</rw_user>
+		<rw_password>twDehbP3jJmeQGLa</rw_password>
+		<ro_user>molclass_admin</ro_user>
+		<ro_password>twDehbP3jJmeQGLa</ro_password>
+
+                <wikilink>http://sysbiolab.bio.ed.ac.uk/wiki/index.php/Current_Datasets_in_MolClass</wikilink>
+
+		<!-- PHP parameters -->
+                <www_server>http://sysbiolab.bio.ed.ac.uk/</www_server>
+		<website>http://sysbiolab.bio.ed.ac.uk/molclass</website>
+		<url>sysbiolab.bio.ed.ac.uk/molclass</url>
+                <molclassemail>MolClassEmailReport@sysbiolab.bio.ed.ac.uk</molclassemail>
+
+                <php_upload>./uploads/</php_upload>
+		<toolsdir>./tools/sdftools/</toolsdir>
+		<site_header_image>./images/header.png</site_header_image>
+
+                <!-- Tables on MolClass website - how many to list -->
+                <ViewModelNumberPerPage>25</ViewModelNumberPerPage>
+                <ViewHitMoleculesPerPage>20</ViewHitMoleculesPerPage>
+                <ViewPredictionResultsPerPage>25</ViewPredictionResultsPerPage>
+                <ViewModelsPerMolecule>25</ViewModelsPerMolecule>
+                <ViewBatchTable>25</ViewBatchTable>
+                <ViewBatchDetailTable>25</ViewBatchDetailTable>
+                <ViewSingleMoleculePredictionTable>25</ViewSingleMoleculePredictionTable>
+      
+		
+		<!-- TABLES -->
+		<molstructable>moldb_molstruc</molstructable>
+		<moldatatable>moldb_moldata</moldatatable>
+		<molstattable>moldb_molstat</molstattable>
+		<molfgtable>moldb_molfg</molfgtable>
+		<molfgbtable>moldb_molfgb</molfgbtable>
+		<molbfptable>moldb_molbfp</molbfptable>
+		<molcfptable>moldb_molcfp</molcfptable>
+		<fpdeftable>moldb_fpdef</fpdeftable>
+		<metatable>moldb_meta</metatable>
+		<pic2dtable>moldb_pic2d</pic2dtable>
+		<molhfptable>moldb_molhfp</molhfptable>
+		<strucinfotable>sdftags</strucinfotable>
+		<plateinfotable>plate_info</plateinfotable>
+		<cdkdesctable>cdk_descriptors</cdkdesctable>
+		<batchlisttable>batchlist</batchlisttable>
+		<batchmoltable>batchmols</batchmoltable>
+		<fingerprinttable>fingerprints</fingerprinttable>
+		<modeltable>class_models</modeltable>
+		<predtable>prediction_list</predtable>
+		<predmoltable>prediction_mols</predmoltable>
+		<timeouttable>timeout_mols</timeouttable>
+		<datatypetable>data_types</datatypetable>
+		<classschemetable>class_schemes</classschemetable>
+		<inchikeytable>inchi_key</inchikeytable>
+		<smilestable>smiles</smilestable>
+		<moltypetable>mol_type</moltypetable>
+		<tempbatchmoltesttable>temp_batchmol_test</tempbatchmoltesttable>
+		<tempbatchmollearntable>temp_batchmol_learn</tempbatchmollearntable>
+
+		<!-- MolDB parameters -->
+		<sitename>MolClass</sitename>
+		<!-- "y" or "n" ("y" gives better performance) -->
+		<tweakmolfiles>y</tweakmolfiles>
+                <!-- prefix not needed for molclass/chemgrid -->
+		<prefix></prefix>
+		<bitmapURLdir>bitmaps</bitmapURLdir>
+		<digits>8</digits>
+		<subdirdigits>4</subdirdigits>
+		<CHECKMOL>./tools/checkmol</CHECKMOL>
+		<MATCHMOL>./tools/matchmol</MATCHMOL>
+		<MOL2SVG>./tools/mol2svg</MOL2SVG>
+                <MOL2PS>./tools/mol2ps</MOL2PS>
+		<SENDMAIL>/usr/sbin/sendmail</SENDMAIL>
+		<GHOSTSCRIPT>gs</GHOSTSCRIPT>
+                <!-- may be "latin1", "latin2" or "utf8" -->
+                <charset>latin1</charset>
+                <!-- # will be appended to table name if applicable -->
+                <memsuffix>_mem</memsuffix>
+                <!-- not needed # allow selection of multiple data collections -->
+                <multiselect>y</multiselect>
+		<default_db>1</default_db> 
+		<fpdict_mode>1</fpdict_mode>    
+                <!--   # 1 = auto adjust, 2 = force 64 bit, 3 = force 32 bit -->
+		<scratchdir>/tmp</scratchdir> 
+                <!--  # needed by cp2mem.pl, -->
+		<enablereactions>y</enablereactions>  
+                <!--    # if not "y": no reaction support -->
+		<enable_download>y</enable_download>
+                <!--    # download option for hit structures/reactions -->
+		<download_limit>100</download_limit>  
+                <!--    # maximum number of hit structures/reactions to be downloaded (per search) -->
+		<enable_svg>y</enable_svg>  
+                <!--  # first choice -->
+		<enable_bitmaps>y</enable_bitmaps>  
+                <!--  # second choice -->
+		<use_cmmmsrv>y</use_cmmmsrv>      
+                <!--      # set to "y" if a cmmmsrv daemon is available -->
+		<cmmmsrv_addr>127.0.0.1</cmmmsrv_addr>
+                <!--   # must be numeric -->
+		<cmmmsrv_port>55624</cmmmsrv_port>   
+                <!--       # the default cmmmsrv port is 55624 -->
+		<StructureSearchMaxHits>500</StructureSearchMaxHits>
+		<StructureSearchMaxCandidates>2000</StructureSearchMaxCandidates>
+
+		<!-- Java only parameters for CDK and Weka -->	
+                <setCDKdescriptortimeout>600000</setCDKdescriptortimeout>
+                <setThreadPoolTimeout>130000</setThreadPoolTimeout>
+                <crossValidateModel>10</crossValidateModel>
+                <setDistributionSpread>5.0</setDistributionSpread>
+                <setTaniBatchSizeComputation>5000</setTaniBatchSizeComputation>
+		<setTanimotoCutoff>0.85</setTanimotoCutoff>
+                <setHeapCacheSize>-Xmx28G -XX:-UseGCOverheadLimit </setHeapCacheSize>
+
+                <!-- depricated -->
+		<model_pred_dir>./tools/model_pred/</model_pred_dir>
+
+<Navigation_Board_Open>
+	<Home>/index.php</Home>
+	<Structure_Search>/structure_search.php</Structure_Search>
+	<Prediction_List>/prediction_list.php</Prediction_List>
+	<Details>/contact.php</Details>
+	<Login>/user_login.php</Login>
+	<SDF_Upload>/sdf_upload.php</SDF_Upload>
+	<Model_Creation>/model_creation.php</Model_Creation>
+</Navigation_Board_Open>
+
+<Global_Design_Parameters>
+	<author>Jan Wildenhain</author>
+	<content_type>text/html; charset=iso-8859-1</content_type>
+	<description>MolClass predicts bioactivity of small molecule by means of Machine Learning method with high throughput screening data.</description>
+	<keywords>screening, virtual screening, machine learning, highthrouput screening</keywords>
+	<page_width>671</page_width>
+	<footer_table_note>Wellcome Trust Centre for Cell Biology, University of Edinburgh</footer_table_note>
+	<filecache>cache/</filecache>
+	<plate_image_folder>plateimg/</plate_image_folder>
+        <set_structure_viewer>1</set_structure_viewer>
+        <set_structure_table_viewer>2</set_structure_table_viewer>
+	<tool_mol2png_application>/var/www/html/molclass/tools/MarvinBeans/bin/molconvert</tool_mol2png_application>
+	<tool_mol2png_options>png:w160,#F6F6F6</tool_mol2png_options>
+	<tool_upload_folder>./uploads/</tool_upload_folder>
+</Global_Design_Parameters>
+
+<R_parameters>
+	<R_DB_CONST_USER>molclass_admin</R_DB_CONST_USER>
+	<R_DB_CONST_DATABASE>molclass_v15</R_DB_CONST_DATABASE>
+	<R_DB_CONST_HOST>prohits.bio.ed.ac.uk</R_DB_CONST_HOST>
+	<R_DB_CONST_PWD>twDehbP3jJmeQGLa</R_DB_CONST_PWD>
+	<R_executable>/usr/bin/R</R_executable>
+	<R_CMD_parameters>--no-restore --no-save --no-readline --slave</R_CMD_parameters>
+	<R_source_folder>./R/</R_source_folder>
+	<R_data_cache>./cache/</R_data_cache>
+	<R_WWW_color_text>black</R_WWW_color_text>
+	<R_WWW_color_bg>#F6F6F6</R_WWW_color_bg>
+	<R_allow_svg>yes</R_allow_svg>
+	<R_png_convert>convert</R_png_convert>
+	<R_png_density>150</R_png_density>
+	<R_png_resize>330</R_png_resize>
+</R_parameters>
+
+</config>
