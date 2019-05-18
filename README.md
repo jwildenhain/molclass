@@ -3,8 +3,8 @@
 
 ## Folder Structure
 
-build - contains the MolClass Java classes
-dist - contains the MolClass.jar and depedencies needed to run MolClass from command line
+ build - contains the MolClass Java classes
+ dist - contains the MolClass.jar and depedencies needed to run MolClass from command line
 html/molclass/api - contains the SLIM REST written in php5 
 html/molclass/sdftools - tools that update and maintain the MolClass MySQL database
 html/molclass/flask - contains the Python FLASK rest service 
