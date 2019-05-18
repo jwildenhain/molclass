@@ -8,7 +8,8 @@ dist - contains the MolClass.jar and depedencies needed to run MolClass from com
 html/molclass/api - contains the SLIM REST written in php5 
 html/molclass/sdftools - tools that update and maintain the MolClass MySQL database
 html/molclass/flask - contains the Python FLASK rest service 
-src - contains the source code for MolClass 
+html/molclass/web - php5/pear webapplication (running on Ubuntu 14.04 LTS)
+src - contains the Java source code for MolClass 
 lib - the new dependencies for MolClass version 1.5
 nbproject - the Netbeans project configuration.
 ```
