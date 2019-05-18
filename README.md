@@ -2,16 +2,16 @@
 ##### MolClass contains relevant pharmacological and physiological models to evaluate the performance of candidates in small molecule high throughput screens. Further it can build supervised machine learning models from small molecule datasets. It uses structural features and chemical properties identified in hit and non-hit molecule populations. It supports binary and multi class models. However the histogram display of models only displays two classes. IWe are planning to add regression models in the next release. 
 
 ## Folder Structure
-
- build - contains the MolClass Java classes
- dist - contains the MolClass.jar and depedencies needed to run MolClass from command line
+```
+build - contains the MolClass Java classes
+dist - contains the MolClass.jar and depedencies needed to run MolClass from command line
 html/molclass/api - contains the SLIM REST written in php5 
 html/molclass/sdftools - tools that update and maintain the MolClass MySQL database
 html/molclass/flask - contains the Python FLASK rest service 
 src - contains the source code for MolClass 
 lib - the new dependencies for MolClass version 1.5
 nbproject - the Netbeans project configuration.
-
+```
 
 ## Update May 2019 (version 1.71)
 - MolClass is going to be moved to chemgrid.org/molclass as the original servers have been taken down due to age related instability.
