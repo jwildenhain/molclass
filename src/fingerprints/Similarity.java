@@ -29,6 +29,17 @@ import org.openscience.cdk.similarity.Tanimoto;
  */
 public class Similarity {
 
+    private static final ThreadLocal<Connection> threadConnCache = new ThreadLocal<Connection>();
+
+    private static Connection getThreadConnection(String host, String user, String pass) throws SQLException {
+        Connection conn = threadConnCache.get();
+        if (conn == null || conn.isClosed()) {
+            conn = DriverManager.getConnection(host, user, pass);
+            threadConnCache.set(conn);
+        }
+        return conn;
+    }
+
     private static class MolRecord {
         String molId;
         String ext;
@@ -124,7 +135,8 @@ public class Similarity {
 		for (final MolRecord mol1 : targetMols) {
 			pool.submit(new Runnable() {
 				public void run() {
-					try (Connection threadConn = DriverManager.getConnection(threadHost, threadUser, threadPassword)) {
+					try {
+						Connection threadConn = getThreadConnection(threadHost, threadUser, threadPassword);
 						for (Integer compBatchId : finalBatchIds) {
 							String nstmtint = "SELECT " + threadFpTable + ".mol_id, " + threadFpTable + ".EXT, " + threadFpTable + ".KR FROM " + threadFpTable + ", " + threadBatchTable + " WHERE " + threadBatchTable + ".mol_id = " + threadFpTable + ".mol_id AND " + threadBatchTable + ".batch_id = ?";
 							try (PreparedStatement stmtint = threadConn.prepareStatement(nstmtint)) {

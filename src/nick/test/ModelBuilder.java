@@ -1037,6 +1037,16 @@ public class ModelBuilder {
   //    ((CVParameterSelection)classifier).setOptions(weka.core.Utils.splitOptions("-P \"I 50 100 2\" -W weka.classifiers.trees.RandomForest -- -K 0 -S 2"));
       classifier = new RandomForest();
       ((RandomForest)classifier).setOptions(weka.core.Utils.splitOptions("-I 100 -K 0 -S 2"));
+      int numThreads = 16;
+      try {
+          String threadsVal = XMLReader.getTag("numThreads");
+          if (threadsVal != null) {
+              numThreads = Integer.parseInt(threadsVal.trim());
+          }
+      } catch (Exception e) {
+          // fallback to 16
+      }
+      ((RandomForest)classifier).setNumExecutionSlots(numThreads);
     } else if (class_scheme.equals("LMT")) {
       classifier = new LMT();
       ((LMT)classifier).setOptions(weka.core.Utils.splitOptions("-I 1 -M 15 -W 0.0"));

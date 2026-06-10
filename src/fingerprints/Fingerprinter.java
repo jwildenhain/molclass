@@ -32,6 +32,17 @@ import org.openscience.cdk.smiles.SmilesGenerator;
 //This class calculates fingerprints for all the molecules with a given batch_id
 public class Fingerprinter {
 
+	private static final ThreadLocal<Connection> threadConnCache = new ThreadLocal<Connection>();
+
+	private static Connection getThreadConnection(String host, String user, String pass) throws SQLException {
+		Connection conn = threadConnCache.get();
+		if (conn == null || conn.isClosed()) {
+			conn = DriverManager.getConnection(host, user, pass);
+			threadConnCache.set(conn);
+		}
+		return conn;
+	}
+
 	/**
 	 * @param args
 	 * @throws Exception
@@ -115,7 +126,8 @@ public class Fingerprinter {
 			
 			pool.submit(new Runnable() {
 				public void run() {
-					try (Connection threadConn = DriverManager.getConnection(threadHost, threadUser, threadPassword)) {
+					try {
+						Connection threadConn = getThreadConnection(threadHost, threadUser, threadPassword);
 						SDFReader srThread = new SDFReader();
 						IAtomContainer mol = srThread.read(new String(bdata));
 						

@@ -24,8 +24,19 @@ public class AutomaticCalcDriver {
 	    
 		DescriptorCalculator dc = new DescriptorCalculator();
 		
-		//Calculate descriptors for batch_id, with 4 worker threads.
-		dc.execute(batch_id, 4);
+		int numThreads = 16;
+		try {
+			String threadsVal = XMLReader.getTag("numThreads");
+			if (threadsVal != null) {
+				numThreads = Integer.parseInt(threadsVal.trim());
+			}
+		} catch (Exception e) {
+			// fallback to 16
+		}
+		System.out.println("...... Running Descriptor calculation with thread pool size = " + numThreads);
+		
+		//Calculate descriptors for batch_id, with worker threads.
+		dc.execute(batch_id, numThreads);
 	}
 
 }
