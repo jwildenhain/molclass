@@ -13,13 +13,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.BitSet;
-import org.openscience.cdk.ConformerContainer;
-
-import org.openscience.cdk.Molecule;
+import org.openscience.cdk.AtomContainer;
 import org.openscience.cdk.inchi.InChIGenerator;
 import org.openscience.cdk.inchi.InChIGeneratorFactory;
 import org.openscience.cdk.interfaces.IAtomContainer;
-import org.openscience.cdk.interfaces.IMolecule;
 import org.openscience.cdk.smiles.SmilesGenerator;
 
 
@@ -65,7 +62,7 @@ public class InChiGenerator {
 		stmt.setInt(1, batch_id);
 
 		ResultSet rs = stmt.executeQuery();
-		Molecule molecule = new Molecule();
+		IAtomContainer molecule = new AtomContainer();
 		SDFReader sr = new SDFReader();
 
 		int x = 0;
@@ -86,12 +83,12 @@ public class InChiGenerator {
                             //IAtomContainer atomContainer = (Molecule) molecule;
                             //IAtomContainer cc = molecule;
                             //IMolecule ccc =molecule;
-                            SmilesGenerator sg = new SmilesGenerator(true);
+                            SmilesGenerator sg = SmilesGenerator.unique();
                             String smiles = "NULL"; // C1CCCCC1
                             Boolean SmileCheck = true;
                             try
                             {
-                                    smiles = sg.createSMILES(molecule); // C1CCCCC1
+                                    smiles = sg.create(molecule); // C1CCCCC1
                             }
                             catch(NullPointerException e)
                             {
@@ -102,7 +99,7 @@ public class InChiGenerator {
                             {
                             try
                             {
-                                    smiles = sg.createSMILES(molecule); // C1CCCCC1
+                                    smiles = sg.create(molecule); // C1CCCCC1
                             }
                             catch(IllegalArgumentException e)
                             {

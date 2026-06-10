@@ -18,15 +18,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.BitSet;
 import java.util.Scanner;
-import org.openscience.cdk.ConformerContainer;
-
-import org.openscience.cdk.Molecule;
-import org.openscience.cdk.DefaultChemObjectBuilder;
-import org.openscience.cdk.exception.InvalidSmilesException;
-import org.openscience.cdk.fingerprint.Fingerprinter;
-import org.openscience.cdk.interfaces.IMolecule;
+import java.util.List;
+import java.util.ArrayList;
 import org.openscience.cdk.similarity.Tanimoto;
-import org.openscience.cdk.smiles.SmilesParser;
 
 
 /**
@@ -34,6 +28,17 @@ import org.openscience.cdk.smiles.SmilesParser;
  * @author zahir
  */
 public class Similarity {
+
+    private static class MolRecord {
+        String molId;
+        String ext;
+        String kr;
+        MolRecord(String molId, String ext, String kr) {
+            this.molId = molId;
+            this.ext = ext;
+            this.kr = kr;
+        }
+    }
     
     
     /**
@@ -75,68 +80,102 @@ public class Similarity {
 				ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
 		stmt.setInt(1, batch_id);
 		ResultSet rs = stmt.executeQuery();
-                //get all batch_ids in MolClass
+		
+		List<MolRecord> targetMols = new ArrayList<>();
+		while (rs.next()) {
+			targetMols.add(new MolRecord(rs.getString("mol_id"), rs.getString("EXT"), rs.getString("KR")));
+		}
+		rs.close();
+		stmt.close();
+
+		//get all batch_ids in MolClass
 		String nstmtdb = new String("SELECT batch_id FROM batchlist");
-		//System.out.println(nstmt);
 		PreparedStatement stmtdb = con.prepareStatement(nstmtdb,
 				ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
 		ResultSet rsdb = stmtdb.executeQuery();
+		List<Integer> batchIds = new ArrayList<>();
+		while (rsdb.next()) {
+			batchIds.add(rsdb.getInt("batch_id"));
+		}
+		rsdb.close();
+		stmtdb.close();
+		
+		int numThreads = 16;
+		try {
+			String threadsVal = XMLReader.getTag("numThreads");
+			if (threadsVal != null) {
+				numThreads = Integer.parseInt(threadsVal.trim());
+			}
+		} catch (Exception e) {
+			// fallback to 16
+		}
+		System.out.println("...... Running Similarity with thread pool size = " + numThreads);
+
+		java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(numThreads);
+		final String threadHost = hostname;
+		final String threadUser = user;
+		final String threadPassword = password;
+		final String threadFpTable = fptablename;
+		final String threadBatchTable = batchmoltable;
+		final Double threadCutoff = TanimotoCutoff;
+		final List<Integer> finalBatchIds = batchIds;
 
 		int x = 0;
-
-		while (rs.next()) {
-                                      
-                        while (rsdb.next()) {
-                            // read all molecules from batch 
-                            String nstmtint = new String("SELECT " + fptablename + ".mol_id, " + fptablename + ".EXT, " + fptablename + ".KR FROM " + fptablename + ", " + batchmoltable + " WHERE " + batchmoltable + ".mol_id = " + fptablename + ".mol_id AND " + batchmoltable
-				+ ".batch_id = ?");
-                            //System.out.println(nstmt);
-                            PreparedStatement stmtint = con.prepareStatement(nstmtint,
-                            ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-                            stmtint.setInt(1, rsdb.getInt("batch_id"));
-                            ResultSet rsint = stmtint.executeQuery();
-                            while (rsint.next()) {
-                                try {
-
-                                    //convert Molecule fingerprints
-                         
-                                    String cmp1e = rs.getString("EXT");
-                                    BitSet bs1 = bsFromString(cmp1e);
-                                    String cmp1kr = rs.getString("KR");
-                                    BitSet bs1k = bsFromString(cmp1kr);
-                        
-                                    String cmp2e = rsint.getString("EXT");
-                                    BitSet bs2 = bsFromString(cmp2e);
-                                    String cmp2kr = rsint.getString("KR");  
-                                    BitSet bs2k = bsFromString(cmp2kr);
-
-                                    Double extscore = calculateSimilarity(bs1,bs2);                                 
-                                    Double krscore = calculateSimilarity(bs1k,bs2k);
-                                    
-                                    if ((extscore >= TanimotoCutoff || krscore >= TanimotoCutoff) && extscore < 1) {
-                                        
-                                        if (rs.getInt("mol_id") != rsint.getInt("mol_id")) {
-                                            System.out.println(rs.getInt("mol_id") + " " + rsint.getInt("mol_id") + "Scores:" + extscore + " " + krscore);
-                                        
-                                            Statement sqlstmt = con.createStatement();
-                                            String sqladdsmile = "insert into `tanimoto` (`mol_id1`,`mol_id2`,`ext`,`kr`) VALUES (" + rs.getString("mol_id") + ",'" + rsint.getString("mol_id") + "'," + extscore +", " + krscore +" ) ON DUPLICATE KEY UPDATE ext=" + extscore + ", kr =" + krscore; 
-                                            //System.out.println(sqladdsmile);
-                                            int updateCount = sqlstmt.executeUpdate(sqladdsmile);
-                                        }
-                                        
-                                    }
-                            
-
-                                    x++;
-                                    // if ((x % 100) == 0)
-                                    //System.out.println(x);
-                                } catch (Exception e) {
-                                    e.printStackTrace();
-                                    continue;
-                                }
-                            }
-                        }
+		for (final MolRecord mol1 : targetMols) {
+			pool.submit(new Runnable() {
+				public void run() {
+					try (Connection threadConn = DriverManager.getConnection(threadHost, threadUser, threadPassword)) {
+						for (Integer compBatchId : finalBatchIds) {
+							String nstmtint = "SELECT " + threadFpTable + ".mol_id, " + threadFpTable + ".EXT, " + threadFpTable + ".KR FROM " + threadFpTable + ", " + threadBatchTable + " WHERE " + threadBatchTable + ".mol_id = " + threadFpTable + ".mol_id AND " + threadBatchTable + ".batch_id = ?";
+							try (PreparedStatement stmtint = threadConn.prepareStatement(nstmtint)) {
+								stmtint.setInt(1, compBatchId);
+								try (ResultSet rsint = stmtint.executeQuery()) {
+									while (rsint.next()) {
+										String mol2Id = rsint.getString("mol_id");
+										String cmp2e = rsint.getString("EXT");
+										String cmp2kr = rsint.getString("KR");
+										
+										if (mol1.ext == null || mol1.kr == null || cmp2e == null || cmp2kr == null) {
+											continue;
+										}
+										
+										BitSet bs1 = bsFromString(mol1.ext);
+										BitSet bs1k = bsFromString(mol1.kr);
+										BitSet bs2 = bsFromString(cmp2e);
+										BitSet bs2k = bsFromString(cmp2kr);
+										
+										double extscore = calculateSimilarity(bs1, bs2);
+										double krscore = calculateSimilarity(bs1k, bs2k);
+										
+										if ((extscore >= threadCutoff || krscore >= threadCutoff) && extscore < 1) {
+											if (!mol1.molId.equals(mol2Id)) {
+												String sqladdsmile = "insert into `tanimoto` (`mol_id1`,`mol_id2`,`ext`,`kr`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE ext=?, kr=?";
+												try (PreparedStatement insertStmt = threadConn.prepareStatement(sqladdsmile)) {
+													insertStmt.setString(1, mol1.molId);
+													insertStmt.setString(2, mol2Id);
+													insertStmt.setDouble(3, extscore);
+													insertStmt.setDouble(4, krscore);
+													insertStmt.setDouble(5, extscore);
+													insertStmt.setDouble(6, krscore);
+													insertStmt.executeUpdate();
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+			});
+			x++;
 		}
+		
+		pool.shutdown();
+		pool.awaitTermination(1, java.util.concurrent.TimeUnit.HOURS);
+		System.out.println("Similarity finished. Submitted " + x + " tasks.");
 
 	}
         

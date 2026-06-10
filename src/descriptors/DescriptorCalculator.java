@@ -15,7 +15,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.openscience.cdk.exception.CDKException;
-import org.openscience.cdk.interfaces.IMolecule;
 import org.openscience.cdk.qsar.*;
 import org.openscience.cdk.modeling.builder3d.ModelBuilder3D;
 import org.openscience.cdk.modeling.builder3d.TemplateHandler3D;

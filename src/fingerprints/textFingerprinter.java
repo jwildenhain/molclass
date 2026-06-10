@@ -13,9 +13,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.BitSet;
 
-import org.openscience.cdk.Molecule;
+import org.openscience.cdk.AtomContainer;
 import org.openscience.cdk.fingerprint.ExtendedFingerprinter;
 import org.openscience.cdk.fingerprint.MACCSFingerprinter;
+import org.openscience.cdk.interfaces.IAtomContainer;
 
 public class textFingerprinter {
 
@@ -49,7 +50,7 @@ public class textFingerprinter {
 				ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
 
 		ResultSet rs = stmt.executeQuery();
-		Molecule molecule = new Molecule();
+		IAtomContainer molecule = new AtomContainer();
                         //Molecule();
 		SDFReader sr = new SDFReader();
 
@@ -73,10 +74,8 @@ public class textFingerprinter {
 
 				molecule = sr.read(sdf_structure);
 
-				//BitSet MACCSset = mfp.getBitFingerprint(molecule).asBitSet();
-				//BitSet EXTset = efp.getBitFingerprint(molecule).asBitSet();
-                                BitSet MACCSset = mfp.getFingerprint(molecule);
-				BitSet EXTset = efp.getFingerprint(molecule);
+				BitSet MACCSset = mfp.getBitFingerprint(molecule).asBitSet();
+				BitSet EXTset = efp.getBitFingerprint(molecule).asBitSet();
 
 				rs2.updateString("MACCS", MACCSset.toString());
 				rs2.updateString("EXT", EXTset.toString());

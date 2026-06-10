@@ -1,27 +1,26 @@
 package descriptors;
 
-import org.openscience.cdk.Molecule;
 import org.openscience.cdk.graph.ConnectivityChecker;
-import org.openscience.cdk.interfaces.IMolecule;
-import org.openscience.cdk.interfaces.IMoleculeSet;
+import org.openscience.cdk.interfaces.IAtomContainer;
+import org.openscience.cdk.interfaces.IAtomContainerSet;
 
 public class SaltStripper {
 	
-	public void SaltStipper(){}
+	public void SaltStripper(){}
 	
-	public Molecule stripSalt(Molecule molecule) {
+	public IAtomContainer stripSalt(IAtomContainer molecule) {
 		if (!ConnectivityChecker.isConnected(molecule)) {
-			IMoleculeSet molSet = ConnectivityChecker
+			IAtomContainerSet molSet = ConnectivityChecker
 					.partitionIntoMolecules(molecule);
-			IMolecule biggest = molSet.getMolecule(0);
-			for (int i = 1; i < molSet.getMoleculeCount(); i++) {
-				if (molSet.getMolecule(i).getBondCount() > biggest
+			IAtomContainer biggest = molSet.getAtomContainer(0);
+			for (int i = 1; i < molSet.getAtomContainerCount(); i++) {
+				if (molSet.getAtomContainer(i).getBondCount() > biggest
 						.getBondCount()) {
-					biggest = molSet.getMolecule(i);
+					biggest = molSet.getAtomContainer(i);
 				}
 			}
 
-			molecule = (Molecule) biggest;
+			molecule = biggest;
 		}
 		return molecule;
 	}

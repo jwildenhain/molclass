@@ -16,7 +16,7 @@
 
 		<!-- General DB INFO -->
 
-		<database>molclass</database>
+		<database>molclass_v15</database>
 		<hostname>localhost</hostname>
 		<rw_user>molclass_user</rw_user>
 		<rw_password>YCuRzNoe</rw_password>
@@ -89,6 +89,7 @@
                 <setThreadPoolTimeout>130000</setThreadPoolTimeout>
                 <crossValidateModel>10</crossValidateModel>
                 <setDistributionSpread>5.0</setDistributionSpread>
+                <numThreads>16</numThreads>
 
                 <!-- depricated -->
 		<model_pred_dir>./tools/model_pred/</model_pred_dir>

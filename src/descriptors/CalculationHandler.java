@@ -11,7 +11,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.openscience.cdk.Molecule;
+import org.openscience.cdk.AtomContainer;
+import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.exception.CDKException;
 import org.openscience.cdk.qsar.descriptors.molecular.*;
 import org.openscience.cdk.modeling.builder3d.ModelBuilder3D;
@@ -48,7 +49,7 @@ class CalculationHandler implements Runnable {
         try {
             Connection conn = null;
             PreparedStatement pstmt = null;
-            Molecule molecule = new Molecule();
+            IAtomContainer molecule = new AtomContainer();
             ResultSet rs = null;
             String sdf_structure = null;
 
@@ -122,7 +123,7 @@ class CalculationHandler implements Runnable {
 
             // this is the "DescriptorEngine" which calculates the descriptors
             DescriptorEngine engine = new DescriptorEngine(
-                    DescriptorEngine.MOLECULAR);
+                    org.openscience.cdk.qsar.IMolecularDescriptor.class, org.openscience.cdk.silent.SilentChemObjectBuilder.getInstance());
 
             // Get the list of descriptors cdk will calculate
             List list = engine.getDescriptorClassNames();
@@ -148,7 +149,7 @@ class CalculationHandler implements Runnable {
 
             //Logger.getLogger(this.getClass().getName()).log(Level.INFO, "mol_id" + mol_id + " cleaned up number of descriptors to calc : " + list.size());
 
-            engine = new DescriptorEngine(list);
+            engine = new DescriptorEngine(list, org.openscience.cdk.silent.SilentChemObjectBuilder.getInstance());
 
 
             // Calculate descriptors and convert to set

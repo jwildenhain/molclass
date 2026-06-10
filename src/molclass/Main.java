@@ -24,18 +24,8 @@ public class Main {
     public static void main(String[] args) {
         // TODO code application logic here
 
-        //Get the System Classloader
-        ClassLoader sysClassLoader = ClassLoader.getSystemClassLoader();
-
-        //Get the URLs
-        URL[] urls = ((URLClassLoader)sysClassLoader).getURLs();
-
-
-        System.out.println("ClassPath ( size : " + urls.length +"): ");
-        for(int i=0; i< urls.length; i++)
-        {
-            System.out.println(urls[i].getFile());
-        }
+        String classPath = System.getProperty("java.class.path");
+        System.out.println("ClassPath: " + classPath);
 
         if (args.length < 1)
         {
@@ -47,7 +37,7 @@ public class Main {
 		System.out.println("\tUsage: java -jar MolClass.jar Predictor <pred_id>");
                 System.out.println("\n");
                 System.out.println("Hint when in struggle:");
-                System.out.println("java -cp lib/cdk-1.4.18.jar:MolClass.jar descriptors.AutomaticCalcDriver <batch_id>");
+                System.out.println("java -cp lib/cdk-2.12.jar:MolClass.jar descriptors.AutomaticCalcDriver <batch_id>");
                 
 
 	}

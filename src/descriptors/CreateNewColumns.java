@@ -11,13 +11,13 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 
-import org.openscience.cdk.DefaultChemObjectBuilder;
-import org.openscience.cdk.Molecule;
+import org.openscience.cdk.AtomContainer;
+import org.openscience.cdk.silent.SilentChemObjectBuilder;
 import org.openscience.cdk.exception.CDKException;
 import org.openscience.cdk.exception.InvalidSmilesException;
 import org.openscience.cdk.graph.ConnectivityChecker;
-import org.openscience.cdk.interfaces.IMolecule;
-import org.openscience.cdk.interfaces.IMoleculeSet;
+import org.openscience.cdk.interfaces.IAtomContainer;
+import org.openscience.cdk.interfaces.IAtomContainerSet;
 import org.openscience.cdk.modeling.builder3d.ModelBuilder3D;
 import org.openscience.cdk.modeling.builder3d.TemplateHandler3D;
 import org.openscience.cdk.qsar.DescriptorEngine;
@@ -41,10 +41,10 @@ public class CreateNewColumns{
 					"jdbc:mysql://prohits.bio.ed.ac.uk", "nfg",
 					"ZeYq2WSXdS43adX3");
 		
-		Molecule molecule;
+		IAtomContainer molecule;
 		
-		SmilesParser sp = new SmilesParser(DefaultChemObjectBuilder.getInstance());
-		molecule = (Molecule)sp.parseSmiles("CC(N)(Cc1ccc(O)cc1)C(O)=O");
+		SmilesParser sp = new SmilesParser(SilentChemObjectBuilder.getInstance());
+		molecule = sp.parseSmiles("CC(N)(Cc1ccc(O)cc1)C(O)=O");
 		
 		molecule = stripSalt(molecule);
 
@@ -52,16 +52,15 @@ public class CreateNewColumns{
 		try {
 			TemplateHandler3D template = TemplateHandler3D.getInstance();
 			ModelBuilder3D mb3d = ModelBuilder3D.getInstance(template,
-					"mm2");
-			molecule = (Molecule) mb3d
-					.generate3DCoordinates(molecule, true);
+					"mm2", org.openscience.cdk.silent.SilentChemObjectBuilder.getInstance());
+			molecule = mb3d.generate3DCoordinates(molecule, true);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
 		// Calculate descriptors and convert to set
 		DescriptorEngine engine = new DescriptorEngine(
-				DescriptorEngine.MOLECULAR,null);
+				org.openscience.cdk.qsar.IMolecularDescriptor.class, SilentChemObjectBuilder.getInstance());
 
 		List list = engine.getDescriptorClassNames();
 		list.remove("org.openscience.cdk.qsar.descriptors.molecular.LengthOverBreadthDescriptor");
@@ -151,19 +150,19 @@ public class CreateNewColumns{
 		}
 	}
 
-	private static Molecule stripSalt(Molecule molecule) {
+	private static IAtomContainer stripSalt(IAtomContainer molecule) {
 		if (!ConnectivityChecker.isConnected(molecule)) {
-			IMoleculeSet molSet = ConnectivityChecker
+			IAtomContainerSet molSet = ConnectivityChecker
 					.partitionIntoMolecules(molecule);
-			IMolecule biggest = molSet.getMolecule(0);
-			for (int i = 1; i < molSet.getMoleculeCount(); i++) {
-				if (molSet.getMolecule(i).getBondCount() > biggest
+			IAtomContainer biggest = molSet.getAtomContainer(0);
+			for (int i = 1; i < molSet.getAtomContainerCount(); i++) {
+				if (molSet.getAtomContainer(i).getBondCount() > biggest
 						.getBondCount()) {
-					biggest = molSet.getMolecule(i);
+					biggest = molSet.getAtomContainer(i);
 				}
 			}
 
-			molecule = (Molecule) biggest;
+			molecule = biggest;
 		}
 		return molecule;
 	}

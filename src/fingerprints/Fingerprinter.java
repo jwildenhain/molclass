@@ -15,12 +15,10 @@ import java.sql.SQLException;
 import java.util.BitSet;
 import org.openscience.cdk.ConformerContainer;
 
-import org.openscience.cdk.Molecule;
+import org.openscience.cdk.AtomContainer;
 import org.openscience.cdk.fingerprint.EStateFingerprinter;
 import org.openscience.cdk.fingerprint.ExtendedFingerprinter;
 import org.openscience.cdk.fingerprint.GraphOnlyFingerprinter;
-// future release 1.5.X cdk needs IBits
-//import org.openscience.cdk.fingerprint.IBitFingerprint;
 import org.openscience.cdk.fingerprint.MACCSFingerprinter;
 import org.openscience.cdk.fingerprint.PubchemFingerprinter;
 import org.openscience.cdk.fingerprint.SubstructureFingerprinter;
@@ -28,7 +26,6 @@ import org.openscience.cdk.fingerprint.KlekotaRothFingerprinter;
 import org.openscience.cdk.inchi.InChIGenerator;
 import org.openscience.cdk.inchi.InChIGeneratorFactory;
 import org.openscience.cdk.interfaces.IAtomContainer;
-import org.openscience.cdk.interfaces.IMolecule;
 import org.openscience.cdk.smiles.SmilesGenerator;
 
 
@@ -64,7 +61,7 @@ public class Fingerprinter {
 		//fingerprinters
 		MACCSFingerprinter mfp = new MACCSFingerprinter();
 		ExtendedFingerprinter efp = new ExtendedFingerprinter();
-                PubchemFingerprinter pcfp = new PubchemFingerprinter();
+                PubchemFingerprinter pcfp = new PubchemFingerprinter(org.openscience.cdk.silent.SilentChemObjectBuilder.getInstance());
                 EStateFingerprinter esfp = new EStateFingerprinter();
                 SubstructureFingerprinter subfp = new SubstructureFingerprinter();
                 GraphOnlyFingerprinter stdfp = new GraphOnlyFingerprinter();
@@ -89,144 +86,78 @@ public class Fingerprinter {
 		stmt.setInt(1, batch_id);
 
 		ResultSet rs = stmt.executeQuery();
-		Molecule molecule = new Molecule();
+		IAtomContainer molecule = new AtomContainer();
 		SDFReader sr = new SDFReader();
+
+		int numThreads = 16;
+		try {
+			String threadsVal = XMLReader.getTag("numThreads");
+			if (threadsVal != null) {
+				numThreads = Integer.parseInt(threadsVal.trim());
+			}
+		} catch (Exception e) {
+			// fallback to 16
+		}
+		System.out.println("...... Running Fingerprinter with thread pool size = " + numThreads);
+		
+		java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(numThreads);
+		final String threadHost = hostname;
+		final String threadUser = user;
+		final String threadPassword = password;
+		final String threadFpTable = fptablename;
 
 		int x = 0;
 
 		while (rs.next()) {
-			try {
-		                          String stmt2 = new String("SELECT * FROM " + fptablename
-                                    + " WHERE mol_id = " + rs.getString("mol_id"));
-                            PreparedStatement pstmt = con.prepareStatement(stmt2, ResultSet.TYPE_FORWARD_ONLY,
-                                    ResultSet.CONCUR_UPDATABLE);
-
-                            ResultSet rs2 = pstmt.executeQuery();
-                            rs2.next();
-
-                            Blob struc = rs.getBlob("struc");
-                            byte[] bdata = struc.getBytes(1, (int) struc.length());
-                            String sdf_structure = new String(bdata);
-
-                            //convert sdf to Molecule
-                            molecule = sr.read(sdf_structure);
-
-                            // System.out.println(molecule);
-/*
-                            // write InChiKey, Smiles into the identifier table
-                            //IAtomContainer atomContainer = (Molecule) molecule;
-                            //IAtomContainer cc = molecule;
-                            //IMolecule ccc =molecule;
-                            SmilesGenerator sg = new SmilesGenerator(true);
-                            String smiles = "NULL"; // C1CCCCC1
-                            Boolean SmileCheck = true;
-                            try
-                            {
-                                    smiles = sg.createSMILES(molecule); // C1CCCCC1
-                            }
-                            catch(NullPointerException e)
-                            {
-                                    System.out.println("Issue with Smiles generation.");
-                                    SmileCheck = false;
-                            }
-                            if (SmileCheck)
-                            {
-                            try
-                            {
-                                    smiles = sg.createSMILES(molecule); // C1CCCCC1
-                            }
-                            catch(IllegalArgumentException e)
-                            {
-                                    System.out.println("Issue with Smiles generation.");
-                            }
-                            }
-                            //sg.setUseAromaticityFlag(true);
-                            //IMolecule benzene2; // one of the two kekule structures with explicit double bond orders
-                            //String smiles2 = sg.createChiralSMILES(molecule,true);
-
-                            // Get InChIGenerator
-                            InChIGeneratorFactory fac = InChIGeneratorFactory.getInstance();// factory = new InChIGeneratorFactory.get();
-                            InChIGenerator gen = fac.getInChIGenerator(molecule);
-                            
-                            String inchi = "NULL";
-                            try
-                            {
-                                    inchi = gen.getInchi();
-                            }
-                            catch(IllegalArgumentException e)
-                            {
-                                    System.out.println("Issue with InChi generation.");
-                            }
-                            
-                            //String auxinfo = gen.getAuxInfo();
-
-                            String inchikey = "NULL";
-                            try
-                            {
-                                    inchikey = gen.getInchiKey();
-                            }
-                            catch(IllegalArgumentException e)
-                            {
-                                    System.out.println("Issue with InChiKey generation.");
-                            }
-
-                            Statement sqlstmt = con.createStatement();
-                            String sqladdsmile = "insert into `inchi_key` (`mol_id`,`inchi`,`smiles`,`inchi_key`) VALUES (" + rs.getString("mol_id") + ",'" + inchi + "','" + smiles + "','"+ inchikey +"') ON DUPLICATE KEY UPDATE inchi_key='" + inchikey + "', smiles='" + smiles + "', inchi ='" + inchi + "'";
-
-                            //String sqladdsmile = "update `inchi_key` set inchi_key='" + inchikey + "', smiles='" + smiles + "', inchi ='" + inchi + "' WHERE mol_id = " + rs.getString("mol_id");
-                            //System.out.println(sqladdsmile);
-                            int updateCount = sqlstmt.executeUpdate(sqladdsmile);
-*/
-                            /*    INCHI_RET ret = gen.getReturnStatus();
-                            if (ret == INCHI_RET.WARNING) {
-                            // InChI generated, but with warning message
-                            System.out.println("InChI warning: " + gen.getMessage());
-                            } else if (ret != INCHI_RET.OKAY) {
-                            // InChI generation failed
-                            throw new CDKException("InChI failed: " + ret.toString()
-                            + " [" + gen.getMessage() + "]");
-                            }
-                             */
-
-
-                                // build the molecule fingerprints
-
-				BitSet ESset = esfp.getFingerprint(molecule);
-                                BitSet MACCSset = mfp.getFingerprint(molecule);                           
-				BitSet EXTset = efp.getFingerprint(molecule);                                
-                                BitSet PCset = pcfp.getFingerprint(molecule);
-                		BitSet STDset = stdfp.getFingerprint(molecule);
-                		BitSet SUBset = subfp.getFingerprint(molecule);
-                                BitSet KRset = krfp.getFingerprint(molecule);
-                            /*
-                             *  Future releases cdk-1.5.X will need IBitFingerprint and BitSet
-                                BitSet MACCSset = mfp.getBitFingerprint(molecule).asBitSet();    
-				BitSet EXTset = efp.getBitFingerprint(molecule).asBitSet();
-                                // new feature add by jw
-                                BitSet PCset = pcfp.getBitFingerprint(molecule).asBitSet();
-                		//BitSet STDset = stdfp.getFingerprint(molecule);
-                		BitSet SUBset = subfp.getBitFingerprint(molecule).asBitSet();
-                                BitSet KRset = krfp.getBitFingerprint(molecule).asBitSet();
-                            */
-				//write string representation of bitsets to database
-				rs2.updateString("MACCS", MACCSset.toString());
-				rs2.updateString("EXT", EXTset.toString());
-                                // new feature add by jw
-				rs2.updateString("PubChem", PCset.toString());
-				rs2.updateString("GOFP", STDset.toString());
-				rs2.updateString("SUB", SUBset.toString());
-				rs2.updateString("KR", KRset.toString());
-                                rs2.updateString("ESFP", ESset.toString());
-
-				rs2.updateRow();
-				x++;
-				// if ((x % 100) == 0)
-				System.out.println(x);
-			} catch (Exception e) {
-				e.printStackTrace();
-				continue;
-			}
+			final String molId = rs.getString("mol_id");
+			Blob struc = rs.getBlob("struc");
+			final byte[] bdata = struc.getBytes(1, (int) struc.length());
+			
+			pool.submit(new Runnable() {
+				public void run() {
+					try (Connection threadConn = DriverManager.getConnection(threadHost, threadUser, threadPassword)) {
+						SDFReader srThread = new SDFReader();
+						IAtomContainer mol = srThread.read(new String(bdata));
+						
+						MACCSFingerprinter mfp = new MACCSFingerprinter();
+						ExtendedFingerprinter efp = new ExtendedFingerprinter();
+						PubchemFingerprinter pcfp = new PubchemFingerprinter(org.openscience.cdk.silent.SilentChemObjectBuilder.getInstance());
+						EStateFingerprinter esfp = new EStateFingerprinter();
+						SubstructureFingerprinter subfp = new SubstructureFingerprinter();
+						GraphOnlyFingerprinter stdfp = new GraphOnlyFingerprinter();
+						KlekotaRothFingerprinter krfp = new KlekotaRothFingerprinter();
+						
+						BitSet ESset = esfp.getBitFingerprint(mol).asBitSet();
+						BitSet MACCSset = mfp.getBitFingerprint(mol).asBitSet();
+						BitSet EXTset = efp.getBitFingerprint(mol).asBitSet();
+						BitSet PCset = pcfp.getBitFingerprint(mol).asBitSet();
+						BitSet STDset = stdfp.getBitFingerprint(mol).asBitSet();
+						BitSet SUBset = subfp.getBitFingerprint(mol).asBitSet();
+						BitSet KRset = krfp.getBitFingerprint(mol).asBitSet();
+						
+						String updateSQL = "UPDATE " + threadFpTable + " SET MACCS=?, EXT=?, PubChem=?, GOFP=?, SUB=?, KR=?, ESFP=? WHERE mol_id=?";
+						try (PreparedStatement updateStmt = threadConn.prepareStatement(updateSQL)) {
+							updateStmt.setString(1, MACCSset.toString());
+							updateStmt.setString(2, EXTset.toString());
+							updateStmt.setString(3, PCset.toString());
+							updateStmt.setString(4, STDset.toString());
+							updateStmt.setString(5, SUBset.toString());
+							updateStmt.setString(6, KRset.toString());
+							updateStmt.setString(7, ESset.toString());
+							updateStmt.setString(8, molId);
+							updateStmt.executeUpdate();
+						}
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+			});
+			x++;
 		}
+		
+		pool.shutdown();
+		pool.awaitTermination(1, java.util.concurrent.TimeUnit.HOURS);
+		System.out.println("Fingerprinter finished. Processed " + x + " molecules.");
 
 	}
 }

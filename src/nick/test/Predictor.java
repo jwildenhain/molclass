@@ -393,7 +393,7 @@ public class Predictor {
       double pred = classifier.classifyInstance(inst);
       
       double id = unlabeled.instance(i).value(unlabeled.attribute("mol_id"));
-      String mol_id = unlabeled.attribute("mol_id").value((int) id);
+      String mol_id = unlabeled.attribute("mol_id").isNumeric() ? String.valueOf((int) id) : unlabeled.attribute("mol_id").value((int) id);
       String pred_class = unlabeled.classAttribute().value((int) pred);
       String mol_col = Utils.padRight(mol_id, 15);
       String class_col = Utils.padRight(pred_class, 27);
