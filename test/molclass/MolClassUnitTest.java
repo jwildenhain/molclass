@@ -223,6 +223,13 @@ public class MolClassUnitTest {
         java.util.List descriptorClasses = engine.getDescriptorClassNames();
         descriptorClasses.remove("org.openscience.cdk.qsar.descriptors.molecular.IPMolecularLearningDescriptor");
         descriptorClasses.remove("org.openscience.cdk.qsar.descriptors.molecular.KierHallSmartsDescriptor");
+        // Remove 3D descriptors because the test structures are 2D, preventing stderr warnings during testing
+        descriptorClasses.remove("org.openscience.cdk.qsar.descriptors.molecular.WHIMDescriptor");
+        descriptorClasses.remove("org.openscience.cdk.qsar.descriptors.molecular.VABCDescriptor");
+        descriptorClasses.remove("org.openscience.cdk.qsar.descriptors.molecular.MomentOfInertiaDescriptor");
+        descriptorClasses.remove("org.openscience.cdk.qsar.descriptors.molecular.LengthOverBreadthDescriptor");
+        descriptorClasses.remove("org.openscience.cdk.qsar.descriptors.molecular.GravitationalIndexDescriptor");
+        descriptorClasses.remove("org.openscience.cdk.qsar.descriptors.molecular.CPSADescriptor");
         
         engine = new DescriptorEngine(descriptorClasses, org.openscience.cdk.silent.SilentChemObjectBuilder.getInstance());
         

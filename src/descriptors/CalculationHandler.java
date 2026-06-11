@@ -31,10 +31,13 @@ class CalculationHandler implements Runnable {
     private String user = null;
     private String password = null;
     static Lock srLock = new ReentrantLock();
-    // static Lock lock3d = new ReentrantLock();
     static Lock xLock = new ReentrantLock();
 
-    // static int x = 1;
+    // Obtain a connection from the HikariCP pool. The pool is keyed by the DB credentials.
+    private static Connection getPooledConnection(String hostname, String user, String password) throws SQLException {
+        return DBConnectionPool.getDataSource(hostname, user, password).getConnection();
+    }
+
     CalculationHandler(String hostname, String user, String password,
             String infotablename, String structablename, String mol_id) {
         this.mol_id = mol_id;
@@ -46,248 +49,179 @@ class CalculationHandler implements Runnable {
     }
 
     public void run() {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        String sdf_structure = null;
+
         try {
-            Connection conn = null;
-            PreparedStatement pstmt = null;
-            IAtomContainer molecule = new AtomContainer();
-            ResultSet rs = null;
-            String sdf_structure = null;
+            conn = getPooledConnection(hostname, user, password);
+            // Disable auto‑commit for the duration of this molecule processing to reduce commit overhead.
+            conn.setAutoCommit(false);
+            String nstmt = "SELECT struc FROM " + structablename + " WHERE mol_id=?";
+            pstmt = conn.prepareStatement(nstmt, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+            pstmt.setString(1, mol_id);
 
-            // // Read sdf file and convert to Molecule. Ensure connectivity.
-            SDFReader sr = new SDFReader();
-
-            try {
-
-                conn = DriverManager.getConnection(hostname, user, password);
-
-                String nstmt = new String("SELECT struc FROM " + structablename
-                        + " WHERE mol_id=?");
-                pstmt = conn.prepareStatement(nstmt, ResultSet.TYPE_FORWARD_ONLY,
-                        ResultSet.CONCUR_UPDATABLE);
-                pstmt.setString(1, mol_id);
-
-
-                rs = pstmt.executeQuery();
-
-                rs.next();
-                // convert from blob into string
+            rs = pstmt.executeQuery();
+            if (rs.next()) {
                 Blob struc = rs.getBlob("struc");
                 byte[] bdata = struc.getBytes(1, (int) struc.length());
                 sdf_structure = new String(bdata);
-
-                nstmt = new String("SELECT * FROM " + infotablename
-                        + " WHERE mol_id=?");
-                pstmt = conn.prepareStatement(nstmt, ResultSet.TYPE_FORWARD_ONLY,
-                        ResultSet.CONCUR_UPDATABLE);
-                pstmt.setString(1, mol_id);
-
-                rs = pstmt.executeQuery();
-
-                rs.next();
-            } catch (SQLException e) {
-              //  Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, "Error with SQL connection", e);
-                System.out.println("Error with SQL connection: "
-                        + e.getMessage());
-                return;
-            } catch (Exception e) {
-              //  Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, "Unknow Error", e);
-                e.printStackTrace();
-                return;
             }
-
-            // Converts string of SDF data into Molecule. Needs lock because
-            // SDFReader is not thread-safe.
-            srLock.lock();
-            try {
-                molecule = sr.read(sdf_structure);
-
-            } catch (Exception e) {
-              //  Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, "Unknown error", e);
-                System.out.println(e.getMessage());
-                e.printStackTrace();
-                return;
-            } finally {
-                srLock.unlock();
-            }
-
-
-            // Use SaltStripper to ensure the molecule is connected (no
-            // unconnected atoms)
-            SaltStripper ss = new SaltStripper();
-            molecule = ss.stripSalt(molecule);
-
-            // 3D coordinates disabled because does not work
-            // TemplateHandler3D template = TemplateHandler3D.getInstance();
-            // ModelBuilder3D mb3d = ModelBuilder3D.getInstance(template,"mm2");
-            // molecule = (Molecule) mb3d.generate3DCoordinates(molecule, true);
-
-            // this is the "DescriptorEngine" which calculates the descriptors
-            DescriptorEngine engine = new DescriptorEngine(
-                    org.openscience.cdk.qsar.IMolecularDescriptor.class, org.openscience.cdk.silent.SilentChemObjectBuilder.getInstance());
-
-            // Get the list of descriptors cdk will calculate
-            List list = engine.getDescriptorClassNames();
-            // These descriptors have to be removed because they cause CDK to
-            // fail for various reasons. The first 3 fail because they need 3D
-            // coordinates, not sure about the others.
-            //Logger.getLogger(this.getClass().getName()).log(Level.INFO, "mol_id" + mol_id + " number of descriptors to calc : " + list.size());
-
-            //list.remove("org.openscience.cdk.qsar.descriptors.molecular.LengthOverBreadthDescriptor");
-            //list.remove("org.openscience.cdk.qsar.descriptors.molecular.TaeAminoAcidDescriptor");
-            //list.remove("org.openscience.cdk.qsar.descriptors.molecular.GravitationalIndexDescriptor"); // these
-            //list.remove("org.openscience.cdk.qsar.descriptors.molecular.MomentOfInertiaDescriptor");
-            //list.remove("org.openscience.cdk.qsar.descriptors.molecular.PetitjeanShapeIndexDescriptor"); // 1 num should work jw
-            //list.remove("org.openscience.cdk.qsar.descriptors.molecular.WHIMDescriptor");
-            //list.remove("org.openscience.cdk.qsar.descriptors.molecular.IPMolecularDescriptor");
-            // those crash with very large molecules like Cyanocobalamin and Lanatoside_C:
-            //list.remove("org.openscience.cdk.qsar.descriptors.molecular.WeightedPathDescriptor"); // 1# fails oca. jw
-            //list.remove("org.openscience.cdk.qsar.descriptors.molecular.FMFDescriptor"); // Jan cdk1.5 crashes MurckoFragm.
-            //list.remove("org.openscience.cdk.qsar.descriptors.molecular.HybridizationRatioDescriptor"); // jw new!
-            //terribly slow and crash very often:
-            list.remove("org.openscience.cdk.qsar.descriptors.molecular.IPMolecularLearningDescriptor"); // Jan CDKver1.5 very slow/buggy
-            list.remove("org.openscience.cdk.qsar.descriptors.molecular.KierHallSmartsDescriptor"); // Jan new CDK version
-
-            //Logger.getLogger(this.getClass().getName()).log(Level.INFO, "mol_id" + mol_id + " cleaned up number of descriptors to calc : " + list.size());
-
-            engine = new DescriptorEngine(list, org.openscience.cdk.silent.SilentChemObjectBuilder.getInstance());
-
-
-            // Calculate descriptors and convert to set
-            System.out.println("IN: " + mol_id);
-            //Logger.getLogger(this.getClass().getName()).log(Level.INFO, "IN:" + mol_id);
-            try {
-                engine.process(molecule);
-            } catch (CDKException e1) {
-              //  Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, "CDK Erro", e1);
-                System.out.println("CalcError: " + mol_id + ": "
-                        + e1.getMessage());
-            }
-            //Logger.getLogger(this.getClass().getName()).log(Level.INFO, "OUT:" + mol_id);
-            System.out.println("OUT: " + mol_id);
-            // System.out.println("CalcError: " + mol_id + ": " +
-            // e.getMessage());
-            // return;
-            // }
-
-
-            // Get set of Molecules properties
-            Set descSet = molecule.getProperties().entrySet();
-
-            // Filter out properties which are not DescriptorValues (the
-            // molecules will have some properties which are not descriptors).
-            Iterator itr = descSet.iterator();
-            while (itr.hasNext()) {
-                Map.Entry e = ((Map.Entry) itr.next());
-//                Logger.getLogger(this.getClass().getName()).log(Level.INFO, "mol_id" + mol_id + " | " + e.getKey().toString() + " -> " + e.getValue().toString());
-                if (!(e.getValue() instanceof DescriptorValue)) {
-                    itr.remove();
-                }
-            }
-
-            itr = descSet.iterator();
-
-            // Iterate over the set of calculated descriptors. We have to test
-            // what type it is (int, double, array), and write it to the
-            // database in a different way depending on this.
-            while (itr.hasNext()) {
-                DescriptorValue desc = (DescriptorValue) ((Map.Entry) itr.next()).getValue();
-                String[] names = desc.getNames();
-
-                try {
-                    rs.first();
-
-                    for (int n = 0; n < names.length; n++) {
-                        String name = names[n];
-                        name = name.replace('-', '_'); // MySQL does not allow
-                        // "-"
-                        name = name.replace('.', '_'); // MySQL does not allow
-                        // "."
-
-                        if ((name.compareTo("TPSA") == 0) && (n == 0)) // rename
-                        // sigular
-                        // tpsa
-                        {
-                            name = new String("TopoPSA");
-                        }
-
-                        IDescriptorResult result = desc.getValue();
-
-                        if (result instanceof BooleanResult) {
-                            BooleanResult res = (BooleanResult) result;
-
-                            boolean value = res.booleanValue();
-                            rs.updateBoolean(name, value);
-                        } else if (result instanceof DoubleArrayResult) {
-                            DoubleArrayResult res = (DoubleArrayResult) result;
-
-                            Double value = res.get(n);
-
-                            if (value.isNaN()) {
-                                continue;
-                            } else if (value.isInfinite()) {
-                                continue;
-                            } else {
-                                rs.updateDouble(name, value);
-                            }
-                        } else if (result instanceof DoubleResult) {
-                            DoubleResult res = (DoubleResult) result;
-
-                            Double value = res.doubleValue();
-                            if (value.isNaN()) {
-                                continue;
-                            } else if (value.isInfinite()) {
-                                continue;
-                            } else {
-                                rs.updateDouble(name, value);
-                            }
-                        } else if (result instanceof IntegerArrayResult) {
-                            IntegerArrayResult res = (IntegerArrayResult) result;
-
-                            Integer value = res.get(n);
-
-                            rs.updateInt(name, value);
-                        } else if (result instanceof IntegerResult) {
-                            IntegerResult res = (IntegerResult) result;
-
-                            Integer value = res.intValue();
-
-                            rs.updateInt(name, value);
-                        }
-                    }
-                    rs.updateRow();
-                } catch (SQLException e) {
-                    System.out.println("Error writing to database: "
-                            + e.getMessage());
-                  //  Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, "sql error", e);
-                } catch (Exception e) {
-                  //  Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, "Unknown error", e);
-                    e.printStackTrace();
-                    return;
-                }
-            }
-
-            try {
-                if (conn != null) {
-                    conn.close();
-                }
-                if (pstmt != null) {
-                    pstmt.close();
-                }
-            } catch (SQLException e) {
-              //  Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, "sql error", e);
-                e.printStackTrace();
-            } catch (Exception e) {
-              //  e.printStackTrace();
-                Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, "Unknown error", e);
-                return;
-            }
-
-
+        } catch (SQLException e) {
+            System.out.println("Error with SQL connection: " + e.getMessage());
             return;
         } catch (Exception e) {
-          //  Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, "Unknown error", e);
             e.printStackTrace();
             return;
+        } finally {
+            try {
+                if (rs != null) rs.close();
+                if (pstmt != null) pstmt.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+
+        if (sdf_structure == null) {
+            return;
+        }
+
+        IAtomContainer molecule = null;
+        SDFReader sr = new SDFReader();
+
+        srLock.lock();
+        try {
+            molecule = sr.read(sdf_structure);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            e.printStackTrace();
+            return;
+        } finally {
+            srLock.unlock();
+        }
+
+        SaltStripper ss = new SaltStripper();
+        molecule = ss.stripSalt(molecule);
+
+        DescriptorEngine engine = new DescriptorEngine(
+                org.openscience.cdk.qsar.IMolecularDescriptor.class, 
+                org.openscience.cdk.silent.SilentChemObjectBuilder.getInstance()
+        );
+
+        List list = engine.getDescriptorClassNames();
+        list.remove("org.openscience.cdk.qsar.descriptors.molecular.IPMolecularLearningDescriptor");
+        list.remove("org.openscience.cdk.qsar.descriptors.molecular.KierHallSmartsDescriptor");
+        // Remove 3D descriptors because the input SDF structures are 2D, which causes calculation failures and stderr warnings.
+        list.remove("org.openscience.cdk.qsar.descriptors.molecular.WHIMDescriptor");
+        list.remove("org.openscience.cdk.qsar.descriptors.molecular.VABCDescriptor");
+        list.remove("org.openscience.cdk.qsar.descriptors.molecular.MomentOfInertiaDescriptor");
+        list.remove("org.openscience.cdk.qsar.descriptors.molecular.LengthOverBreadthDescriptor");
+        list.remove("org.openscience.cdk.qsar.descriptors.molecular.GravitationalIndexDescriptor");
+        list.remove("org.openscience.cdk.qsar.descriptors.molecular.CPSADescriptor");
+
+        engine = new DescriptorEngine(list, org.openscience.cdk.silent.SilentChemObjectBuilder.getInstance());
+
+        System.out.println("IN: " + mol_id);
+        try {
+            engine.process(molecule);
+        } catch (CDKException e1) {
+            System.out.println("CalcError: " + mol_id + ": " + e1.getMessage());
+        }
+        System.out.println("OUT: " + mol_id);
+
+        Set descSet = molecule.getProperties().entrySet();
+        Iterator itr = descSet.iterator();
+        while (itr.hasNext()) {
+            Map.Entry e = ((Map.Entry) itr.next());
+            if (!(e.getValue() instanceof DescriptorValue)) {
+                itr.remove();
+            }
+        }
+
+        itr = descSet.iterator();
+        Map<String, Object> updates = new HashMap<>();
+        while (itr.hasNext()) {
+            DescriptorValue desc = (DescriptorValue) ((Map.Entry) itr.next()).getValue();
+            String[] names = desc.getNames();
+
+            for (int n = 0; n < names.length; n++) {
+                String name = names[n];
+                name = name.replace('-', '_').replace('.', '_');
+
+                if (name.equals("TPSA") && n == 0) {
+                    name = "TopoPSA";
+                }
+
+                IDescriptorResult result = desc.getValue();
+                if (result instanceof BooleanResult) {
+                    updates.put(name, ((BooleanResult) result).booleanValue());
+                } else if (result instanceof DoubleArrayResult) {
+                    Double value = ((DoubleArrayResult) result).get(n);
+                    if (!value.isNaN() && !value.isInfinite()) {
+                        updates.put(name, value);
+                    }
+                } else if (result instanceof DoubleResult) {
+                    Double value = ((DoubleResult) result).doubleValue();
+                    if (!value.isNaN() && !value.isInfinite()) {
+                        updates.put(name, value);
+                    }
+                } else if (result instanceof IntegerArrayResult) {
+                    updates.put(name, ((IntegerArrayResult) result).get(n));
+                } else if (result instanceof IntegerResult) {
+                    updates.put(name, ((IntegerResult) result).intValue());
+                }
+            }
+        }
+
+        if (!updates.isEmpty()) {
+            StringBuilder sql = new StringBuilder("UPDATE " + infotablename + " SET ");
+            List<Object> values = new ArrayList<>();
+            int count = 0;
+            for (Map.Entry<String, Object> entry : updates.entrySet()) {
+                if (count > 0) {
+                    sql.append(", ");
+                }
+                sql.append(entry.getKey()).append("=?");
+                values.add(entry.getValue());
+                count++;
+            }
+            sql.append(" WHERE mol_id=?");
+
+            PreparedStatement pstmtUpdate = null;
+            try {
+                pstmtUpdate = conn.prepareStatement(sql.toString());
+                for (int i = 0; i < values.size(); i++) {
+                    Object val = values.get(i);
+                    if (val instanceof Boolean) {
+                        pstmtUpdate.setBoolean(i + 1, (Boolean) val);
+                    } else if (val instanceof Double) {
+                        pstmtUpdate.setDouble(i + 1, (Double) val);
+                    } else if (val instanceof Integer) {
+                        pstmtUpdate.setInt(i + 1, (Integer) val);
+                    }
+                }
+                pstmtUpdate.setInt(values.size() + 1, Integer.parseInt(mol_id));
+                pstmtUpdate.addBatch();
+                // Execute batch immediately for this single‑molecule task.
+                pstmtUpdate.executeBatch();
+                conn.commit();
+            } catch (SQLException e) {
+                System.out.println("Error writing to database: " + e.getMessage());
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    if (pstmtUpdate != null) {
+                        pstmtUpdate.close();
+                    }
+                    if (conn != null) {
+                        conn.close(); // Return to pool
+                    }
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 }

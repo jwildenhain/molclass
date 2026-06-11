@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.PreparedStatement;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import descriptors.DBConnectionPool;
 import java.text.DecimalFormat;
 import java.util.Properties;
 
@@ -64,35 +65,40 @@ public class Predictor {
 
     String databaseURL = new String("jdbc:mysql://" + hostname + "/" + database);
 
-    // get other info from database table
-    Connection conn = DriverManager.getConnection(databaseURL, username,
-	password);
-    String stmt = new String("SELECT batch_id, model_id, username email FROM " + predtable
-	+ " WHERE pred_id = ?");
-    PreparedStatement pstmt = conn.prepareStatement(stmt,
-	ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_UPDATABLE);
-    pstmt.setInt(1, pred_id);
+    // get other info from database table using pooled connection
+    Connection conn = DBConnectionPool.getConnection(databaseURL, username, password);
+    conn.setAutoCommit(false);
+    String email;
+    int model_id;
+    int batch_id;
+    try (PreparedStatement pstmt1 = conn.prepareStatement(
+        "SELECT batch_id, model_id, username email FROM " + predtable + " WHERE pred_id = ?",
+        ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
+      pstmt1.setInt(1, pred_id);
+      try (ResultSet rs1 = pstmt1.executeQuery()) {
+        rs1.next();
+        email = rs1.getString("email");
+        model_id = rs1.getInt("model_id");
+        batch_id = rs1.getInt("batch_id");
+      }
+    }
 
-    ResultSet rs = pstmt.executeQuery();
-    rs.next();
-    
-    String email = rs.getString("email");
-    int model_id = rs.getInt("model_id");
-    int batch_id = rs.getInt("batch_id");
-
-    stmt = new String("SELECT * FROM " + modeltable + " WHERE model_id = ?");
-    pstmt = conn.prepareStatement(stmt, ResultSet.TYPE_FORWARD_ONLY,
-	ResultSet.CONCUR_READ_ONLY);
-    pstmt.setInt(1, new Integer(model_id));
-
-    rs = pstmt.executeQuery();
-    rs.next();
-
-    String data_type = rs.getString("data_type");
-    String class_tag = rs.getString("class_tag");
-    Classifier classifier = (Classifier) Byter.bytesToObj(rs
-	.getBytes("model_data"));
-    Instances header = (Instances) Byter.bytesToObj(rs.getBytes("header"));
+    String data_type;
+    String class_tag;
+    Classifier classifier;
+    Instances header;
+    try (PreparedStatement pstmt2 = conn.prepareStatement(
+        "SELECT * FROM " + modeltable + " WHERE model_id = ?",
+        ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
+      pstmt2.setInt(1, model_id);
+      try (ResultSet rs2 = pstmt2.executeQuery()) {
+        rs2.next();
+        data_type = rs2.getString("data_type");
+        class_tag = rs2.getString("class_tag");
+        classifier = (Classifier) Byter.bytesToObj(rs2.getBytes("model_data"));
+        header = (Instances) Byter.bytesToObj(rs2.getBytes("header"));
+      }
+    }
 
     // get data
     InstanceQuery query = new InstanceQuery();
@@ -233,15 +239,13 @@ public class Predictor {
     } else if (data_type.equals("ALL")) {
 
 
+          String cdk_table_header;
           select_query = new String("select * from " +  cdktable + " limit 1");
-          // create a statement
-          pstmt = conn.prepareStatement(select_query, ResultSet.TYPE_FORWARD_ONLY,
-	          ResultSet.CONCUR_READ_ONLY);
-          // execute query and return result as a ResultSet
-          rs = pstmt.executeQuery();
-          // get the column names from the ResultSet
-          String cdk_table_header = getColumnNames(rs);
-          //System.out.println(cdk_table_header);
+          try (PreparedStatement pstmt = conn.prepareStatement(select_query, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+               ResultSet rs = pstmt.executeQuery()) {
+            rs.next();
+            cdk_table_header = getColumnNames(rs);
+          }
 
 
       select_query = new String("SELECT " + fptable + ".mol_id, " + fptable
@@ -354,99 +358,96 @@ public class Predictor {
     }
     text.append("\n");
 
-    // compares the attributes in unlabeled to the attributes in header
-    // discard attributes from unlabeled which are not in header
-    for (int i = 0; i < unlabeled.numInstances(); i++) {
-      Instance curr = unlabeled.instance(i);
-      // create an instance for the classifier that fits the training data
-      // Instances object returned here might differ slightly from the one
-      // used during training the classifier, e.g., different order of
-      // nominal values, different number of attributes.
-      Instance inst = new DenseInstance(header.numAttributes());
-      inst.setDataset(header);
-      for (int n = 0; n < header.numAttributes(); n++) {
-	Attribute att = unlabeled.attribute(header.attribute(n).name());
-	// original attribute is also present in the current dataset
-	if (att != null) {
-	  if (att.isNominal()) {
-	    // is this label also in the original data?
-	    // Note:
-	    // "numValues() > 0" is only used to avoid problems with nominal
-	    // attributes that have 0 labels, which can easily happen with
-	    // data loaded from a database
-	    if ((header.attribute(n).numValues() > 0) && (att.numValues() > 0)) {
-	      String label = curr.stringValue(att);
-	      int index = header.attribute(n).indexOfValue(label);
-	      if (index != -1)
-		inst.setValue(n, index);
-	    }
-	  } else if (att.isNumeric()) {
-	    inst.setValue(n, curr.value(att));
-	  } else {
-	    throw new IllegalStateException("Unhandled attribute type!");
-	  }
-	}
-      }
+    String insertSQL = "INSERT INTO " + predmoltable
+        + "(mol_id, pred_id, main_class, distribution, lhood) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE mol_id = ? , pred_id = ?";
+    try (PreparedStatement pstmtInsert = conn.prepareStatement(insertSQL)) {
+      // compares the attributes in unlabeled to the attributes in header
+      // discard attributes from unlabeled which are not in header
+      for (int i = 0; i < unlabeled.numInstances(); i++) {
+        Instance curr = unlabeled.instance(i);
+        // create an instance for the classifier that fits the training data
+        // Instances object returned here might differ slightly from the one
+        // used during training the classifier, e.g., different order of
+        // nominal values, different number of attributes.
+        Instance inst = new DenseInstance(header.numAttributes());
+        inst.setDataset(header);
+        for (int n = 0; n < header.numAttributes(); n++) {
+          Attribute att = unlabeled.attribute(header.attribute(n).name());
+          // original attribute is also present in the current dataset
+          if (att != null) {
+            if (att.isNominal()) {
+              // is this label also in the original data?
+              // Note:
+              // "numValues() > 0" is only used to avoid problems with nominal
+              // attributes that have 0 labels, which can easily happen with
+              // data loaded from a database
+              if ((header.attribute(n).numValues() > 0) && (att.numValues() > 0)) {
+                String label = curr.stringValue(att);
+                int index = header.attribute(n).indexOfValue(label);
+                if (index != -1)
+                  inst.setValue(n, index);
+              }
+            } else if (att.isNumeric()) {
+              inst.setValue(n, curr.value(att));
+            } else {
+              throw new IllegalStateException("Unhandled attribute type!");
+            }
+          }
+        }
 
-      unlabeled.setClass(unlabeled.attribute(class_tag));
+        unlabeled.setClass(unlabeled.attribute(class_tag));
 
-      double pred = classifier.classifyInstance(inst);
-      
-      double id = unlabeled.instance(i).value(unlabeled.attribute("mol_id"));
-      String mol_id = unlabeled.attribute("mol_id").isNumeric() ? String.valueOf((int) id) : unlabeled.attribute("mol_id").value((int) id);
-      String pred_class = unlabeled.classAttribute().value((int) pred);
-      String mol_col = Utils.padRight(mol_id, 15);
-      String class_col = Utils.padRight(pred_class, 27);
-      text.append(mol_col + class_col + '\t');
-
-      double[] dist = classifier.distributionForInstance(inst);
-
-      StringBuffer mol_dist = new StringBuffer();
-
-      for (int x = 0; x < dist.length; x++) {
-	double d = dist[x];
-	text.append(df.format(d));
-	mol_dist.append(df.format(d));
-	if (x == (int) pred) {
-	  text.append('*');
-	}
-	text.append('\t');
-	mol_dist.append('\t');
-
-	// System.out.print(predictionText(classifier, inst, new
-	// Integer(mol_id)));
-      }
-      text.append('\n');
-      // make log likelihood on first property column
-     
-      double llhood = logIt(dist[0],0.001);
-      //System.out.print(llhood);
-      
-      stmt = new String("INSERT INTO " + predmoltable
-		+ "(mol_id, pred_id, main_class, distribution, lhood) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE mol_id = ? , pred_id = ?");
-      
-      pstmt = conn.prepareStatement(stmt, ResultSet.TYPE_FORWARD_ONLY,
-		ResultSet.CONCUR_UPDATABLE);
-      pstmt.setInt(1, new Integer(mol_id));
-      pstmt.setInt(2, pred_id);
-      pstmt.setString(3, pred_class);
-      pstmt.setString(4, mol_dist.toString());
-      pstmt.setDouble(5, llhood);
-      pstmt.setInt(6, new Integer(mol_id));
-      pstmt.setInt(7, pred_id);
-      pstmt.executeUpdate();
+        double pred = classifier.classifyInstance(inst);
         
+        double id = unlabeled.instance(i).value(unlabeled.attribute("mol_id"));
+        String mol_id = unlabeled.attribute("mol_id").isNumeric() ? String.valueOf((int) id) : unlabeled.attribute("mol_id").value((int) id);
+        String pred_class = unlabeled.classAttribute().value((int) pred);
+        String mol_col = Utils.padRight(mol_id, 15);
+        String class_col = Utils.padRight(pred_class, 27);
+        text.append(mol_col + class_col + '\t');
+
+        double[] dist = classifier.distributionForInstance(inst);
+
+        StringBuffer mol_dist = new StringBuffer();
+
+        for (int x = 0; x < dist.length; x++) {
+          double d = dist[x];
+          text.append(df.format(d));
+          mol_dist.append(df.format(d));
+          if (x == (int) pred) {
+            text.append('*');
+          }
+          text.append('\t');
+          mol_dist.append('\t');
+
+          // System.out.print(predictionText(classifier, inst, new
+          // Integer(mol_id)));
+        }
+        text.append('\n');
+        // make log likelihood on first property column
+       
+        double llhood = logIt(dist[0],0.001);
+        //System.out.print(llhood);
+        
+        pstmtInsert.setInt(1, Integer.parseInt(mol_id));
+        pstmtInsert.setInt(2, pred_id);
+        pstmtInsert.setString(3, pred_class);
+        pstmtInsert.setString(4, mol_dist.toString());
+        pstmtInsert.setDouble(5, llhood);
+        pstmtInsert.setInt(6, Integer.parseInt(mol_id));
+        pstmtInsert.setInt(7, pred_id);
+        pstmtInsert.executeUpdate();
+      }
     }
 
+    String updateSQL = "UPDATE " + predtable + " SET printout = ? WHERE pred_id = ?";
+    try (PreparedStatement pstmtUpdate = conn.prepareStatement(updateSQL)) {
+      pstmtUpdate.setString(1, text.toString());
+      pstmtUpdate.setInt(2, pred_id);
+      pstmtUpdate.executeUpdate();
+    }
 
-    stmt = new String("UPDATE " + predtable
-	+ " SET printout = ? WHERE pred_id = ?");
-    pstmt = conn.prepareStatement(stmt, ResultSet.TYPE_FORWARD_ONLY,
-	ResultSet.CONCUR_UPDATABLE);
-    pstmt.setString(1, text.toString());
-    pstmt.setInt(2, pred_id);
-    pstmt.executeUpdate();
-
+    conn.commit();
     conn.close();
 
     // System.out.println(text.toString());

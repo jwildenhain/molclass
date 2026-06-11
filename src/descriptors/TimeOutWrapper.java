@@ -47,15 +47,10 @@ public class TimeOutWrapper implements Runnable {
 			thread.stop();
 			System.out.println("timeout: " + mol_id);
 
-			try {
-				Connection con = DriverManager.getConnection(hostname, user,
-						password);
-				String stmt = new String("INSERT INTO " + timeouttable
-						+ "(mol_id) VALUES (?)");
-				PreparedStatement pstmt = con.prepareStatement(stmt);
-				pstmt.setInt(1, new Integer(mol_id));
+			try (Connection con = DriverManager.getConnection(hostname, user, password);
+			     PreparedStatement pstmt = con.prepareStatement("INSERT INTO " + timeouttable + "(mol_id) VALUES (?)")) {
+				pstmt.setInt(1, Integer.parseInt(mol_id));
 				pstmt.executeUpdate();
-
 			} catch (SQLException e) {
 				System.out.println("SQL Error");
 				e.printStackTrace();
