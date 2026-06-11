@@ -3,3 +3,5 @@ dist/
 *.log
 DatabaseUtils.props
 classpath.sh
+__pycache__/
+*.pyc
