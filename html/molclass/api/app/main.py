@@ -66,6 +66,32 @@ def get_dataset_compounds(id: int, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def resolve_mol_id(identifier: str, db: Session) -> int:
+    clean_id = identifier.replace('_', '/')
+    if clean_id.isdigit():
+        return int(clean_id)
+    
+    # Query using UNION on individual indexes to guarantee O(1)/O(log N) lookup
+    sql = """
+        SELECT mol_id FROM sdftags WHERE compound_name = :clean_id
+        UNION
+        SELECT mol_id FROM moldb_moldata WHERE mol_name = :clean_id
+        UNION
+        SELECT mol_id FROM inchi_key WHERE inchi_key = :clean_id
+        UNION
+        SELECT mol_id FROM inchi_key WHERE smiles = :clean_id
+        UNION
+        SELECT mol_id FROM inchi_key WHERE inchi = :clean_id
+        LIMIT 1
+    """
+    row = db.execute(text(sql), {"clean_id": clean_id}).scalar()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Compound matching '{identifier}' not found"
+        )
+    return int(row)
+
 @app.get("/compound/{id}", tags=["Compounds"])
 def get_compound(id: str, db: Session = Depends(get_db)):
     """
@@ -73,19 +99,17 @@ def get_compound(id: str, db: Session = Depends(get_db)):
     Accepts molecule ID, compound name, SMILES, InChI, or InChI key.
     Note: Underscores in the input string are replaced with slashes (e.g. for InChI strings).
     """
-    clean_id = id.replace('_', '/')
+    mol_id = resolve_mol_id(id, db)
     sql = """
         SELECT a.*, b.inchi_key, b.smiles, c.compound_name, c.class as class_tag, 
                c.classifier, c.activity_class, c.*, b.inchi 
         FROM sdftags c 
         LEFT JOIN inchi_key b USING (mol_id) 
         LEFT JOIN moldb_moldata a USING (mol_id) 
-        WHERE (c.compound_name = :clean_id OR mol_name = :clean_id) 
-           OR mol_id = :clean_id 
-           OR (b.smiles = :clean_id OR b.inchi = :clean_id OR b.inchi_key = :clean_id)
+        WHERE mol_id = :mol_id
     """
     try:
-        row = db.execute(text(sql), {"clean_id": clean_id}).mappings().first()
+        row = db.execute(text(sql), {"mol_id": mol_id}).mappings().first()
         if not row:
             raise HTTPException(status_code=404, detail=f"Compound matching '{id}' not found")
         return dict(row)
@@ -97,19 +121,15 @@ def get_compound(id: str, db: Session = Depends(get_db)):
 @app.get("/compound/{id}/structurefingerprint", tags=["Compounds"])
 def get_compound_structure_fingerprint(id: str, db: Session = Depends(get_db)):
     """Retrieve structural fingerprints and InChI key fields for a compound."""
-    clean_id = id.replace('_', '/')
+    mol_id = resolve_mol_id(id, db)
     sql = """
         SELECT fingerprints.*, inchi_key.* 
-        FROM sdftags 
+        FROM fingerprints 
         LEFT JOIN inchi_key USING (mol_id) 
-        LEFT JOIN fingerprints USING (mol_id) 
-        WHERE mol_id = :clean_id 
-           OR inchi_key.smiles = :clean_id 
-           OR inchi_key.inchi = :clean_id 
-           OR inchi_key.inchi_key = :clean_id
+        WHERE mol_id = :mol_id
     """
     try:
-        row = db.execute(text(sql), {"clean_id": clean_id}).mappings().first()
+        row = db.execute(text(sql), {"mol_id": mol_id}).mappings().first()
         if not row:
             raise HTTPException(status_code=404, detail=f"Compound matching '{id}' not found")
         return dict(row)
@@ -121,20 +141,15 @@ def get_compound_structure_fingerprint(id: str, db: Session = Depends(get_db)):
 @app.get("/compound/{id}/propertyfingerprint", tags=["Compounds"])
 def get_compound_property_fingerprint(id: str, db: Session = Depends(get_db)):
     """Retrieve physical property descriptors (CDK and Weka) for a compound."""
-    clean_id = id.replace('_', '/')
+    mol_id = resolve_mol_id(id, db)
     sql = """
         SELECT moldb_molstat.*, cdk_descriptors.* 
-        FROM sdftags 
-        LEFT JOIN inchi_key USING (mol_id) 
+        FROM moldb_molstat 
         LEFT JOIN cdk_descriptors USING (mol_id) 
-        LEFT JOIN moldb_molstat USING (mol_id) 
-        WHERE mol_id = :clean_id 
-           OR inchi_key.smiles = :clean_id 
-           OR inchi_key.inchi = :clean_id 
-           OR inchi_key.inchi_key = :clean_id
+        WHERE mol_id = :mol_id
     """
     try:
-        row = db.execute(text(sql), {"clean_id": clean_id}).mappings().first()
+        row = db.execute(text(sql), {"mol_id": mol_id}).mappings().first()
         if not row:
             raise HTTPException(status_code=404, detail=f"Compound matching '{id}' not found")
         return dict(row)
@@ -146,46 +161,39 @@ def get_compound_property_fingerprint(id: str, db: Session = Depends(get_db)):
 @app.get("/compound/{id}/modelfingerprint", response_model=ModelFingerprint, tags=["Compounds"])
 def get_compound_model_fingerprint(id: str, db: Session = Depends(get_db)):
     """Retrieve trained machine learning model likelihood scores for a compound."""
-    clean_id = id.replace('_', '/')
+    mol_id = resolve_mol_id(id, db)
     sql = """
         SELECT prediction_list.model_id, prediction_mols.lhood 
         FROM prediction_mols 
         LEFT JOIN prediction_list USING (pred_id) 
-        WHERE mol_id = :clean_id
+        WHERE mol_id = :mol_id
     """
     try:
-        # Check if compound exists
-        exist_check = db.execute(text("SELECT mol_id FROM sdftags WHERE mol_id = :id"), {"id": clean_id}).scalar()
-        if not exist_check:
-            raise HTTPException(status_code=404, detail=f"Compound with ID {id} not found")
-
-        results = db.execute(text(sql), {"clean_id": clean_id}).all()
+        results = db.execute(text(sql), {"mol_id": mol_id}).all()
         predictions = {}
         for r in results:
             predictions[f"model_{r[0]}"] = r[1]
             
         return {
-            "mol_id": int(clean_id) if clean_id.isdigit() else 0,
+            "mol_id": mol_id,
             "predictions": predictions
         }
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/compound/{id}/models", tags=["Compounds"])
 def get_compound_models(id: str, db: Session = Depends(get_db)):
     """Retrieve detailed machine learning predictions grouped by models for a compound."""
-    clean_id = id.replace('_', '/')
+    mol_id = resolve_mol_id(id, db)
     sql = """
         SELECT prediction_mols.*, prediction_list.model_id, prediction_list.batch_id 
         FROM prediction_mols 
         LEFT JOIN prediction_list USING (pred_id) 
-        WHERE mol_id = :clean_id 
+        WHERE mol_id = :mol_id 
         GROUP BY mol_id, model_id
     """
     try:
-        results = db.execute(text(sql), {"clean_id": clean_id}).mappings().all()
+        results = db.execute(text(sql), {"mol_id": mol_id}).mappings().all()
         return [dict(r) for r in results]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
