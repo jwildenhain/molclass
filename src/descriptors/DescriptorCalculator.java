@@ -37,33 +37,27 @@ public class DescriptorCalculator {
 
 		String hostname = new String("jdbc:mysql://" + host + "/" + database);
 
-		Connection con = DriverManager.getConnection(hostname, user, password);
-		
-		// Get all mols in the batch where CDK descriptors have not yet been calculated
-		String nstmt = new String("SELECT " + cdktable + ".mol_id FROM "
+		String nstmt = "SELECT " + cdktable + ".mol_id FROM "
 				+ cdktable + ", " + batchmoltable + " WHERE " + cdktable
 				+ ".MW IS NULL AND " + batchmoltable + ".batch_id = ? AND "
-				+ cdktable + ".mol_id = " + batchmoltable + ".mol_id");
-		PreparedStatement stmt = con.prepareStatement(nstmt,
-				ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-		stmt.setInt(1, batch_id);
+				+ cdktable + ".mol_id = " + batchmoltable + ".mol_id";
 
-		ResultSet rs = stmt.executeQuery();
-
-		//Set up the worker pool and insert all the mol_ids as tasks.
-		//Jobs are called in a "TimeoutWrapper", which was added to solve a problem where CDK would take forever calculating for a molecule. See TimeoutWrapper for details
 		ExecutorService pool = Executors.newFixedThreadPool(workers);
-		while (rs.next()) {
-			String mol_id = rs.getString("mol_id");
-			TimeOutWrapper to = new TimeOutWrapper(new CalculationHandler(
-					hostname, user, password, cdktable, structable, mol_id),
-					setCDKdescriptortimeout, mol_id);
-                        //TimeOutWrapper to = new TimeOutWrapper(new CalculationHandler(
-			//		hostname, user, password, cdktable, structable, mol_id),
-			//		20000, mol_id);
 
-			pool.submit(to);
+		try (Connection con = DriverManager.getConnection(hostname, user, password);
+		     PreparedStatement stmt = con.prepareStatement(nstmt, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
+			stmt.setInt(1, batch_id);
+			try (ResultSet rs = stmt.executeQuery()) {
+				while (rs.next()) {
+					String mol_id = rs.getString("mol_id");
+					TimeOutWrapper to = new TimeOutWrapper(new CalculationHandler(
+							hostname, user, password, cdktable, structable, mol_id),
+							setCDKdescriptortimeout, mol_id);
+					pool.submit(to);
+				}
+			}
 		}
+
 		System.out.println("All Submitted.");
 		pool.shutdown();
 		pool.awaitTermination(setThreadPoolTimeout, TimeUnit.SECONDS);
