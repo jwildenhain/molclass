@@ -1,4 +1,4 @@
-package nick.test;
+package molclass;
 
 import java.io.BufferedOutputStream;
 import java.io.BufferedWriter;

@@ -857,7 +857,7 @@ sub pred_test()
       #$cmd = "java -cp lib/cdk-git-20110515.jar:lib/weka2.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar  nick.test.Predictor $pred_id";
       #$cmd = "java MolClass.jar Predictor $pred_id";
       #
-      $cmd = "./deploy.sh nick.test.Predictor $pred_id";
+      $cmd = "./deploy.sh molclass.Predictor $pred_id";
 
       #print "\n$cmd\n";
       #system $cmd;

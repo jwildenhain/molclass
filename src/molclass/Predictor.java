@@ -1,4 +1,4 @@
-package nick.test;
+package molclass;
 
 import java.sql.Connection;
 import java.sql.DriverManager;

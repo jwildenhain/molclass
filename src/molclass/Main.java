@@ -46,7 +46,7 @@ public class Main {
 
                if (args[0].equals("ModelBuilder") || args[0].equals("Predictor"))
                {
-                        String base = "nick.test.";
+                        String base = "molclass.";
                         Class target = null;
 
                         try {

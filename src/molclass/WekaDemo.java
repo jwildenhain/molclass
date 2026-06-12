@@ -1,4 +1,4 @@
-package nick.test;
+package molclass;
 
 import weka.classifiers.AbstractClassifier;
 import weka.classifiers.Classifier;

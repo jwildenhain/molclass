@@ -1,4 +1,4 @@
-package nick.test;
+package molclass;
 
 import java.io.UnsupportedEncodingException;
 import java.util.BitSet;

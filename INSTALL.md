@@ -79,7 +79,7 @@ jdbcURL=jdbc:mysql://<HOST>/<DATABASE>
 A deployment script `deploy.sh` is provided. It:
 - Sources `classpath.sh` to set `$CLASSPATH`.
 - Reads the MySQL configuration from `DatabaseUtils.props`.
-- Starts the desired Java class (e.g., `nick.test.Predictor`).
+- Starts the desired Java class (e.g., `molclass.Predictor`).
 
 ```bash
 chmod +x deploy.sh

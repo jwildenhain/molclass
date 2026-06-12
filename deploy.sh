@@ -6,7 +6,7 @@
 #   ./deploy.sh <ClassName> [Arguments...]
 #
 # Example:
-#   ./deploy.sh nick.test.Predictor 1
+#   ./deploy.sh molclass.Predictor 1
 #
 
 set -e
@@ -47,8 +47,8 @@ if [[ $# -lt 1 ]]; then
     echo "  descriptors.AutomaticCalcDriver   - Calculate CDK molecular descriptors"
     echo "  fingerprints.Fingerprinter        - Generate molecular fingerprints"
     echo "  fingerprints.Similarity           - Calculate molecular similarities"
-    echo "  nick.test.ModelBuilder            - Build and evaluate Weka machine learning models"
-    echo "  nick.test.Predictor               - Apply Weka models to predict batch activities"
+    echo "  molclass.ModelBuilder             - Build and evaluate Weka machine learning models"
+    echo "  molclass.Predictor                - Apply Weka models to predict batch activities"
     exit 0
 fi
 

@@ -1,4 +1,4 @@
-package nick.test;
+package molclass;
 /*
  * mysql> CREATE TABLE class_models ( 
  * model_id INT AUTO_INCREMENT, 

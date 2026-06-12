@@ -658,7 +658,7 @@ def run_single_prediction_task(
                 # Run Predictor via deploy.sh
                 pred_cmd = [
                     "./deploy.sh",
-                    "nick.test.Predictor",
+                    "molclass.Predictor",
                     str(pred_id)
                 ]
                 pred_res = subprocess.run(pred_cmd, capture_output=True, text=True, cwd=repo_root)

@@ -1,4 +1,4 @@
-package nick.test;
+package molclass;
 
 public class XMLReader {
     public static String getTag(String tag) {
