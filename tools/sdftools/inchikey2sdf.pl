@@ -1,0 +1,1 @@
+/home/jw/repos/wdc_gitlab/molclass/html/molclass/tools/inchikey2sdf.pl
