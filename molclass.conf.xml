@@ -56,6 +56,7 @@
 		<molbfptable>moldb_molbfp</molbfptable>
 		<fpdeftable>moldb_fpdef</fpdeftable>
 		<molhfptable>moldb_molhfp</molhfptable>
+		<metatable>moldb_meta</metatable>
 		<strucinfotable>sdftags</strucinfotable>
 		<plateinfotable>plate_info</plateinfotable>
 		<cdkdesctable>cdk_descriptors</cdkdesctable>
@@ -79,8 +80,9 @@
 		<digits>8</digits>
 		<subdirdigits>4</subdirdigits>
 		<sitename>MolClass</sitename>
-		<CHECKMOL>/usr/local/bin/checkmol</CHECKMOL>
-		<MATCHMOL>/usr/local/bin/matchmol</MATCHMOL>
+		<CHECKMOL>/var/www/html/molclass/tools/checkmol</CHECKMOL>
+		<MATCHMOL>/var/www/html/molclass/tools/matchmol</MATCHMOL>
+		<MOL2SVG>/var/www/html/molclass/tools/mol2svg</MOL2SVG>
 		<StructureSearchMaxHits>500</StructureSearchMaxHits>
 		<StructureSearchMaxCandidates>2000</StructureSearchMaxCandidates>
 

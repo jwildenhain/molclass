@@ -1134,7 +1134,7 @@ public class ModelBuilder {
     AttributeSelection filter = new AttributeSelection();  // package weka.filters.supervised.attribute!
     CfsSubsetEval attreval = new CfsSubsetEval();
     GreedyStepwise search = new GreedyStepwise();
-    search.setSearchBackwards(true);
+    search.setSearchBackwards(false);
     filter.setEvaluator(attreval);
     filter.setSearch(search);
     filter.setInputFormat(data);

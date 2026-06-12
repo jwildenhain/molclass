@@ -208,7 +208,7 @@ if ($found_mol_name == 0) {
   print "field into 'mol_name', please read the instructions in $deffile!\n";
   print "Otherwise, a field 'mol_name' will be automatically created, but it\n";
   print "might remain empty during the SDF import operation.\n\n";
-  $askuser = 1;
+  # $askuser = 1;
 }
 
 if ($askuser > 0) {

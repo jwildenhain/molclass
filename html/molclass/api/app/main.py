@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -6,13 +6,16 @@ from typing import List, Dict, Any, Union, Optional
 import re
 import os
 import subprocess
+import uuid
+import threading
 
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app.config import settings
 from app.schemas import (
     Dataset, ModelSummary, ModelDetail, CompoundIdResponse, ModelFingerprint,
     ModelCreateRequest, ModelCreateResponse, SimilarityResponse,
-    ScaffoldMatchResponse, TextSearchResponse
+    ScaffoldMatchResponse, TextSearchResponse,
+    SinglePredictionRequest, SinglePredictionTaskResponse, PredictionTaskStatusResponse
 )
 
 app = FastAPI(
@@ -541,3 +544,240 @@ def get_prediction_results(id: int, db: Session = Depends(get_db)):
         return [dict(r) for r in results]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Task store and lock for thread-safety
+prediction_tasks = {}
+prediction_tasks_lock = threading.Lock()
+
+def run_single_prediction_task(
+    task_id: str,
+    identifier_type: str,
+    identifier: str,
+    model_ids: List[int]
+):
+    repo_root = find_repo_root(settings.tools_dir)
+    temp_sdf_path = os.path.join(repo_root, f"uploads/temp_single_{task_id}.sdf")
+    batch_id = None
+    db = SessionLocal()
+    
+    try:
+        # Step 1: Update status to running
+        with prediction_tasks_lock:
+            if task_id in prediction_tasks:
+                prediction_tasks[task_id]["status"] = "running"
+
+        # Step 2: Convert SMILES/InChI to SDF using CDK
+        cmd = [
+            "bash", "-c",
+            f"source ./classpath.sh && java -Dweka.core.WekaPackageManager.offline=true -cp \"$CLASSPATH\" molclass.SdfConverter {identifier_type} '{identifier}'"
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True, cwd=repo_root)
+        if res.returncode != 0:
+            raise RuntimeError(f"CDK SdfConverter failed: {res.stderr or res.stdout}")
+        
+        sdf_content = res.stdout.strip()
+        if not sdf_content or "V2000" not in sdf_content:
+            raise RuntimeError(f"Invalid SDF generated from SdfConverter: {sdf_content}")
+
+        # Step 3: Write the SDF file
+        os.makedirs(os.path.dirname(temp_sdf_path), exist_ok=True)
+        with open(temp_sdf_path, "w") as f:
+            f.write(sdf_content)
+
+        # Step 3.5: Run sdfcheck.pl to generate the def file
+        check_script = os.path.join(settings.tools_dir, "sdfcheck.pl")
+        check_cmd = [
+            "perl", check_script,
+            temp_sdf_path
+        ]
+        check_res = subprocess.run(check_cmd, capture_output=True, text=True, cwd=repo_root, env=get_subprocess_env())
+        if check_res.returncode != 0:
+            raise RuntimeError(f"sdfcheck.pl failed: {check_res.stderr}\nStdout: {check_res.stdout}")
+
+        # Step 4: Import molecule to a temporary test batch via sdf2moldb.pl
+        info_string = f"Single molecule prediction task {task_id}"
+        perl_script = os.path.join(settings.tools_dir, "sdf2moldb.pl")
+        
+        import_cmd = [
+            "perl", perl_script,
+            temp_sdf_path,
+            "single_pred_user",
+            "dummy@example.com",
+            "test",
+            "0",
+            info_string,
+            f"single_{task_id}"
+        ]
+        
+        import_res = subprocess.run(import_cmd, capture_output=True, text=True, cwd=repo_root, env=get_subprocess_env())
+        if import_res.returncode != 0:
+            raise RuntimeError(f"sdf2moldb.pl failed: {import_res.stderr}\nStdout: {import_res.stdout}")
+
+        # Step 5: Find the batch_id
+        batch_id_query = text("SELECT batch_id FROM batchlist WHERE info = :info")
+        batch_id = db.execute(batch_id_query, {"info": info_string}).scalar()
+        if not batch_id:
+            raise RuntimeError("Temporary batch creation failed: batch_id not found in database")
+
+        # Step 6: Loop through selected models and run Predictor
+        for model_id in model_ids:
+            try:
+                # Check if model exists
+                model_exists = db.execute(
+                    text("SELECT model_id FROM class_models WHERE model_id = :id"),
+                    {"id": model_id}
+                ).scalar()
+                
+                if not model_exists:
+                    with prediction_tasks_lock:
+                        if task_id in prediction_tasks:
+                            prediction_tasks[task_id]["results"][model_id] = {
+                                "error": f"Model with ID {model_id} not found in system"
+                            }
+                            prediction_tasks[task_id]["processed_count"] += 1
+                    continue
+
+                # Insert prediction job record
+                pred_name = f"single_pred_{task_id}_{model_id}"
+                insert_sql = """
+                    INSERT INTO prediction_list (username, batch_id, model_id, pred_name, email)
+                    VALUES (:username, :batch_id, :model_id, :pred_name, :email)
+                """
+                db.execute(text(insert_sql), {
+                    "username": "single_pred_user",
+                    "batch_id": batch_id,
+                    "model_id": model_id,
+                    "pred_name": pred_name,
+                    "email": "dummy@example.com"
+                })
+                db.commit()
+                
+                pred_id = db.execute(text("SELECT LAST_INSERT_ID()")).scalar()
+                
+                # Run Predictor via deploy.sh
+                pred_cmd = [
+                    "./deploy.sh",
+                    "nick.test.Predictor",
+                    str(pred_id)
+                ]
+                pred_res = subprocess.run(pred_cmd, capture_output=True, text=True, cwd=repo_root)
+                
+                # Retrieve result from prediction_mols
+                result_sql = """
+                    SELECT main_class, distribution, lhood 
+                    FROM prediction_mols 
+                    WHERE pred_id = :pred_id
+                """
+                row = db.execute(text(result_sql), {"pred_id": pred_id}).mappings().first()
+                
+                with prediction_tasks_lock:
+                    if task_id in prediction_tasks:
+                        if row:
+                            prediction_tasks[task_id]["results"][model_id] = {
+                                "main_class": row["main_class"],
+                                "distribution": row["distribution"],
+                                "likelihood": row["lhood"]
+                            }
+                        else:
+                            prediction_tasks[task_id]["results"][model_id] = {
+                                "error": f"No prediction outcome generated. Stderr: {pred_res.stderr}"
+                            }
+                        prediction_tasks[task_id]["processed_count"] += 1
+            except Exception as model_err:
+                with prediction_tasks_lock:
+                    if task_id in prediction_tasks:
+                        prediction_tasks[task_id]["results"][model_id] = {
+                            "error": f"Error during model prediction: {str(model_err)}"
+                        }
+                        prediction_tasks[task_id]["processed_count"] += 1
+
+        # Step 7: Completed
+        with prediction_tasks_lock:
+            if task_id in prediction_tasks:
+                prediction_tasks[task_id]["status"] = "completed"
+                
+    except Exception as e:
+        with prediction_tasks_lock:
+            if task_id in prediction_tasks:
+                prediction_tasks[task_id]["status"] = "failed"
+                prediction_tasks[task_id]["error"] = str(e)
+                
+    finally:
+        # Cleanup batch from database
+        if batch_id:
+            try:
+                delete_script = os.path.join(settings.tools_dir, "delete_batch.pl")
+                subprocess.run(
+                    ["perl", delete_script, str(batch_id)],
+                    capture_output=True, cwd=repo_root, env=get_subprocess_env()
+                )
+            except Exception:
+                pass
+        # Cleanup temporary SDF file
+        if os.path.exists(temp_sdf_path):
+            try:
+                os.remove(temp_sdf_path)
+            except Exception:
+                pass
+        # Cleanup temporary def file
+        temp_def_path = os.path.join(repo_root, f"uploads/sdf2moldb_temp_single_{task_id}.sdf.def")
+        if os.path.exists(temp_def_path):
+            try:
+                os.remove(temp_def_path)
+            except Exception:
+                pass
+        db.close()
+
+
+@app.post("/prediction/single", response_model=SinglePredictionTaskResponse, tags=["Predictions"])
+def submit_single_prediction(request: SinglePredictionRequest, background_tasks: BackgroundTasks):
+    """
+    Submit a single molecule (SMILES or InChI string) to run predictions against a set of models in the background.
+    Creates and returns a task_id handler to fetch results.
+    """
+    if request.identifier_type.lower() not in ["smiles", "inchi"]:
+        raise HTTPException(status_code=400, detail="identifier_type must be either 'smiles' or 'inchi'")
+    if not request.identifier.strip():
+        raise HTTPException(status_code=400, detail="identifier string cannot be empty")
+    if not request.model_ids:
+        raise HTTPException(status_code=400, detail="model_ids list cannot be empty")
+
+    task_id = str(uuid.uuid4())
+    
+    with prediction_tasks_lock:
+        prediction_tasks[task_id] = {
+            "task_id": task_id,
+            "status": "pending",
+            "processed_count": 0,
+            "total_count": len(request.model_ids),
+            "results": {},
+            "error": None
+        }
+        
+    background_tasks.add_task(
+        run_single_prediction_task,
+        task_id,
+        request.identifier_type.lower(),
+        request.identifier,
+        request.model_ids
+    )
+    
+    return SinglePredictionTaskResponse(
+        task_id=task_id,
+        status="pending",
+        message="Single molecule prediction task submitted successfully."
+    )
+
+
+@app.get("/prediction/task/{task_id}", response_model=PredictionTaskStatusResponse, tags=["Predictions"])
+def get_prediction_task_status(task_id: str):
+    """
+    Retrieve the status and results of a submitted single molecule prediction task.
+    Supports fetching intermediate results while the task is still running.
+    """
+    with prediction_tasks_lock:
+        if task_id not in prediction_tasks:
+            raise HTTPException(status_code=404, detail=f"Prediction task with ID {task_id} not found")
+        return prediction_tasks[task_id]
+

@@ -72,3 +72,22 @@ class TextSearchResponse(BaseModel):
     inchi_key: Optional[str] = None
     smiles: Optional[str] = None
 
+class SinglePredictionRequest(BaseModel):
+    identifier_type: str = Field(..., description="Either 'smiles' or 'inchi'")
+    identifier: str = Field(..., description="The SMILES or InChI identifier string")
+    model_ids: List[int] = Field(..., description="List of model IDs to run predictions against")
+
+class SinglePredictionTaskResponse(BaseModel):
+    task_id: str
+    status: str
+    message: str
+
+class PredictionTaskStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    processed_count: int
+    total_count: int
+    results: Dict[int, Optional[Dict[str, Any]]]
+    error: Optional[str] = None
+
+
