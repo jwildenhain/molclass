@@ -774,13 +774,13 @@ if ($verbose > 0) {
 
 #Calculate fingerprint & descriptor
 #print "Calculating finger printers...\n\n\n";
-$cmd = "java -cp lib/cdk-1.4.18.jar:MolClass.jar fingerprints.Fingerprinter $batchnum";
+$cmd = "./deploy.sh fingerprints.Fingerprinter $batchnum";
 system($cmd. " 1>> ./log/output_fingerprinter.log"." 2>> ./log/error_fingerprinter.log"); 
 
 
 print "Calculating descriptors...\n\n\n";
 
-$cmd = "java -cp lib/cdk-1.4.18.jar:MolClass.jar  descriptors.AutomaticCalcDriver $batchnum";
+$cmd = "./deploy.sh descriptors.AutomaticCalcDriver $batchnum";
 system($cmd. " 1>> ./log/output_descriptors.log"." 2>> ./log/error_descriptors.log"); 
 
 # dirty fix:
@@ -797,7 +797,7 @@ system $cmd; # this should be enough for a large molecule library
 #$cmd = "java -cp lib/cdk-1.4.18.jar:./MolClass.jar fingerprints.InChiGenerator $batchnum";
 
 # get InChi, InChiKeys and Smiles
-$cmd = "java -cp lib/cdk-1.4.18.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar fingerprints.InChiGenerator  $batchnum";
+$cmd = "./deploy.sh fingerprints.InChiGenerator  $batchnum";
 system($cmd. " 1>> ./log/output_InChiGenerator.log"." 2>> ./log/error_InChiGenerator.log"); 
 
 
@@ -824,11 +824,11 @@ $dbh->disconnect();
 
 
 # generate Murcko Fragments
-$cmd = "java -cp lib/cdk-1.4.18.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar fingerprints.MurckoFragments $batchnum";
+$cmd = "./deploy.sh fingerprints.MurckoFragments $batchnum";
 system($cmd. " 1>> ./log/output_Murcko.log"." 2>> ./log/error_Murcko.log");
 
 # generate Tanimoto scores for > 0.85
-$cmd = "java -cp lib/cdk-1.4.18.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar fingerprints.Similarity  $batchnum";
+$cmd = "./deploy.sh fingerprints.Similarity  $batchnum";
 system($cmd. " 1>> ./log/output_Similarity.log"." 2>> ./log/error_Similarity.log");
 
 sendEmail($email, "MolClass", "Similarity calculus for batch $batchnum against database is complete", "You can explore your data at $url");
@@ -857,7 +857,7 @@ sub pred_test()
       #$cmd = "java -cp lib/cdk-git-20110515.jar:lib/weka2.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar  nick.test.Predictor $pred_id";
       #$cmd = "java MolClass.jar Predictor $pred_id";
       #
-      $cmd = "java $setHeapSize -cp lib/cdk-1.4.18.jar:lib/weka2.jar:lib/libsvm.jar:lib/hiddenNaiveBayes.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar  nick.test.Predictor $pred_id";
+      $cmd = "./deploy.sh nick.test.Predictor $pred_id";
 
       #print "\n$cmd\n";
       #system $cmd;

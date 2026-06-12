@@ -66,6 +66,4 @@ $web_server_location	= $data->{website};
 
 $setHeapSize = $data->{setHeapCacheSize};
 
-
-
-
+1;

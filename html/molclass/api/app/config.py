@@ -35,6 +35,20 @@ class Settings:
             
             # Additional global properties
             self.website = root.find("website").text.strip() if root.find("website") is not None else "http://localhost/molclass"
+            
+            raw_toolsdir = root.find("toolsdir").text.strip() if root.find("toolsdir") is not None else "./tools/sdftools/"
+            if raw_toolsdir.startswith("./"):
+                self.tools_dir = os.path.abspath(os.path.join(os.path.dirname(config_path), raw_toolsdir[2:]))
+            else:
+                self.tools_dir = os.path.abspath(raw_toolsdir)
+                
+            # Self-healing fallback: if pred_model_upload.pl is not found in self.tools_dir,
+            # resolve the actual tools directory in the workspace
+            if not os.path.exists(os.path.join(self.tools_dir, "pred_model_upload.pl")):
+                repo_root = os.path.dirname(config_path)
+                candidate_path = os.path.join(repo_root, "html", "molclass", "tools")
+                if os.path.exists(os.path.join(candidate_path, "pred_model_upload.pl")):
+                    self.tools_dir = os.path.abspath(candidate_path)
         except Exception as e:
             raise RuntimeError(f"Error parsing configuration XML file: {e}")
 

@@ -41,7 +41,7 @@ $dbh = DBI->connect("DBI:mysql:database=$database;host=$hostname",$user, $passwo
     #$cmd = "java -jar MolClass.jar Predictor ".$pred_id;
     #$cmd = "java -cp lib/cdk-git-20110515.jar:lib/weka2.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar  nick.test.Predictor $pred_id 1>> ./cache/error_predictor_sdfupload.log";
     #$cmd = "java -cp lib/cdk-1.4.5.jar:lib/weka2.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar  nick.test.Predictor $pred_id 1>> ./cache/error_predictor_sdfupload.log";
-    $cmd = "java $setHeapSize -cp lib/cdk-1.4.18.jar:lib/weka2.jar:lib/libsvm.jar:lib/hiddenNaiveBayes.jar:lib/mysql-connector-java-5.1.17-bin.jar:MolClass.jar  nick.test.Predictor $pred_id 1>> ./log/error_predictor_sdfupload.log";
+    $cmd = "./deploy.sh nick.test.Predictor $pred_id 1>> ./log/error_predictor_sdfupload.log";
     print "$cmd\n";
     system $cmd;
     

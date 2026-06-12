@@ -42,3 +42,33 @@ class CompoundIdResponse(BaseModel):
 class ModelFingerprint(BaseModel):
     mol_id: int
     predictions: Dict[str, Optional[float]]
+
+class ModelCreateRequest(BaseModel):
+    batch_id: int
+    classifier: str
+    data_type: str
+    class_scheme: str
+    email: str
+    username: str
+
+class ModelCreateResponse(BaseModel):
+    model_id: int
+    message: str
+
+class SimilarityResponse(BaseModel):
+    mol_id: int
+    ext: float
+    kr: float
+
+class ScaffoldMatchResponse(BaseModel):
+    mol_id: int
+    mol_name: Optional[str] = None
+    smiles: Optional[str] = None
+    inchi_key: Optional[str] = None
+
+class TextSearchResponse(BaseModel):
+    mol_id: int
+    mol_name: Optional[str] = None
+    inchi_key: Optional[str] = None
+    smiles: Optional[str] = None
+
