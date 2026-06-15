@@ -58,6 +58,10 @@ $id= $ARGV[6];
 $inbase = basename($infile);
 $indir = dirname($infile);
 
+if ($email eq 'dummy@example.com') {
+  $chkzero = 0;
+}
+
 #
 # molclass/chemgrid
 #
@@ -339,7 +343,11 @@ while ($ref0 = $sth0->fetchrow_hashref()) {
 }
 
 if ($n > 0) {
-  if ($name eq $db_name) {
+  my $clean_name = $name;
+  my $clean_dbname = $db_name;
+  $clean_name =~ s/['\"]//g;
+  $clean_dbname =~ s/['\"]//g;
+  if ($clean_name eq $clean_dbname) {
     if ($verbose > 0) {
       print "INFORMATION: adding data to an already existing collection\n";
     }
@@ -804,18 +812,22 @@ system($cmd. " 1>> ./log/output_InChiGenerator.log"." 2>> ./log/error_InChiGener
 #EMAIL NOTIFICATION (added by Nicholas FitzGerald for chemgrid)
 print $email;
 
+if ($email ne 'dummy@example.com') {
+  $url = $web_server_location."/view_batch_detail.php?batch_id=".$batchnum;
+  sendEmail($email, "MolClass", "SDF Upload for batch $batchnum complete", "Upload of file ".$sdffilename." is complete. You can check uploaded file at $url");
+  print "Sending email for notifying finish of SDF Upload...\n\n\n";
+}
 
-$url = $web_server_location."/view_batch_detail.php?batch_id=".$batchnum;
-sendEmail($email, "MolClass", "SDF Upload for batch $batchnum complete", "Upload of file ".$sdffilename." is complete. You can check uploaded file at $url");
-print "Sending email for notifying finish of SDF Upload...\n\n\n";
 #Check uploaded
 $dbh->do("UPDATE $batchlisttable SET uploaded = '1' WHERE batch_id = $batchnum");
 
-#Make a prediction for uploaded molecules against models build
-pred_test();
-$url = $web_server_location."/view_batch_detail.php?batch_id=".$batchnum;
-sendEmail($email, "MolClass", "Model prediction for batch $batchnum complete", "Prediction against all existing model in a database is complete. You can check prediction result at $url");
-print "Sending email for notifying finish of Prediction...\n\n\n";
+if ($email ne 'dummy@example.com') {
+  #Make a prediction for uploaded molecules against models build
+  pred_test();
+  $url = $web_server_location."/view_batch_detail.php?batch_id=".$batchnum;
+  sendEmail($email, "MolClass", "Model prediction for batch $batchnum complete", "Prediction against all existing model in a database is complete. You can check prediction result at $url");
+  print "Sending email for notifying finish of Prediction...\n\n\n";
+}
 
 #Check Prediction has been made
 $dbh->do("UPDATE $batchlisttable SET uploaded = '1' WHERE batch_id = $batchnum");
@@ -823,16 +835,18 @@ $dbh->do("UPDATE $batchlisttable SET uploaded = '1' WHERE batch_id = $batchnum")
 $dbh->disconnect();
 
 
-# generate Murcko Fragments
-$cmd = "./deploy.sh fingerprints.MurckoFragments $batchnum";
-system($cmd. " 1>> ./log/output_Murcko.log"." 2>> ./log/error_Murcko.log");
+if ($email ne 'dummy@example.com') {
+  # generate Murcko Fragments
+  $cmd = "./deploy.sh fingerprints.MurckoFragments $batchnum";
+  system($cmd. " 1>> ./log/output_Murcko.log"." 2>> ./log/error_Murcko.log");
 
-# generate Tanimoto scores for > 0.85
-$cmd = "./deploy.sh fingerprints.Similarity  $batchnum";
-system($cmd. " 1>> ./log/output_Similarity.log"." 2>> ./log/error_Similarity.log");
+  # generate Tanimoto scores for > 0.85
+  $cmd = "./deploy.sh fingerprints.Similarity  $batchnum";
+  system($cmd. " 1>> ./log/output_Similarity.log"." 2>> ./log/error_Similarity.log");
 
-sendEmail($email, "MolClass", "Similarity calculus for batch $batchnum against database is complete", "You can explore your data at $url");
-print "Sending email for notifying finish of Prediction...\n\n\n";
+  sendEmail($email, "MolClass", "Similarity calculus for batch $batchnum against database is complete", "You can explore your data at $url");
+  print "Sending email for notifying finish of Prediction...\n\n\n";
+}
 
 
 
@@ -959,6 +973,9 @@ sub insert_data() {
     }
   }
   $insertcmd = "INSERT INTO $moldatatable VALUES ( $entry";
+  if ($found_mol_name == 0) {
+    $insertcmd = $insertcmd . ", \"$internal_name\"";
+  }
   $struc_cols = "mol_id";
   $struc_vals = "$entry";
   $plate_cols = "mol_id";

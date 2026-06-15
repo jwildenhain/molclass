@@ -55,6 +55,8 @@
 		<molfgbtable>moldb_molfgb</molfgbtable>
 		<molbfptable>moldb_molbfp</molbfptable>
 		<fpdeftable>moldb_fpdef</fpdeftable>
+		<molcfptable>moldb_molcfp</molcfptable>
+		<pic2dtable>moldb_pic2d</pic2dtable>
 		<molhfptable>moldb_molhfp</molhfptable>
 		<metatable>moldb_meta</metatable>
 		<strucinfotable>sdftags</strucinfotable>

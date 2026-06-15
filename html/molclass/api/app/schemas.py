@@ -91,3 +91,15 @@ class PredictionTaskStatusResponse(BaseModel):
     error: Optional[str] = None
 
 
+class StructureSearchRequest(BaseModel):
+    search_type: str = Field(..., description="Either 'similarity' or 'substructure'")
+    query_type: str = Field(..., description="Either 'smiles' or 'inchi'")
+    query_string: str = Field(..., description="The SMILES or InChI query string")
+    fingerprint_type: Optional[str] = Field("maccs", description="Either 'maccs', 'pubchem', or 'kr'")
+    limit: Optional[int] = Field(100, description="Max number of results to return")
+    threshold: Optional[float] = Field(0.8, description="Minimum Tanimoto similarity (only for similarity search)")
+
+class StructureSearchResult(BaseModel):
+    mol_id: int
+    similarity: Optional[float] = None
+

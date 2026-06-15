@@ -5,3 +5,5 @@ DatabaseUtils.props
 classpath.sh
 __pycache__/
 *.pyc
+scratch/
+uploads/

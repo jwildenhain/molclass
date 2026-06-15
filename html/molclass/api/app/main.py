@@ -15,13 +15,14 @@ from app.schemas import (
     Dataset, ModelSummary, ModelDetail, CompoundIdResponse, ModelFingerprint,
     ModelCreateRequest, ModelCreateResponse, SimilarityResponse,
     ScaffoldMatchResponse, TextSearchResponse,
-    SinglePredictionRequest, SinglePredictionTaskResponse, PredictionTaskStatusResponse
+    SinglePredictionRequest, SinglePredictionTaskResponse, PredictionTaskStatusResponse,
+    StructureSearchRequest, StructureSearchResult
 )
 
 app = FastAPI(
     title="MolClass REST API",
     description="Modernized REST API for the MolClass chemical informatics portal. Exposes datasets, compounds, descriptors, fingerprints, and model predictions.",
-    version="2.0.0",
+    version="2.0.1",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -576,7 +577,7 @@ def run_single_prediction_task(
         if res.returncode != 0:
             raise RuntimeError(f"CDK SdfConverter failed: {res.stderr or res.stdout}")
         
-        sdf_content = res.stdout.strip()
+        sdf_content = res.stdout.rstrip()
         if not sdf_content or "V2000" not in sdf_content:
             raise RuntimeError(f"Invalid SDF generated from SdfConverter: {sdf_content}")
 
@@ -780,4 +781,57 @@ def get_prediction_task_status(task_id: str):
         if task_id not in prediction_tasks:
             raise HTTPException(status_code=404, detail=f"Prediction task with ID {task_id} not found")
         return prediction_tasks[task_id]
+
+
+@app.post("/search/structure", response_model=List[StructureSearchResult], tags=["Search"])
+def structure_search(request: StructureSearchRequest):
+    """
+    Perform structural similarity or substructure searches in the database using CDK.
+    Does not use checkmol/matchmol binaries, but executes a fast, optimized, parallelized JVM search process.
+    """
+    if request.search_type.lower() not in ["similarity", "substructure"]:
+        raise HTTPException(status_code=400, detail="search_type must be either 'similarity' or 'substructure'")
+    if request.query_type.lower() not in ["smiles", "inchi"]:
+        raise HTTPException(status_code=400, detail="query_type must be either 'smiles' or 'inchi'")
+    if not request.query_string.strip():
+        raise HTTPException(status_code=400, detail="query_string cannot be empty")
+    if request.fingerprint_type.lower() not in ["maccs", "pubchem", "kr"]:
+        raise HTTPException(status_code=400, detail="fingerprint_type must be 'maccs', 'pubchem', or 'kr'")
+
+    # Run StructureSearch via deploy.sh
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
+    cmd = [
+        "./deploy.sh",
+        "molclass.StructureSearch",
+        request.search_type.lower(),
+        request.query_type.lower(),
+        request.query_string,
+        request.fingerprint_type.lower(),
+        str(request.limit),
+        str(request.threshold)
+    ]
+    
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, cwd=repo_root)
+        if res.returncode != 0:
+            raise HTTPException(status_code=500, detail=f"Search failed: {res.stderr}")
+        
+        # Parse output JSON
+        import json
+        output = res.stdout
+        
+        json_lines = []
+        for line in output.splitlines():
+            line_str = line.strip()
+            if line_str.startswith("[deploy]") or line_str.startswith("---") or not line_str:
+                continue
+            json_lines.append(line_str)
+            
+        json_str = "".join(json_lines)
+        results = json.loads(json_str)
+        return results
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 

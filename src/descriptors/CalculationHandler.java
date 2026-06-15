@@ -131,6 +131,16 @@ class CalculationHandler implements Runnable {
                 }
             }
 
+            Set<String> validColumns = new HashSet<>();
+            try (PreparedStatement colStmt = conn.prepareStatement("SELECT * FROM " + infotablename + " LIMIT 1");
+                 ResultSet colRs = colStmt.executeQuery()) {
+                java.sql.ResultSetMetaData rsmd = colRs.getMetaData();
+                int colCount = rsmd.getColumnCount();
+                for (int i = 1; i <= colCount; i++) {
+                    validColumns.add(rsmd.getColumnName(i).toLowerCase());
+                }
+            }
+
             itr = descSet.iterator();
             Map<String, Object> updates = new HashMap<>();
             while (itr.hasNext()) {
@@ -143,6 +153,10 @@ class CalculationHandler implements Runnable {
 
                     if (name.equals("TPSA") && n == 0) {
                         name = "TopoPSA";
+                    }
+
+                    if (!validColumns.contains(name.toLowerCase())) {
+                        continue;
                     }
 
                     IDescriptorResult result = desc.getValue();
