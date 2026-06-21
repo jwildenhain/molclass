@@ -6,7 +6,7 @@ import java.sql.ResultSet;
 import java.sql.PreparedStatement;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import descriptors.DBConnectionPool;
+import molclass.descriptors.DBConnectionPool;
 import java.text.DecimalFormat;
 import java.util.Properties;
 

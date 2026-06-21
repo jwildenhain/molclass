@@ -6,6 +6,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.Properties;
 import java.util.Random;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 import javax.mail.Message;
 import javax.mail.MessagingException;
@@ -15,6 +18,8 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 import weka.attributeSelection.CfsSubsetEval;
 import weka.attributeSelection.GreedyStepwise;
+import weka.attributeSelection.ReliefFAttributeEval;
+import weka.attributeSelection.Ranker;
 
 import weka.classifiers.Classifier;
 import weka.classifiers.Evaluation;
@@ -50,10 +55,16 @@ import weka.filters.unsupervised.attribute.Remove;
 import weka.filters.unsupervised.attribute.RemoveUseless;
 import weka.filters.supervised.instance.SMOTE;
 import weka.filters.supervised.instance.SpreadSubsample;
+import weka.classifiers.meta.AttributeSelectedClassifier;
+import weka.classifiers.meta.FilteredClassifier;
+import weka.filters.MultiFilter;
 
 public class ModelBuilder {
 
+    private static final Pattern SAFE_COLUMN_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
   public static void main(String[] args) throws Exception {
+    System.setProperty("java.util.Arrays.useLegacyMergeSort", "true");
 
     int model_id = new Integer(1);
     if (args.length != 1)
@@ -90,7 +101,7 @@ public class ModelBuilder {
     //get info about model from modeltable
     Connection conn = DriverManager.getConnection(databaseURL, username,
 	password);
-    String stmt = new String("SELECT username, batch_id, data_type, class_tag, class_scheme, username email FROM " + modeltable + " WHERE model_id = ?");
+    String stmt = new String("SELECT username, batch_id, data_type, class_tag, class_scheme, feature_selection, username email FROM " + modeltable + " WHERE model_id = ?");
     PreparedStatement pstmt = conn.prepareStatement(stmt, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_UPDATABLE);
     pstmt.setInt(1, model_id);
     
@@ -102,7 +113,11 @@ public class ModelBuilder {
     String data_type = rs.getString("data_type");
     String class_tag = rs.getString("class_tag");
     String class_scheme = rs.getString("class_scheme");
+    String feature_selection = rs.getString("feature_selection");
+    if (feature_selection == null) feature_selection = "CfsSubsetEval";
     String email = rs.getString("email");
+
+    validateClassTag(conn, classtable, class_tag);
     
 
     InstanceQuery query = new InstanceQuery();
@@ -1126,48 +1141,61 @@ public class ModelBuilder {
       throw new Exception("class_scheme " + class_scheme + " not recognized.");
     }
     //
-    // Add classifer batch filtering
+    // Advanced Pipeline Configuration
+    // To avoid data leakage, we encapsulate AttributeSelection, SMOTE, and SpreadSubsample
+    // inside meta-classifiers. This ensures they are applied uniquely per fold in CV.
     //
-    //http://weka.wikispaces.com/Use+Weka+in+your+Java+code#Attribute%20selection
-    //
-    //
-    AttributeSelection filter = new AttributeSelection();  // package weka.filters.supervised.attribute!
-    CfsSubsetEval attreval = new CfsSubsetEval();
-    GreedyStepwise search = new GreedyStepwise();
-    search.setSearchBackwards(false);
-    filter.setEvaluator(attreval);
-    filter.setSearch(search);
-    filter.setInputFormat(data);
-    // generate new data
-    data = Filter.useFilter(data, filter);
     
-    // Implement SMOTE Filter for testing purposes only!
-    // weka.filters.Filter
-      Filter incclass = new SMOTE();
-      String[] class_options = {""}; // set somote features
-      ((SMOTE)incclass).setOptions(class_options);
-      incclass.setInputFormat(data);
-      try
-      {
-            data = Filter.useFilter(data, incclass);
-      }
-      catch (IllegalArgumentException e)
-      {
-            System.out.println("Can not perform SMOTE: ");
-            System.out.println(e);
-      }
-    //
-    // Adjusting weights on datasets if they are very unbalanced.
-    //
-    SpreadSubsample fltbias = new SpreadSubsample();
-    fltbias.setDistributionSpread(setDistributionSpreadFromXML); // setDistributionSpread = 5
-    fltbias.setInputFormat(data);
-    data = Filter.useFilter(data, fltbias);
+    // 1. Attribute Selection
+    AttributeSelectedClassifier asc = new AttributeSelectedClassifier();
+    
+    if (feature_selection.equals("ReliefFAttributeEval")) {
+        ReliefFAttributeEval attreval = new ReliefFAttributeEval();
+        Ranker search = new Ranker();
+        // Typically keep top N features, or let Ranker decide based on threshold. Default Ranker behavior is fine for now.
+        asc.setEvaluator(attreval);
+        asc.setSearch(search);
+        asc.setClassifier(classifier);
+    } else if (feature_selection.equals("None")) {
+        // Bypass Attribute Selection
+        // asc acts as a pass-through if no evaluator is set, or we can just not use asc at all.
+        // Actually, to make the pipeline consistent, if "None", we can just NOT encapsulate with asc.
+        // Wait, if we don't encapsulate with asc, we need to pass `classifier` directly into `finalClassifier`.
+    } else {
+        // Default to CfsSubsetEval
+        CfsSubsetEval attreval = new CfsSubsetEval();
+        GreedyStepwise search = new GreedyStepwise();
+        search.setSearchBackwards(false);
+        asc.setEvaluator(attreval);
+        asc.setSearch(search);
+        asc.setClassifier(classifier);
+    }
 
+    // 2. SMOTE and SpreadSubsample (Instance Filters)
+    SMOTE smote = new SMOTE();
+    
+    SpreadSubsample spreadSubsample = new SpreadSubsample();
+    spreadSubsample.setDistributionSpread(setDistributionSpreadFromXML);
 
+    MultiFilter multiFilter = new MultiFilter();
+    multiFilter.setFilters(new Filter[]{spreadSubsample, smote});
+
+    FilteredClassifier finalClassifier = new FilteredClassifier();
+    finalClassifier.setFilter(multiFilter);
+    if (feature_selection.equals("None")) {
+        finalClassifier.setClassifier(classifier);
+    } else {
+        finalClassifier.setClassifier(asc);
+    }
+
+    // We replace the classifier with our robust pipeline
+    classifier = finalClassifier;
+
+    // Build classifier on the entire dataset (for final saving)
     classifier.buildClassifier(data);
 
-    Evaluation eval = new Evaluation(data); // set crossValidateModel = 10
+    // Evaluate using Cross Validation (filters will be applied per-fold automatically)
+    Evaluation eval = new Evaluation(data);
     eval.crossValidateModel(classifier, data, crossValidateModelFromXML, new Random(1));
 
     StringBuffer printout = new StringBuffer();
@@ -1223,11 +1251,54 @@ public class ModelBuilder {
     String from = new String(molclassemail);
     // disable email for now.
     //postMail(to, subject, message, from);
-    conn.close();
-  }
+	  conn.close();
+	  }
 
-  private static void postMail(String recipients[], String subject,
-      String message, String from) throws MessagingException {
+	private static void validateClassTag(Connection conn, String classtable, String classTag) throws Exception {
+		if (classTag == null || classTag.trim().isEmpty()) {
+			throw new Exception("Model class_tag is empty. A valid sdftags column name is required.");
+		}
+
+		if (!SAFE_COLUMN_NAME.matcher(classTag).matches()) {
+			throw new Exception("Model class_tag contains invalid characters: '" + classTag + "'. Expected SQL-safe identifier.");
+		}
+
+		Set<String> columns = loadTableColumns(conn, classtable);
+		if (!columns.contains(classTag.toLowerCase())) {
+			throw new Exception("Model class_tag '" + classTag + "' does not exist in table " + classtable
+				+ ". Available columns include: " + summarizeColumns(columns));
+		}
+	}
+
+	private static Set<String> loadTableColumns(Connection conn, String tableName) throws Exception {
+		Set<String> columns = new HashSet<>();
+		try (PreparedStatement ps = conn.prepareStatement("SHOW COLUMNS FROM " + tableName);
+		     ResultSet rs = ps.executeQuery()) {
+			while (rs.next()) {
+				columns.add(rs.getString("Field").toLowerCase());
+			}
+		}
+		return columns;
+	}
+
+	private static String summarizeColumns(Set<String> columns) {
+		StringBuilder sb = new StringBuilder();
+		int count = 0;
+		for (String column : columns) {
+			if (count++ > 0) {
+				sb.append(", ");
+			}
+			sb.append(column);
+			if (count >= 20) {
+				sb.append(" ...");
+				break;
+			}
+		}
+		return sb.toString();
+	}
+
+	  private static void postMail(String recipients[], String subject,
+	      String message, String from) throws MessagingException {
     boolean debug = false;
 
     // Set the host smtp address

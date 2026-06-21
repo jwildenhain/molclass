@@ -1,0 +1,44 @@
+plugins {
+    id 'org.springframework.boot' version '3.2.3'
+    id 'io.spring.dependency-management' version '1.1.4'
+    id 'java'
+}
+
+group = 'molclass'
+version = '1.0.0'
+sourceCompatibility = '17'
+
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    implementation 'org.mariadb.jdbc:mariadb-java-client'
+    def useLegacyWeka = project.hasProperty('legacyWeka')
+    if (useLegacyWeka) {
+        // Dependencies from original molclass (legacy VM environment)
+        implementation fileTree(dir: '../lib_legacy', include: ['*.jar'])
+    } else {
+        // Dependencies from current molclass
+        implementation fileTree(dir: '../lib', include: ['*.jar'])
+        implementation 'nz.ac.waikato.cms.weka:weka-stable:3.8.6'
+    }
+    
+    // We depend on the root project's classes explicitly
+    implementation project(':')
+}
+
+tasks.withType(org.springframework.boot.gradle.tasks.bundling.BootJar) {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+bootRun {
+    if (project.hasProperty('legacyWeka')) {
+        systemProperty 'molclass.models.dir', 'models'
+    } else {
+        systemProperty 'molclass.models.dir', 'models_modern'
+    }
+}

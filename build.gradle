@@ -1,0 +1,69 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'molclass'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+repositories {
+    mavenCentral()
+}
+
+application {
+    // Existing aggregator entry point; provide module name via --args.
+    mainClassName = 'molclass.Main'
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+        }
+        resources {
+            srcDirs = ['src']
+            exclude '**/*.java'
+        }
+    }
+    test {
+        java {
+            srcDirs = ['test']
+        }
+    }
+}
+
+dependencies {
+    // Rely on pre-bundled local jar dependencies
+    implementation fileTree(dir: 'lib', include: ['*.jar'])
+
+    // Explicit test dependencies
+    testImplementation 'junit:junit:4.13.2'
+}
+
+jar {
+    manifest {
+        attributes(
+            'Main-Class': 'molclass.Main',
+            'Class-Path': fileTree(dir: 'lib', include: ['*.jar']).files.collect { "lib/${it.name}" }.join(' ')
+        )
+    }
+}
+
+tasks.named('run') {
+    // Keep runtime behavior aligned with deploy.sh.
+    jvmArgs '--add-opens', 'java.base/java.lang=ALL-UNNAMED'
+    jvmArgs '-Dweka.core.WekaPackageManager.offline=true'
+}
+
+test {
+    useJUnit()
+    maxHeapSize = "4g"
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+}
