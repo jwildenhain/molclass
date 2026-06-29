@@ -2,8 +2,9 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-package fingerprints;
+package molclass.fingerprints;
 
+import molclass.XMLReader;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -192,7 +193,7 @@ public class Similarity {
 	}
         
         
-        private static BitSet bsFromString(String string) {
+        public static BitSet bsFromString(String string) {
 		String s = new String(string);
 		BitSet bs = new BitSet();
 		
@@ -210,7 +211,7 @@ public class Similarity {
 		return bs;
 	}
         
-        private static double calculateSimilarity(BitSet fp1, BitSet fp2) {
+        public static double calculateSimilarity(BitSet fp1, BitSet fp2) {
 		
 		double score = Double.MIN_VALUE;
 		if (fp1 != null && fp2 != null) {

@@ -141,4 +141,19 @@ public class PredictionController {
             return "Error uploading file: " + e.getMessage();
         }
     }
+
+    @GetMapping("/api/predictions/{modelId}/results")
+    public List<Map<String, Object>> getPredictionResults(@PathVariable int modelId) {
+        // We find the pred_id associated with this model_id. Usually there is one main prediction task.
+        List<Integer> predIds = jdbcTemplate.queryForList("SELECT pred_id FROM prediction_list WHERE model_id = ? ORDER BY pred_id DESC LIMIT 1", Integer.class, modelId);
+        if (predIds.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        int predId = predIds.get(0);
+
+        String sql = "SELECT m.mol_id, m.main_class, m.distribution, m.response_strength, m.certainty_score " +
+                     "FROM prediction_mols m " +
+                     "WHERE m.pred_id = ? ORDER BY m.mol_id ASC";
+        return jdbcTemplate.queryForList(sql, predId);
+    }
 }

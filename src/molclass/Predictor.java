@@ -519,8 +519,24 @@ public class Predictor {
     }
     text.append("\n");
 
+    // Fetch training set EXT fingerprints for Applicability Domain (Certainty Score)
+    java.util.List<java.util.BitSet> trainingMols = new java.util.ArrayList<>();
+    String fetchTrainingFp = "SELECT EXT FROM " + fptable + ", " + batchmoltable 
+        + " WHERE " + fptable + ".mol_id = " + batchmoltable + ".mol_id AND " 
+        + batchmoltable + ".batch_id = ?";
+    try (PreparedStatement pstmt = conn.prepareStatement(fetchTrainingFp)) {
+      pstmt.setInt(1, batch_id);
+      try (ResultSet rs = pstmt.executeQuery()) {
+        while (rs.next()) {
+          String ext = rs.getString("EXT");
+          if (ext != null && !ext.isEmpty()) {
+            trainingMols.add(molclass.fingerprints.Similarity.bsFromString(ext));
+          }
+        }
+      }
+    }
     String insertSQL = "INSERT INTO " + predmoltable
-        + "(mol_id, pred_id, main_class, distribution, lhood) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE mol_id = ? , pred_id = ?";
+        + "(mol_id, pred_id, main_class, distribution, response_strength, certainty_score) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE mol_id = ? , pred_id = ?";
     try (PreparedStatement pstmtInsert = conn.prepareStatement(insertSQL)) {
       // compares the attributes in unlabeled to the attributes in header
       // discard attributes from unlabeled which are not in header
@@ -571,12 +587,14 @@ public class Predictor {
 
         StringBuffer mol_dist = new StringBuffer();
 
+        double response_strength = 0.0;
         for (int x = 0; x < dist.length; x++) {
           double d = dist[x];
           text.append(df.format(d));
           mol_dist.append(df.format(d));
           if (x == (int) pred) {
             text.append('*');
+            response_strength = d; // Use the probability of the predicted class
           }
           text.append('\t');
           mol_dist.append('\t');
@@ -585,18 +603,47 @@ public class Predictor {
           // Integer(mol_id)));
         }
         text.append('\n');
-        // make log likelihood on first property column
-       
-        double llhood = logIt(dist[0],0.001);
-        //System.out.print(llhood);
+
+        // Calculate Certainty Score (Applicability Domain)
+        double certainty_score = 0.0;
+        String fetchQueryFp = "SELECT EXT FROM " + fptable + " WHERE mol_id = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(fetchQueryFp)) {
+          pstmt.setInt(1, Integer.parseInt(mol_id));
+          try (ResultSet rs = pstmt.executeQuery()) {
+            if (rs.next()) {
+              String extStr = rs.getString("EXT");
+              if (extStr != null && !extStr.isEmpty() && !trainingMols.isEmpty()) {
+                java.util.BitSet queryBs = molclass.fingerprints.Similarity.bsFromString(extStr);
+                
+                // Calculate similarity to all training molecules
+                java.util.List<Double> scores = new java.util.ArrayList<>();
+                for (java.util.BitSet trainBs : trainingMols) {
+                  scores.add(molclass.fingerprints.Similarity.calculateSimilarity(queryBs, trainBs));
+                }
+                
+                // Average of top 5 neighbors
+                scores.sort(java.util.Collections.reverseOrder());
+                int k = Math.min(5, scores.size());
+                double sum = 0.0;
+                for (int m = 0; m < k; m++) {
+                  sum += scores.get(m);
+                }
+                if (k > 0) {
+                  certainty_score = sum / k;
+                }
+              }
+            }
+          }
+        }
         
         pstmtInsert.setInt(1, Integer.parseInt(mol_id));
         pstmtInsert.setInt(2, pred_id);
         pstmtInsert.setString(3, pred_class);
         pstmtInsert.setString(4, mol_dist.toString());
-        pstmtInsert.setDouble(5, llhood);
-        pstmtInsert.setInt(6, Integer.parseInt(mol_id));
-        pstmtInsert.setInt(7, pred_id);
+        pstmtInsert.setDouble(5, response_strength);
+        pstmtInsert.setDouble(6, certainty_score);
+        pstmtInsert.setInt(7, Integer.parseInt(mol_id));
+        pstmtInsert.setInt(8, pred_id);
         pstmtInsert.executeUpdate();
       }
     }
@@ -680,11 +727,6 @@ private static void postMail(String recipients[], String subject,
     }
     return(header);
   }
-
-  private static double logIt(double p, double offset) {
-      double loglike = Math.log((p+offset)/(1+offset-p));
-      return(loglike);
- }
 
 
 

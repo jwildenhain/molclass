@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: molclass_db
+    environment:
+      MYSQL_ROOT_PASSWORD: rootPassword
+      MYSQL_USER: molclass_unit_user
+      MYSQL_PASSWORD: unittestPassword
+      MYSQL_DATABASE: molclass_unittest
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./docker/db_init:/docker-entrypoint-initdb.d
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: molclass_backend
+    environment:
+      DB_URL: jdbc:mariadb://db:3306/molclass_unittest
+      DB_USER: molclass_unit_user
+      DB_PASS: unittestPassword
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./molclass-frontend
+      dockerfile: Dockerfile
+    container_name: molclass_frontend
+    environment:
+      API_URL: http://backend:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
