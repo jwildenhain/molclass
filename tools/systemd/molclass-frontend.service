@@ -1,0 +1,41 @@
+[Unit]
+Description=MolClass Next.js frontend (standalone production server)
+Documentation=file:///mnt/wdc_store/gitlab/molclass/docs/V3_MODEL_REVIEW.md
+After=network-online.target molclass-api.service molclass-predictor.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+WorkingDirectory=/mnt/wdc_store/gitlab/molclass/molclass-frontend
+
+# Runs the standalone production build, not `next dev`. The dev server's HMR
+# WebSocket fails in this environment and starves client-side data fetching,
+# which is what left /model-review stuck on "loading".
+#
+# .env.local is deliberately NOT loaded here. next.config.ts resolves
+# API_URL/PREDICTOR_API_URL inside rewrites(), which Next.js evaluates at BUILD
+# time and bakes into the routes manifest -- so those values come from the build,
+# not from this unit. Loading .env.local at runtime would only re-apply its
+# PORT=3100 and fight the port set below.
+#
+# Rebuild (and re-stage static assets) with tools/build-frontend.sh after any
+# frontend source or backend-port change, then: systemctl --user restart molclass-frontend
+Environment=NODE_ENV=production
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3000
+
+ExecStart=/usr/bin/env node /mnt/wdc_store/gitlab/molclass/molclass-frontend/.next/standalone/server.js
+
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=molclass-frontend
+
+[Install]
+WantedBy=default.target

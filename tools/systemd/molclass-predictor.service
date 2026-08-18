@@ -1,0 +1,38 @@
+[Unit]
+Description=MolClass Spring Boot predictor (v3 prediction and molecule search)
+Documentation=file:///mnt/wdc_store/gitlab/molclass/docs/V3_PRODUCTION_RUNBOOK.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+WorkingDirectory=/mnt/wdc_store/gitlab/molclass
+
+# Reuses the ordinary read/insert account. The predictor never mutates model
+# lifecycle state, so it must not be given the approver credential.
+EnvironmentFile=%h/.config/molclass/api.env
+
+Environment=MOLCLASS_PREDICTOR_ADDRESS=127.0.0.1
+Environment=MOLCLASS_PREDICTOR_PORT=8182
+Environment=MOLCLASS_LEGACY_MODELS_ENABLED=false
+Environment=MOLCLASS_LEGACY_API_ENABLED=false
+
+# bootRun is a development entry point: it holds a Gradle process open for the
+# lifetime of the service. Prefer the built jar once `bootJar` output is
+# published; see molclass-predictor-jar.service.example in this directory.
+ExecStart=/mnt/wdc_store/gitlab/molclass/gradlew --no-daemon :spring_boot_predictor:bootRun
+
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=300
+TimeoutStopSec=60
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=molclass-predictor
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,46 @@
+[Unit]
+Description=MolClass FastAPI service (v3 review and upload API)
+Documentation=file:///mnt/wdc_store/gitlab/molclass/docs/V3_MODEL_REVIEW.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+WorkingDirectory=/mnt/wdc_store/gitlab/molclass
+
+# Credentials live outside the repository and are never baked into the unit.
+# api.env         -> read/insert account used for ordinary requests
+# model-approval.env -> approval account + review token, used only to spawn the
+#                       canonical Java approval transaction in a child process.
+EnvironmentFile=%h/.config/molclass/api.env
+EnvironmentFile=-%h/.config/molclass/model-approval.env
+
+Environment=MOLCLASS_API_ADDRESS=127.0.0.1
+Environment=MOLCLASS_API_PORT=8100
+Environment=MOLCLASS_LEGACY_API_ENABLED=false
+Environment=MOLCLASS_REPO_ROOT=/mnt/wdc_store/gitlab/molclass
+
+# systemd --user gives this service a minimal PATH (no .bashrc/.profile is
+# sourced), so plain `python3` resolves to /usr/bin/python3, which does not
+# have uvicorn/fastapi installed. run.sh itself must stay interpreter-agnostic
+# because the Docker image installs these packages globally with no venv at
+# all -- so the venv is selected here, at the unit level, not inside run.sh.
+Environment=PATH=/mnt/wdc_store/gitlab/molclass/.venv/bin:/usr/bin:/bin
+
+ExecStart=/mnt/wdc_store/gitlab/molclass/html/molclass/api/run.sh
+
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+# The approval bridge shells out to gradlew, so this service cannot be fully
+# sandboxed, but it should never need elevated privileges or new privileges.
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=molclass-api
+
+[Install]
+WantedBy=default.target
