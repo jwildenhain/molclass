@@ -1,5 +1,6 @@
-package fingerprints;
+package molclass.fingerprints;
 
+import molclass.SDFReader;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -18,7 +19,7 @@ import org.openscience.cdk.fingerprint.ExtendedFingerprinter;
 import org.openscience.cdk.fingerprint.MACCSFingerprinter;
 import org.openscience.cdk.interfaces.IAtomContainer;
 
-public class textFingerprinter {
+public class TextFingerprinter {
 
 	/**
 	 * @param args

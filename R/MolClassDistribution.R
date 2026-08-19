@@ -120,10 +120,10 @@ unit_test <- function() {
   # database prediction ID or model ID
   R_P_ID = 1,
   # database connection
-  DB_connection_user = "molclass_admin",
-  DB_connection_host = "prohits.bio.ed.ac.uk",
-  DB_connection_database = "molclass_v15",
-  DB_connection_password = "twDehbP3jJmeQGLa",
+  DB_connection_user = "molclass_unit_user",
+  DB_connection_host = "localhost",
+  DB_connection_database = "molclass_unittest",
+  DB_connection_password = "unittestPassword",
   R_WWW_color_bg = "white" 
   )
   return(param)

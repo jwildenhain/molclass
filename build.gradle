@@ -7,8 +7,8 @@ group = 'molclass'
 version = '2.1.0'
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 repositories {
@@ -39,7 +39,21 @@ sourceSets {
 
 dependencies {
     // Rely on pre-bundled local jar dependencies
-    implementation fileTree(dir: 'lib', include: ['*.jar'])
+    implementation fileTree(dir: 'lib', include: ['*.jar'], exclude: ['cdk-2.12.jar', 'weka-stable-3.8.6.jar', 'weka-src.jar'])
+    implementation 'org.openscience.cdk:cdk-bundle:2.12'
+    implementation 'nz.ac.waikato.cms.weka:weka-stable:3.8.7'
+
+    components {
+        withModule('com.github.fommil.netlib:all') {
+            allVariants {
+                withFiles {
+                    // This aggregate publishes a POM as its runtime artifact.
+                    // Keep its netlib dependencies, but never put the POM on Java classpaths.
+                    removeAllFiles()
+                }
+            }
+        }
+    }
 
     // Explicit test dependencies
     testImplementation 'junit:junit:4.13.2'
@@ -67,3 +81,12 @@ test {
         events "passed", "skipped", "failed"
     }
 }
+
+apply from: 'gradle/v3-migration.gradle'
+apply from: 'gradle/v3-features.gradle'
+apply from: 'gradle/v3-models.gradle'
+
+apply from: 'gradle/v3-import.gradle'
+apply from: 'gradle/v3-approval.gradle'
+
+apply from: 'gradle/v3-audit.gradle'

@@ -1,5 +1,6 @@
-package descriptors;
+package molclass.descriptors;
 
+import molclass.XMLReader;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;

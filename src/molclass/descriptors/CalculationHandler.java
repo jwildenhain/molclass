@@ -1,4 +1,6 @@
-package descriptors;
+package molclass.descriptors;
+
+import molclass.SDFReader;
 
 import java.sql.Blob;
 import java.sql.Connection;

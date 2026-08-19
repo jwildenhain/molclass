@@ -1,0 +1,35 @@
+.git
+.gitignore
+.gradle
+**/.gradle
+**/build
+**/dist
+**/node_modules
+**/.next
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/playwright-report
+**/test-results
+**/*.log
+**/*.pid
+**/.DS_Store
+
+# Runtime data must not become part of an application image.
+uploads
+logs
+tmp
+
+# The database is mounted by the database service. Historical dumps may contain
+# credentials or personal data and must never enter an application build context.
+docker/db_init/*.sql
+docker/db_init/*.sql.gz
+docker/db_init/*.dump
+
+# Local configuration and secrets.
+.env
+.env.*
+!.env.example
+DatabaseUtils.props
+molclass.conf.xml.local
+

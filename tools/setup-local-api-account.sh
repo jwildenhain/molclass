@@ -45,7 +45,15 @@ if [[ -z "$db_password" ]]; then
 fi
 
 # Tables the v3 API inserts into. Every other privilege stays withheld.
-insert_tables=(dataset import_run job job_event upload_artifact model_definition audit_event)
+#
+# scaffold_definition/molecule_scaffold (Murcko scaffold storage) and
+# prediction_job/prediction_result (persisted predictions) were added when the
+# Spring predictor gained write paths of its own; job was already granted for
+# the FastAPI upload/import pipeline and is reused for prediction job rows.
+insert_tables=(
+    dataset import_run job job_event upload_artifact model_definition audit_event
+    scaffold_definition molecule_scaffold prediction_job prediction_result
+)
 
 {
     for host in localhost 127.0.0.1; do

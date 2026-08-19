@@ -141,10 +141,10 @@ Type 'q()' to quit R.
 +   # database prediction ID or model ID
 +   R_P_ID = 1,
 +   # database connection
-+   DB_connection_user = "molclass_admin",
-+   DB_connection_host = "prohits.bio.ed.ac.uk",
-+   DB_connection_database = "molclass_v15",
-+   DB_connection_password = "twDehbP3jJmeQGLa",
++   DB_connection_user = "molclass_unit_user",
++   DB_connection_host = "localhost",
++   DB_connection_database = "molclass_unittest",
++   DB_connection_password = "unittestPassword",
 +   R_WWW_color_bg = "white" 
 +   )
 +   return(param)
@@ -205,16 +205,16 @@ $R_P_ID
 [1] 1
 
 $DB_connection_user
-[1] "molclass_admin"
+[1] "molclass_unit_user"
 
 $DB_connection_host
-[1] "prohits.bio.ed.ac.uk"
+[1] "localhost"
 
 $DB_connection_database
-[1] "molclass_v15"
+[1] "molclass_unittest"
 
 $DB_connection_password
-[1] "twDehbP3jJmeQGLa"
+[1] "unittestPassword"
 
 $R_WWW_color_bg
 [1] "white"

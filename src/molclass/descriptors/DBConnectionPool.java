@@ -1,4 +1,4 @@
-package descriptors;
+package molclass.descriptors;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;

@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 #
-# Deployment & Execution script for MolClass
+# Deployment & Execution script for MolClass (Gradle-first)
 #
 # Usage:
-#   ./deploy.sh <ClassName> [Arguments...]
+#   ./deploy.sh <ClassName|ToolName> [Arguments...]
 #
-# Example:
-#   ./deploy.sh molclass.Predictor 1
+# Examples:
+#   ./deploy.sh SdfImporter <sdf_target> <username> <email> <mol_type> <pmid> <info> <id>
+#   ./deploy.sh Predictor 123
 #
 
 set -e
@@ -14,55 +15,71 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# 1. Check if setup and classpath exist
-if [[ ! -f "./classpath.sh" ]]; then
-    echo "[deploy] Error: ./classpath.sh not found."
-    echo "[deploy] Please run './setup.sh' first to resolve dependencies and generate classpath."
+if [[ ! -x "./gradlew" ]]; then
+    echo "[deploy] Error: ./gradlew is not executable."
+    echo "[deploy] Run: chmod +x gradlew"
     exit 1
 fi
 
-# Source the classpath script to export CLASSPATH
-source ./classpath.sh
-
-# 2. Check if build directory exists and classes are compiled
-if [[ ! -d "build/classes" || -z "$(ls -A build/classes 2>/dev/null)" ]]; then
-    echo "[deploy] Build directory empty. Compiling project via Ant first..."
-    ant compile
+if [[ ! -f "./setup.sh" ]]; then
+    echo "[deploy] Warning: ./setup.sh not found. Dependency bootstrap may fail."
 fi
 
-# 3. Perform database connection sanity check
-if ! java -Dweka.core.WekaPackageManager.offline=true --add-opens java.base/java.lang=ALL-UNNAMED -cp "$CLASSPATH" descriptors.DBConnectionTest; then
-    echo "[deploy] Error: Database connection check failed."
-    echo "[deploy] Please verify your database credentials and configuration in 'molclass.conf.xml'."
+if [[ ! -f "./gradle/wrapper/gradle-wrapper.jar" ]]; then
+    echo "[deploy] Error: Gradle wrapper jar missing."
+    echo "[deploy] Expected ./gradle/wrapper/gradle-wrapper.jar"
     exit 1
 fi
 
-# 4. Check class argument
+if [[ ! -x "./setup.sh" ]]; then
+    echo "[deploy] Error: Missing setup.sh; cannot ensure lib/ dependencies are available."
+    echo "[deploy] Run ./setup.sh first to download required jars into lib/."
+    exit 1
+fi
+
+# Quick sanity check: setup should have generated runtime dependency jars.
+if [[ ! -d "./lib" || -z "$(ls -1 ./lib/*.jar 2>/dev/null)" ]]; then
+    echo "[deploy] Error: No jar dependencies found in ./lib/."
+    echo "[deploy] Run ./setup.sh to download required jars, then retry."
+    exit 1
+fi
+
 if [[ $# -lt 1 ]]; then
-    echo "Usage:"
-    echo "  ./deploy.sh <ClassName> [Arguments...]"
-    echo ""
-    echo "Available core classes to run:"
-    echo "  molclass.Main                     - Command line main entry point"
-    echo "  descriptors.AutomaticCalcDriver   - Calculate CDK molecular descriptors"
-    echo "  fingerprints.Fingerprinter        - Generate molecular fingerprints"
-    echo "  fingerprints.Similarity           - Calculate molecular similarities"
-    echo "  molclass.ModelBuilder             - Build and evaluate Weka machine learning models"
-    echo "  molclass.Predictor                - Apply Weka models to predict batch activities"
+    cat <<'USAGE'
+Usage:
+  ./deploy.sh <ClassName|ToolName> [Arguments...]
+
+ClassName examples:
+  molclass.Predictor
+  molclass.ModelBuilder
+  molclass.SdfImporter
+
+ToolName examples:
+  Predictor
+  ModelBuilder
+  SdfImporter
+  DBConnectionTest
+USAGE
     exit 0
 fi
 
-MAIN_CLASS="$1"
+TARGET_CLASS="$1"
 shift
 
-echo "[deploy] Starting $MAIN_CLASS..."
-echo "--------------------------------------------------"
+if [[ -z "${GRADLE_OPTS:-}" ]]; then
+    export GRADLE_OPTS="-Dorg.gradle.daemon=false"
+fi
 
-# Execute the Java class with modern JVM compatibility arguments
-java -Dweka.core.WekaPackageManager.offline=true \
-     --add-opens java.base/java.lang=ALL-UNNAMED \
-     -cp "$CLASSPATH" \
-     "$MAIN_CLASS" "$@"
+# Validate DB connectivity first via the Java launcher, using Main dispatch.
+./gradlew -q run --args="DBConnectionTest"
 
+ARGS="$TARGET_CLASS"
+if [[ $# -gt 0 ]]; then
+    ARGS="$ARGS $*"
+fi
+
+echo "[deploy] Starting ${TARGET_CLASS}"
 echo "--------------------------------------------------"
-echo "[deploy] Finished execution of $MAIN_CLASS."
+./gradlew -q run --args="$ARGS"
+echo "--------------------------------------------------"
+echo "[deploy] Finished execution of ${TARGET_CLASS}."

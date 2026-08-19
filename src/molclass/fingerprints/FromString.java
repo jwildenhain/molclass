@@ -1,10 +1,10 @@
-package fingerprints;
+package molclass.fingerprints;
 
 import java.util.BitSet;
 import java.util.Scanner;
 import org.openscience.cdk.similarity.Tanimoto;
 
-public class fromString {
+public class FromString {
 
 	public static void main(String[] args) {
 		BitSet bs1 = bsFromString("{21, 49, 65, 75, 94, 98, 104, 105, 106, 107, 108, 109, 112, 122, 126, 142, 144, 145, 146, 147, 148, 149, 153, 155, 156, 157, 158, 160, 161, 162, 163, 164}");

@@ -10,7 +10,7 @@ import org.openscience.cdk.fingerprint.PubchemFingerprinter;
 import org.openscience.cdk.fingerprint.KlekotaRothFingerprinter;
 import org.openscience.cdk.similarity.Tanimoto;
 import org.openscience.cdk.isomorphism.Pattern;
-import descriptors.SDFReader;
+import molclass.SDFReader;
 
 import java.sql.Blob;
 import java.sql.Connection;

@@ -1,4 +1,4 @@
-package descriptors;
+package molclass.descriptors;
 
 import org.openscience.cdk.graph.ConnectivityChecker;
 import org.openscience.cdk.interfaces.IAtomContainer;

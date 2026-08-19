@@ -32,9 +32,7 @@ $info = $ARGV[6];
 #$cmd = "perl ".$toolsdir."inchikey2sdf.pl ".$sdf_target;
 #system $cmd;
 
-# sdf2moldb_alt.pl - This script reads an SDF file which was previously analyzed 
-# by the script "sdfcheck.pl" and adds its content (structures and data) into a MySQL-based MolDB database.
-$cmd = "/usr/bin/perl ".$toolsdir."sdf2moldb.pl '$sdf_target' '$username' '$email' '$mol_type' '$pmid' '$info' '$id'";
+$cmd = "./deploy.sh molclass.SdfImporter '$sdf_target' '$username' '$email' '$mol_type' '$pmid' '$info' '$id'";
 system "echo ".$cmd." >> ./log/call_sdf2moldb.log";
 system $cmd;
 

@@ -1,5 +1,7 @@
-package fingerprints;
+package molclass.fingerprints;
 
+import molclass.XMLReader;
+import molclass.SDFReader;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

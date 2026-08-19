@@ -7,13 +7,12 @@ import static org.junit.Assert.*;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
-import fingerprints.XMLReader;
-import fingerprints.Fingerprinter;
-import fingerprints.Similarity;
+import molclass.XMLReader;
+import molclass.fingerprints.Fingerprinter;
+import molclass.fingerprints.Similarity;
 
 public class MultithreadedUnitTest {
 
@@ -30,6 +29,7 @@ public class MultithreadedUnitTest {
         rwPassword = XMLReader.getTag("rw_password");
         databaseURL = "jdbc:mysql://" + host + "/" + database;
         conn = DriverManager.getConnection(databaseURL, rwUser, rwPassword);
+        conn.setAutoCommit(true);
     }
 
     @AfterClass
@@ -50,57 +50,60 @@ public class MultithreadedUnitTest {
     @Test
     public void testMultithreadedFingerprinter() throws Exception {
         System.out.println("\n=== MULTITHREADED FINGERPRINTER TEST ===");
-        
-        // 1. Reset fingerprints for batch 84
-        String resetSQL = "UPDATE fingerprints SET SUB = NULL WHERE mol_id IN (SELECT mol_id FROM batchmols WHERE batch_id = 84)";
-        Statement resetStmt = conn.createStatement();
-        resetStmt.executeUpdate(resetSQL);
-        resetStmt.close();
-        
-        // Verify reset succeeded
-        String checkSQL = "SELECT COUNT(*) FROM fingerprints WHERE mol_id IN (SELECT mol_id FROM batchmols WHERE batch_id = 84) AND SUB IS NULL";
-        Statement checkStmt = conn.createStatement();
-        ResultSet checkRs = checkStmt.executeQuery(checkSQL);
-        assertTrue(checkRs.next());
-        assertEquals("All 20 molecules should be reset with SUB=NULL", 20, checkRs.getInt(1));
-        checkRs.close();
-        checkStmt.close();
+
+        int batchId = 84;
+        int totalMolecules = queryScalarInt(
+                "SELECT COUNT(*) FROM batchmols WHERE batch_id = " + batchId);
+        assertEquals("Expected batch size should be 20", 20, totalMolecules);
+
+        // 1. Reset fingerprints for batch
+        String resetSQL = "UPDATE fingerprints SET SUB = NULL WHERE mol_id IN (SELECT mol_id FROM batchmols WHERE batch_id = " + batchId + ")";
+        try (Statement resetStmt = conn.createStatement()) {
+            resetStmt.executeUpdate(resetSQL);
+        }
+
+        int resetNullCount = queryScalarInt(
+                "SELECT COUNT(*) FROM fingerprints WHERE mol_id IN (SELECT mol_id FROM batchmols WHERE batch_id = " + batchId + ") AND SUB IS NULL");
+        assertEquals("All selected molecules should be reset with SUB=NULL", totalMolecules, resetNullCount);
 
         // 2. Run multithreaded Fingerprinter
-        Fingerprinter.main(new String[]{"84"});
+        Fingerprinter.main(new String[]{String.valueOf(batchId)});
 
         // 3. Verify all molecules now have computed fingerprints (SUB is not null)
-        String verifySQL = "SELECT COUNT(*) FROM fingerprints WHERE mol_id IN (SELECT mol_id FROM batchmols WHERE batch_id = 84) AND SUB IS NOT NULL";
-        Statement verifyStmt = conn.createStatement();
-        ResultSet verifyRs = verifyStmt.executeQuery(verifySQL);
-        assertTrue(verifyRs.next());
-        assertEquals("All 20 molecules should have generated fingerprints concurrently", 20, verifyRs.getInt(1));
-        verifyRs.close();
-        verifyStmt.close();
+        int computedCount = queryScalarInt(
+                "SELECT COUNT(*) FROM fingerprints WHERE mol_id IN (SELECT mol_id FROM batchmols WHERE batch_id = " + batchId + ") AND SUB IS NOT NULL");
+
+        assertEquals("All 20 molecules should have generated fingerprints concurrently", totalMolecules, computedCount);
     }
 
     @Test
     public void testMultithreadedSimilarity() throws Exception {
         System.out.println("\n=== MULTITHREADED SIMILARITY TEST ===");
-        
-        // 1. Reset similarity records for batch 84
-        String resetSQL = "DELETE FROM tanimoto WHERE mol_id1 IN (SELECT mol_id FROM batchmols WHERE batch_id = 84)";
-        Statement resetStmt = conn.createStatement();
-        resetStmt.executeUpdate(resetSQL);
-        resetStmt.close();
+
+        int batchId = 84;
+        // 1. Reset similarity records for batch
+        String resetSQL = "DELETE FROM tanimoto WHERE mol_id1 IN (SELECT mol_id FROM batchmols WHERE batch_id = " + batchId + ")";
+        try (Statement resetStmt = conn.createStatement()) {
+            resetStmt.executeUpdate(resetSQL);
+        }
 
         // 2. Run multithreaded Similarity
-        Similarity.main(new String[]{"84"});
+        Similarity.main(new String[]{String.valueOf(batchId)});
 
         // 3. Verify that tanimoto entries were successfully populated
-        String verifySQL = "SELECT COUNT(*) FROM tanimoto WHERE mol_id1 IN (SELECT mol_id FROM batchmols WHERE batch_id = 84)";
-        Statement verifyStmt = conn.createStatement();
-        ResultSet verifyRs = verifyStmt.executeQuery(verifySQL);
-        assertTrue(verifyRs.next());
-        int count = verifyRs.getInt(1);
+        String verifySQL = "SELECT COUNT(*) FROM tanimoto WHERE mol_id1 IN (SELECT mol_id FROM batchmols WHERE batch_id = " + batchId + ")";
+        int count = queryScalarInt(verifySQL);
         System.out.println("Generated " + count + " similarity relations in tanimoto table.");
         assertTrue("Should have calculated similarities and created rows in tanimoto table", count > 0);
-        verifyRs.close();
-        verifyStmt.close();
+    }
+
+    private static int queryScalarInt(String sql) throws Exception {
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            if (!rs.next()) {
+                return 0;
+            }
+            return rs.getInt(1);
+        }
     }
 }

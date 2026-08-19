@@ -1,51 +1,191 @@
-version: '3.8'
+name: molclass
 
 services:
   db:
     image: mariadb:10.11
-    container_name: molclass_db
+    restart: unless-stopped
+    command:
+      - --max-allowed-packet=640M
+      - --innodb-buffer-pool-size=${MOLCLASS_INNODB_BUFFER_POOL:-8G}
+      - --default-time-zone=+00:00
     environment:
-      MYSQL_ROOT_PASSWORD: rootPassword
-      MYSQL_USER: molclass_unit_user
-      MYSQL_PASSWORD: unittestPassword
-      MYSQL_DATABASE: molclass_unittest
-    ports:
-      - "3306:3306"
+      MARIADB_ROOT_PASSWORD: "${MOLCLASS_DB_ROOT_PASSWORD:?set MOLCLASS_DB_ROOT_PASSWORD in an untracked environment file}"
+      MARIADB_DATABASE: molclass_v3
+      MARIADB_USER: "${MOLCLASS_DB_USER:-molclass_app}"
+      MARIADB_PASSWORD: "${MOLCLASS_DB_PASSWORD:?set MOLCLASS_DB_PASSWORD in an untracked environment file}"
+    expose:
+      - "3306"
     volumes:
-      - ./docker/db_init:/docker-entrypoint-initdb.d
+      - ./sql/v3:/docker-entrypoint-initdb.d:ro
       - db_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 20
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
 
-  backend:
+  api:
     build:
-      context: .
+      context: ./html/molclass/api
       dockerfile: Dockerfile
-    container_name: molclass_backend
+    restart: unless-stopped
     environment:
-      DB_URL: jdbc:mariadb://db:3306/molclass_unittest
-      DB_USER: molclass_unit_user
-      DB_PASS: unittestPassword
+      MOLCLASS_V3_DB_HOST: db
+      MOLCLASS_V3_DB_PORT: "3306"
+      MOLCLASS_V3_SCHEMA: molclass_v3
+      MOLCLASS_DB_USER: "${MOLCLASS_DB_USER:-molclass_app}"
+      MOLCLASS_DB_PASSWORD: "${MOLCLASS_DB_PASSWORD:?set MOLCLASS_DB_PASSWORD in an untracked environment file}"
+      MOLCLASS_UPLOAD_ROOT: /var/lib/molclass/uploads
+      MOLCLASS_LEGACY_API_ENABLED: "false"
+      MOLCLASS_ALLOWED_ORIGINS: "http://127.0.0.1:${MOLCLASS_FRONTEND_PORT:-3000},http://localhost:${MOLCLASS_FRONTEND_PORT:-3000}"
     ports:
-      - "8080:8080"
+      - "127.0.0.1:${MOLCLASS_API_PORT:-8000}:8000"
+    volumes:
+      - upload_data:/var/lib/molclass/uploads
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/readiness', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: "${MOLCLASS_API_MEMORY:-1g}"
+
+  sdf-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: sdf-worker
+    restart: unless-stopped
+    command: ["--poll-seconds", "2", "--lease-seconds", "120"]
+    environment:
+      MOLCLASS_JDBC_URL: jdbc:mysql://db:3306/molclass_v3
+      MOLCLASS_V3_SCHEMA: molclass_v3
+      MOLCLASS_DB_USER: "${MOLCLASS_DB_USER:-molclass_app}"
+      MOLCLASS_DB_PASSWORD: "${MOLCLASS_DB_PASSWORD:?set MOLCLASS_DB_PASSWORD in an untracked environment file}"
+      MOLCLASS_UPLOAD_ROOT: /var/lib/molclass/uploads
+    volumes:
+      - upload_data:/var/lib/molclass/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=2g,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: "${MOLCLASS_SDF_WORKER_MEMORY:-2g}"
+
+  model-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: model-worker
+    restart: unless-stopped
+    command: ["--poll-seconds", "30", "--feature-timeout-minutes", "30", "--model-timeout-minutes", "60", "--threads", "8"]
+    environment:
+      MOLCLASS_JDBC_URL: jdbc:mysql://db:3306/molclass_v3
+      MOLCLASS_V3_SCHEMA: molclass_v3
+      MOLCLASS_DB_USER: "${MOLCLASS_DB_USER:-molclass_app}"
+      MOLCLASS_DB_PASSWORD: "${MOLCLASS_DB_PASSWORD:?set MOLCLASS_DB_PASSWORD in an untracked environment file}"
+      MOLCLASS_ALLOW_FEATURE_EXCLUSIONS: "true"
+      MOLCLASS_CODE_REVISION: "${MOLCLASS_CODE_REVISION:-container-build}"
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=4g,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    mem_limit: "${MOLCLASS_MODEL_WORKER_MEMORY:-16g}"
+
+  predictor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: predictor
+    restart: unless-stopped
+    environment:
+      MOLCLASS_JDBC_URL: jdbc:mariadb://db:3306/molclass_v3
+      MOLCLASS_DB_USER: "${MOLCLASS_DB_USER:-molclass_app}"
+      MOLCLASS_DB_PASSWORD: "${MOLCLASS_DB_PASSWORD:?set MOLCLASS_DB_PASSWORD in an untracked environment file}"
+      MOLCLASS_V3_SCHEMA: molclass_v3
+      MOLCLASS_PREDICTOR_ADDRESS: 0.0.0.0
+      MOLCLASS_PREDICTOR_PORT: "8082"
+      MOLCLASS_LEGACY_MODELS_ENABLED: "false"
+      MOLCLASS_LEGACY_API_ENABLED: "false"
+    ports:
+      - "127.0.0.1:${MOLCLASS_PREDICTOR_PORT:-8082}:8082"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8082/actuator/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: "${MOLCLASS_PREDICTOR_MEMORY:-6g}"
 
   frontend:
     build:
       context: ./molclass-frontend
       dockerfile: Dockerfile
-    container_name: molclass_frontend
+      args:
+        API_URL: http://api:8000
+        PREDICTOR_API_URL: http://predictor:8082
+    restart: unless-stopped
     environment:
-      API_URL: http://backend:8080
+      API_URL: http://api:8000
+      PREDICTOR_API_URL: http://predictor:8082
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
     ports:
-      - "3000:3000"
+      - "127.0.0.1:${MOLCLASS_FRONTEND_PORT:-3000}:3000"
     depends_on:
-      - backend
+      api:
+        condition: service_healthy
+      predictor:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+      - /app/.next/cache:size=256m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: "${MOLCLASS_FRONTEND_MEMORY:-1g}"
 
 volumes:
   db_data:
+  upload_data:

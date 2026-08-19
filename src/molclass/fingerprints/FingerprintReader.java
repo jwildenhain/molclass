@@ -1,4 +1,4 @@
-package fingerprints;
+package molclass.fingerprints;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;

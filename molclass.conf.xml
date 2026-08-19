@@ -5,7 +5,7 @@
 		<!-- PHP PEAR DB INFO -->
 		<DB_DataObject>
 
-			<dsn>mysqli://molclass_user:YCuRzNoe@localhost/molclass</dsn>
+			<dsn>mysqli://molclass_unit_user:unittestPassword@localhost/molclass_unittest</dsn>
 
 			<proxy>full</proxy>
 			<schema_location>/var/www/html/tools/DataObjects</schema_location>
@@ -16,12 +16,12 @@
 
 		<!-- General DB INFO -->
 
-		<database>molclass_v15</database>
+		<database>molclass_legacy</database>
 		<hostname>localhost</hostname>
-		<rw_user>molclass_user</rw_user>
-		<rw_password>YCuRzNoe</rw_password>
-		<ro_user>molclass_user</ro_user>
-		<ro_password>YCuRzNoe</ro_password>
+		<rw_user>molclass_unit_user</rw_user>
+		<rw_password>unittestPassword</rw_password>
+		<ro_user>molclass_unit_user</ro_user>
+		<ro_password>unittestPassword</ro_password>
 
 
 

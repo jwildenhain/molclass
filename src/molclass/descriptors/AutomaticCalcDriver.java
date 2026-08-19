@@ -1,8 +1,8 @@
-package descriptors;
+package molclass.descriptors;
 
 import java.sql.SQLException;
 
-import descriptors.XMLReader;
+import molclass.XMLReader;
 
 public class AutomaticCalcDriver {
 

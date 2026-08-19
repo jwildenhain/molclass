@@ -1,5 +1,7 @@
-package fingerprints;
+package molclass.fingerprints;
 
+import molclass.XMLReader;
+import molclass.SDFReader;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -33,6 +35,9 @@ import org.openscience.cdk.smiles.SmilesGenerator;
 public class Fingerprinter {
 
 	private static final ThreadLocal<Connection> threadConnCache = new ThreadLocal<Connection>();
+	private static final String SUB_STATUS_OK = "ok";
+	private static final String SUB_STATUS_FALLBACK = "fallback";
+	private static final String SUB_STATUS_ERROR = "error";
 
 	private static Connection getThreadConnection(String host, String user, String pass) throws SQLException {
 		Connection conn = threadConnCache.get();
@@ -41,6 +46,18 @@ public class Fingerprinter {
 			threadConnCache.set(conn);
 		}
 		return conn;
+	}
+
+	private static final class FingerprintComputeResult {
+		final BitSet bits;
+		final String status;
+		final String statusMessage;
+
+		FingerprintComputeResult(BitSet bits, String status, String statusMessage) {
+			this.bits = bits;
+			this.status = status;
+			this.statusMessage = statusMessage;
+		}
 	}
 
 	/**
@@ -126,8 +143,9 @@ public class Fingerprinter {
 			
 			pool.submit(new Runnable() {
 				public void run() {
+					Connection threadConn = null;
 					try {
-						Connection threadConn = getThreadConnection(threadHost, threadUser, threadPassword);
+						threadConn = getThreadConnection(threadHost, threadUser, threadPassword);
 						SDFReader srThread = new SDFReader();
 						IAtomContainer mol = srThread.read(new String(bdata));
 						
@@ -139,30 +157,96 @@ public class Fingerprinter {
 						GraphOnlyFingerprinter stdfp = new GraphOnlyFingerprinter();
 						KlekotaRothFingerprinter krfp = new KlekotaRothFingerprinter();
 						
-						BitSet ESset = esfp.getBitFingerprint(mol).asBitSet();
-						BitSet MACCSset = mfp.getBitFingerprint(mol).asBitSet();
-						BitSet EXTset = efp.getBitFingerprint(mol).asBitSet();
-						BitSet PCset = pcfp.getBitFingerprint(mol).asBitSet();
-						BitSet STDset = stdfp.getBitFingerprint(mol).asBitSet();
-						BitSet SUBset = subfp.getBitFingerprint(mol).asBitSet();
-						BitSet KRset = krfp.getBitFingerprint(mol).asBitSet();
+						BitSet ESset = computeSafeBitset("ESFP", molId, new java.util.concurrent.Callable<BitSet>() {
+							public BitSet call() throws Exception {
+								return esfp.getBitFingerprint(mol).asBitSet();
+							}
+						});
+						BitSet MACCSset = computeSafeBitset("MACCS", molId, new java.util.concurrent.Callable<BitSet>() {
+							public BitSet call() throws Exception {
+								return mfp.getBitFingerprint(mol).asBitSet();
+							}
+						});
+						BitSet EXTset = computeSafeBitset("EXT", molId, new java.util.concurrent.Callable<BitSet>() {
+							public BitSet call() throws Exception {
+								return efp.getBitFingerprint(mol).asBitSet();
+							}
+						});
+						BitSet PCset = computeSafeBitset("PubChem", molId, new java.util.concurrent.Callable<BitSet>() {
+							public BitSet call() throws Exception {
+								return pcfp.getBitFingerprint(mol).asBitSet();
+							}
+						});
+						BitSet STDset = computeSafeBitset("GOFP", molId, new java.util.concurrent.Callable<BitSet>() {
+							public BitSet call() throws Exception {
+								return stdfp.getBitFingerprint(mol).asBitSet();
+							}
+						});
+						FingerprintComputeResult SUBresult = computeSubFingerprint("SUB", molId, new java.util.concurrent.Callable<BitSet>() {
+							public BitSet call() throws Exception {
+								return subfp.getBitFingerprint(mol).asBitSet();
+							}
+						});
+						BitSet SUBset = SUBresult.bits;
+						BitSet KRset = computeSafeBitset("KR", molId, new java.util.concurrent.Callable<BitSet>() {
+							public BitSet call() throws Exception {
+								return krfp.getBitFingerprint(mol).asBitSet();
+							}
+						});
 						
-						String updateSQL = "UPDATE " + threadFpTable + " SET MACCS=?, EXT=?, PubChem=?, GOFP=?, SUB=?, KR=?, ESFP=? WHERE mol_id=?";
-						try (PreparedStatement updateStmt = threadConn.prepareStatement(updateSQL)) {
-							updateStmt.setString(1, MACCSset.toString());
-							updateStmt.setString(2, EXTset.toString());
-							updateStmt.setString(3, PCset.toString());
-							updateStmt.setString(4, STDset.toString());
-							updateStmt.setString(5, SUBset.toString());
-							updateStmt.setString(6, KRset.toString());
-							updateStmt.setString(7, ESset.toString());
-							updateStmt.setString(8, molId);
+						String updateSQL = "UPDATE " + threadFpTable + " SET MACCS=?, EXT=?, PubChem=?, GOFP=?, SUB=?, KR=?, ESFP=?, sub_status=?, sub_status_message=? WHERE mol_id=?";
+						try {
+							try (PreparedStatement updateStmt = threadConn.prepareStatement(updateSQL)) {
+								updateStmt.setString(1, MACCSset.toString());
+								updateStmt.setString(2, EXTset.toString());
+								updateStmt.setString(3, PCset.toString());
+								updateStmt.setString(4, STDset.toString());
+								updateStmt.setString(5, SUBset.toString());
+								updateStmt.setString(6, KRset.toString());
+								updateStmt.setString(7, ESset.toString());
+								updateStmt.setString(8, SUBresult.status);
+								updateStmt.setString(9, SUBresult.statusMessage);
+								updateStmt.setString(10, molId);
+								updateStmt.executeUpdate();
+							}
+						} catch (SQLException e) {
+							// Legacy schema fallback (no sub_status columns)
+							String legacyUpdateSQL = "UPDATE " + threadFpTable + " SET MACCS=?, EXT=?, PubChem=?, GOFP=?, SUB=?, KR=?, ESFP=? WHERE mol_id=?";
+							try (PreparedStatement updateStmt = threadConn.prepareStatement(legacyUpdateSQL)) {
+								updateStmt.setString(1, MACCSset.toString());
+								updateStmt.setString(2, EXTset.toString());
+								updateStmt.setString(3, PCset.toString());
+								updateStmt.setString(4, STDset.toString());
+								updateStmt.setString(5, SUBset.toString());
+								updateStmt.setString(6, KRset.toString());
+								updateStmt.setString(7, ESset.toString());
+								updateStmt.setString(8, molId);
+								updateStmt.executeUpdate();
+							}
+						}
+				} catch (Throwable e) {
+					System.err.println("FAILED mol_id=" + molId + " : " + e);
+					e.printStackTrace();
+					if (threadConn == null) {
+						try {
+							threadConn = getThreadConnection(threadHost, threadUser, threadPassword);
+						} catch (SQLException fallbackConnErr) {
+							return;
+						}
+					}
+					try {
+						String fallbackSQL = "UPDATE " + threadFpTable + " SET SUB=?, sub_status=?, sub_status_message=? WHERE mol_id=?";
+						try (PreparedStatement updateStmt = threadConn.prepareStatement(fallbackSQL)) {
+							updateStmt.setString(1, new BitSet().toString());
+							updateStmt.setString(2, SUB_STATUS_ERROR);
+							updateStmt.setString(3, e.getClass().getSimpleName() + ": " + e.getMessage());
+							updateStmt.setString(4, molId);
 							updateStmt.executeUpdate();
 						}
-					} catch (Exception e) {
-						e.printStackTrace();
+					} catch (Exception ignore) {
 					}
 				}
+				} // end run()
 			});
 			x++;
 		}
@@ -171,5 +255,37 @@ public class Fingerprinter {
 		pool.awaitTermination(1, java.util.concurrent.TimeUnit.HOURS);
 		System.out.println("Fingerprinter finished. Processed " + x + " molecules.");
 
+	}
+
+
+	private static FingerprintComputeResult computeSubFingerprint(String label, String molId, java.util.concurrent.Callable<BitSet> task) {
+		try {
+			BitSet result = task.call();
+			BitSet safeBits = result == null ? new BitSet() : result;
+			return new FingerprintComputeResult(safeBits, SUB_STATUS_OK, null);
+		} catch (OutOfMemoryError e) {
+			System.err.println("OutOfMemoryError while computing " + label + " for mol_id=" + molId + ": " + e);
+			System.gc();
+			return new FingerprintComputeResult(new BitSet(), SUB_STATUS_FALLBACK,
+					e.getClass().getSimpleName() + ": " + e.getMessage());
+		} catch (Exception e) {
+			System.err.println("Error computing " + label + " for mol_id=" + molId + ": " + e);
+			return new FingerprintComputeResult(new BitSet(), SUB_STATUS_FALLBACK,
+					e.getClass().getSimpleName() + ": " + e.getMessage());
+		}
+	}
+
+	private static BitSet computeSafeBitset(String label, String molId, java.util.concurrent.Callable<BitSet> task) {
+		try {
+			BitSet result = task.call();
+			return result == null ? new BitSet() : result;
+		} catch (OutOfMemoryError e) {
+			System.err.println("OutOfMemoryError while computing " + label + " for mol_id=" + molId + ": " + e);
+			System.gc();
+			return new BitSet();
+		} catch (Exception e) {
+			System.err.println("Error computing " + label + " for mol_id=" + molId + ": " + e);
+			return new BitSet();
+		}
 	}
 }

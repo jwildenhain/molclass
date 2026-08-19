@@ -4,7 +4,7 @@
 
 		<!-- PHP PEAR DB INFO -->
 		<DB_DataObject>
-			<dsn>mysqli://molclass_admin:twDehbP3jJmeQGLa@prohits.bio.ed.ac.uk/molclass_v15</dsn>
+			<dsn>mysqli://molclass_unit_user:unittestPassword@localhost/molclass_unittest</dsn>
 			<proxy>full</proxy>
 			<schema_location>/var/www/html/tools/DataObjects</schema_location>
 			<class_location>/var/www/html/tools/DataObjects</class_location>
@@ -13,12 +13,12 @@
 		</DB_DataObject>
 
 		<!-- General DB INFO -->
-		<database>molclass_v15</database>
-		<hostname>prohits.bio.ed.ac.uk</hostname>
-		<rw_user>molclass_admin</rw_user>
-		<rw_password>twDehbP3jJmeQGLa</rw_password>
-		<ro_user>molclass_admin</ro_user>
-		<ro_password>twDehbP3jJmeQGLa</ro_password>
+		<database>molclass_unittest</database>
+		<hostname>localhost</hostname>
+		<rw_user>molclass_unit_user</rw_user>
+		<rw_password>unittestPassword</rw_password>
+		<ro_user>molclass_unit_user</ro_user>
+		<ro_password>unittestPassword</ro_password>
 
                 <wikilink>http://sysbiolab.bio.ed.ac.uk/wiki/index.php/Current_Datasets_in_MolClass</wikilink>
 
@@ -156,10 +156,10 @@
 </Global_Design_Parameters>
 
 <R_parameters>
-	<R_DB_CONST_USER>molclass_admin</R_DB_CONST_USER>
-	<R_DB_CONST_DATABASE>molclass_v15</R_DB_CONST_DATABASE>
-	<R_DB_CONST_HOST>prohits.bio.ed.ac.uk</R_DB_CONST_HOST>
-	<R_DB_CONST_PWD>twDehbP3jJmeQGLa</R_DB_CONST_PWD>
+	<R_DB_CONST_USER>molclass_unit_user</R_DB_CONST_USER>
+	<R_DB_CONST_DATABASE>molclass_unittest</R_DB_CONST_DATABASE>
+	<R_DB_CONST_HOST>localhost</R_DB_CONST_HOST>
+	<R_DB_CONST_PWD>unittestPassword</R_DB_CONST_PWD>
 	<R_executable>/usr/bin/R</R_executable>
 	<R_CMD_parameters>--no-restore --no-save --no-readline --slave</R_CMD_parameters>
 	<R_source_folder>./R/</R_source_folder>
