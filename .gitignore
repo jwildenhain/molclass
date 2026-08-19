@@ -7,3 +7,13 @@ __pycache__/
 *.pyc
 scratch/
 uploads/
+.env
+.env.*
+!.env.example
+.claude/
+.gradle/
+.venv/
+logs/
+tmp_weka_src/
+*.pid
+docker/db_init/
