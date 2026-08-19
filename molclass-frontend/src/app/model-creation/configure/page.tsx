@@ -1,164 +1,323 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
+
+type ClassLabel = { label: string; supportCount: number };
+type Target = {
+  propertyId: number;
+  name: string;
+  sqlType: string;
+  presentCount: number;
+  blankCount: number;
+  distinctCount: number;
+  classLabels: ClassLabel[];
+};
+type Dataset = {
+  datasetId: number;
+  name: string;
+  originalFilename: string | null;
+  description: string | null;
+  status: string;
+  importedRecords: number;
+  failedRecords: number;
+  notProcessedRecords: number;
+  partialAcknowledgementRequired: boolean;
+  targets: Target[];
+};
+type Option = { code: string; name: string; description: string };
+type Profile = {
+  featureProfileId: number;
+  code: string;
+  version: string;
+  description: string | null;
+  status: string;
+};
+type ModelOptions = {
+  algorithms: Option[];
+  featureSelections: Option[];
+  featureProfiles: Profile[];
+};
+type CreationResult = {
+  modelDefinitionId: number;
+  status: string;
+  datasetId: number;
+  targetProperty: string;
+  declaredClassLabels: string[];
+  positiveClassLabel: string;
+};
+
+function payloadMessage(payload: unknown, fallback: string) {
+  if (!payload || typeof payload !== "object") return fallback;
+  const detail = (payload as Record<string, unknown>).detail;
+  if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object") {
+    const value = detail as Record<string, unknown>;
+    if (typeof value.code === "string") return value.code.replaceAll("_", " ");
+  }
+  return fallback;
+}
+
+async function apiJson<T>(response: Response, fallback: string): Promise<T> {
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payloadMessage(payload, fallback));
+  return payload as T;
+}
+
+function minorityLabel(labels: ClassLabel[]) {
+  return labels.reduce<ClassLabel | null>(
+    (smallest, item) => !smallest || item.supportCount < smallest.supportCount ? item : smallest,
+    null,
+  )?.label ?? "";
+}
 
 function ConfigureModelForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const batchId = searchParams.get("batch_id") || "00000000000";
-
+  const datasetId = Number(searchParams.get("dataset_id"));
+  const datasetIdValid = Number.isSafeInteger(datasetId) && datasetId > 0;
+  const [dataset, setDataset] = useState<Dataset | null>(null);
+  const [options, setOptions] = useState<ModelOptions | null>(null);
+  const [targetPropertyId, setTargetPropertyId] = useState("");
+  const [featureProfileId, setFeatureProfileId] = useState("");
+  const [algorithmCode, setAlgorithmCode] = useState("RandomForest");
+  const [featureSelectionCode, setFeatureSelectionCode] = useState("CfsSubsetEval");
+  const [positiveClass, setPositiveClass] = useState("");
+  const [modelName, setModelName] = useState("");
+  const [createdBy, setCreatedBy] = useState("web-operator");
+  const [partialAcknowledged, setPartialAcknowledged] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [result, setResult] = useState<CreationResult | null>(null);
 
-  const [formData, setFormData] = useState({
-    data_type: "ALL",
-    class_scheme: "RandomForest",
-    feature_selection: "CfsSubsetEval",
-    class_tag: "class",
-    email: "root@localhost.org"
-  });
+  useEffect(() => {
+    if (!datasetIdValid) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [datasetResponse, optionsResponse] = await Promise.all([
+          fetch(`/api/v1/model-datasets/${datasetId}`, { cache: "no-store" }),
+          fetch("/api/v1/model-options", { cache: "no-store" }),
+        ]);
+        const nextDataset = await apiJson<Dataset>(datasetResponse, "The selected dataset is not model-ready.");
+        const nextOptions = await apiJson<ModelOptions>(optionsResponse, "Model options are unavailable.");
+        if (cancelled) return;
+        const target = nextDataset.targets[0];
+        const profile = nextOptions.featureProfiles.find((item) => item.code === "ALL") ?? nextOptions.featureProfiles[0];
+        setDataset(nextDataset);
+        setOptions(nextOptions);
+        setTargetPropertyId(String(target.propertyId));
+        setPositiveClass(minorityLabel(target.classLabels));
+        setFeatureProfileId(profile ? String(profile.featureProfileId) : "");
+        setModelName(`${nextDataset.name} - ${target.name}`.slice(0, 255));
+      } catch (loadError) {
+        if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Model configuration could not be loaded.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [datasetId, datasetIdValid]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const selectedTarget = useMemo(
+    () => dataset?.targets.find((target) => target.propertyId === Number(targetPropertyId)) ?? null,
+    [dataset, targetPropertyId],
+  );
+  const selectedProfile = useMemo(
+    () => options?.featureProfiles.find((profile) => profile.featureProfileId === Number(featureProfileId)) ?? null,
+    [options, featureProfileId],
+  );
+  const selectedAlgorithm = useMemo(
+    () => options?.algorithms.find((algorithm) => algorithm.code === algorithmCode) ?? null,
+    [options, algorithmCode],
+  );
+  const selectedFeatureSelection = useMemo(
+    () => options?.featureSelections.find((selection) => selection.code === featureSelectionCode) ?? null,
+    [options, featureSelectionCode],
+  );
+
+  const changeTarget = (value: string) => {
+    setTargetPropertyId(value);
+    const target = dataset?.targets.find((item) => item.propertyId === Number(value));
+    if (target) setPositiveClass(minorityLabel(target.classLabels));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!dataset || !selectedTarget || !positiveClass || !featureProfileId) return;
     setSubmitting(true);
-    setMessage("");
-
-    const params = new URLSearchParams({
-      batch_id: parseInt(batchId, 10).toString(),
-      data_type: formData.data_type,
-      class_scheme: formData.class_scheme,
-      feature_selection: formData.feature_selection,
-      class_tag: formData.class_tag,
-      email: formData.email
-    });
-
+    setError("");
     try {
-      const res = await fetch("/api/models/queue", {
+      const response = await fetch("/api/v1/model-definitions", {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: params.toString()
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dataset_id: dataset.datasetId,
+          target_property_id: selectedTarget.propertyId,
+          feature_profile_id: Number(featureProfileId),
+          model_name: modelName.trim(),
+          algorithm_code: algorithmCode,
+          feature_selection_code: featureSelectionCode,
+          positive_class_label: positiveClass,
+          partial_dataset_acknowledged: partialAcknowledged,
+          created_by: createdBy.trim(),
+        }),
       });
-
-      if (res.ok) {
-        setMessage("Model building job successfully queued!");
-        setTimeout(() => router.push("/prediction-list"), 2000);
-      } else {
-        setMessage("Failed to queue model. Please check settings.");
-      }
-    } catch (err) {
-      setMessage("Server connection error.");
+      setResult(await apiJson<CreationResult>(response, "The model definition could not be created."));
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "The model definition could not be created.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  return (
-    <>
-      <p className="text-slate-400 mb-8 font-mono text-sm">Target Batch: {batchId}</p>
+  if (!datasetIdValid) return <ErrorPanel message="A valid dataset_id query parameter is required." />;
+  if (loading) return <div className="p-12 text-center text-muted-foreground">Loading verified model configuration...</div>;
+  if (error && !dataset) return <ErrorPanel message={error} />;
+  if (!dataset || !options || !selectedTarget) return <ErrorPanel message="The selected dataset has no supported target property." />;
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        
-        {/* Data Type */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-300">Data Type / Descriptors</label>
-          <select 
-            name="data_type" 
-            value={formData.data_type} 
-            onChange={handleChange}
-            className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-          >
-            {["CDK", "MACCS", "ALL", "PubChem", "EXT", "EXTGO", "KR", "SUB", "JUMBO", "MCAT", "GO"].map(dt => (
-              <option key={dt} value={dt}>{dt}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Class Scheme */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-300">Algorithm (Class Scheme)</label>
-          <select 
-            name="class_scheme" 
-            value={formData.class_scheme} 
-            onChange={handleChange}
-            className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-          >
-            {["RandomForest", "LMT", "J48", "NaiveBayes", "KNN", "SMO", "LibSVM", "LogitBoost", "RacedIncrementalLogitBoost", "Ensemble", "NBTree", "HiddenNaiveBayes", "DecisionTreeNaiveBayes", "LibSVM2", "BayesNet", "NeuralNet", "Ensemble2"].map(cs => (
-              <option key={cs} value={cs}>{cs}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Feature Selection */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-300">Feature Selection Optimizer</label>
-          <select 
-            name="feature_selection" 
-            value={formData.feature_selection} 
-            onChange={handleChange}
-            className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-          >
-            <option value="CfsSubsetEval">Correlation-Based (CFS Subset) - Legacy Default</option>
-            <option value="ReliefFAttributeEval">Relief-F (High Speed, Noise Tolerant)</option>
-            <option value="None">None (Train on all raw features)</option>
-          </select>
-        </div>
-
-        {/* Classifier Tag */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-300">Target Feature</label>
-          <select 
-            name="class_tag" 
-            value={formData.class_tag} 
-            onChange={handleChange}
-            className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-          >
-            <option value="class">class</option>
-          </select>
-        </div>
-
-        {/* Email */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-300">Notification Email</label>
-          <input 
-            type="email" 
-            name="email" 
-            value={formData.email} 
-            onChange={handleChange}
-            className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-            required
-          />
-        </div>
-
-        <button 
-          type="submit" 
-          disabled={submitting}
-          className="w-full py-3 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-lg shadow-lg disabled:opacity-50 transition-all mt-4"
-        >
-          {submitting ? "Queueing Job..." : "Confirm & Queue Job"}
-        </button>
-
-        {message && (
-          <div className={`p-4 rounded-lg text-center ${message.includes("success") ? "bg-emerald-900/50 text-emerald-400" : "bg-red-900/50 text-red-400"}`}>
-            {message}
+  if (result) {
+    return (
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-7">
+          <p className="font-mono text-xs uppercase tracking-[0.24em] text-emerald-700 dark:text-emerald-300">Definition accepted</p>
+          <h2 className="mt-3 text-2xl font-bold text-foreground">Model definition {result.modelDefinitionId} is pending rebuild.</h2>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            Feature generation and Weka training run through the controlled worker pipeline. The resulting build will require explicit evaluation and approval before publication.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2 font-mono text-xs text-emerald-800 dark:text-emerald-200">
+            <span className="rounded-lg bg-black/5 px-3 py-2 dark:bg-black/20">status {result.status}</span>
+            <span className="rounded-lg bg-black/5 px-3 py-2 dark:bg-black/20">target {result.targetProperty}</span>
+            <span className="rounded-lg bg-black/5 px-3 py-2 dark:bg-black/20">positive {result.positiveClassLabel}</span>
           </div>
-        )}
-      </form>
-    </>
+        </div>
+        <Link href="/model-creation" className="inline-flex rounded-xl border border-border px-5 py-3 font-semibold text-foreground transition hover:border-amber-400/50 hover:bg-amber-400/5">
+          Return to datasets
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-7">
+      <div className="rounded-2xl border border-border bg-muted/20 p-5">
+        <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Dataset {dataset.datasetId}</p>
+        <h2 className="mt-2 text-xl font-bold text-foreground">{dataset.name}</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{dataset.importedRecords.toLocaleString()} imported records / {dataset.status}</p>
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <SelectField label="Target property" value={targetPropertyId} onChange={changeTarget}>
+          {dataset.targets.map((target) => <option key={target.propertyId} value={target.propertyId}>{target.name} / {target.distinctCount} classes</option>)}
+        </SelectField>
+        <SelectField label="Feature profile" value={featureProfileId} onChange={setFeatureProfileId}>
+          {options.featureProfiles.map((profile) => <option key={profile.featureProfileId} value={profile.featureProfileId}>{profile.code} / {profile.version}</option>)}
+        </SelectField>
+        <SelectField label="Weka algorithm" value={algorithmCode} onChange={setAlgorithmCode}>
+          {options.algorithms.map((algorithm) => <option key={algorithm.code} value={algorithm.code}>{algorithm.name}</option>)}
+        </SelectField>
+        <SelectField label="Feature selection" value={featureSelectionCode} onChange={setFeatureSelectionCode}>
+          {options.featureSelections.map((selection) => <option key={selection.code} value={selection.code}>{selection.name}</option>)}
+        </SelectField>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <InfoCard label="Profile" value={`${selectedProfile?.code ?? ""} / ${selectedProfile?.status ?? ""}`} detail={selectedProfile?.description ?? "Versioned CDK feature contract."} />
+        <InfoCard label="Training path" value={selectedAlgorithm?.name ?? algorithmCode} detail={`${selectedAlgorithm?.description ?? ""} ${selectedFeatureSelection?.description ?? ""}`} />
+      </div>
+
+      <fieldset>
+        <legend className="text-sm font-semibold text-foreground">Positive class</legend>
+        <p className="mt-1 text-sm text-muted-foreground">Choose the class whose probability and recall should be treated as positive during evaluation.</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {selectedTarget.classLabels.map((item) => (
+            <label key={item.label} className={`cursor-pointer rounded-xl border p-4 transition ${positiveClass === item.label ? "border-amber-400 bg-amber-400/10" : "border-border bg-muted/10"}`}>
+              <div className="flex items-start gap-3">
+                <input type="radio" name="positiveClass" value={item.label} checked={positiveClass === item.label} onChange={() => setPositiveClass(item.label)} className="mt-1 h-4 w-4 accent-amber-400" />
+                <span>
+                  <span className="block font-semibold text-foreground">{item.label}</span>
+                  <span className="mt-1 block font-mono text-xs text-muted-foreground">{item.supportCount.toLocaleString()} records</span>
+                </span>
+              </div>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <TextField label="Model name" value={modelName} onChange={setModelName} maxLength={255} />
+        <TextField label="Created by" value={createdBy} onChange={setCreatedBy} maxLength={255} />
+      </div>
+
+      {dataset.partialAcknowledgementRequired && (
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4">
+          <input type="checkbox" checked={partialAcknowledged} onChange={(event) => setPartialAcknowledged(event.target.checked)} className="mt-0.5 h-4 w-4 accent-amber-400" />
+          <span className="text-sm text-foreground">Acknowledge that this dataset contains failed or not-processed import records.</span>
+        </label>
+      )}
+
+      {error && <ErrorPanel message={error} />}
+      <button
+        type="submit"
+        disabled={submitting || !modelName.trim() || !createdBy.trim() || !positiveClass || (dataset.partialAcknowledgementRequired && !partialAcknowledged)}
+        className="w-full rounded-xl bg-amber-400 px-5 py-3.5 font-bold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {submitting ? "Creating definition..." : "Create pending model definition"}
+      </button>
+    </form>
   );
+}
+
+function SelectField({ label, value, onChange, children }: { label: string; value: string; onChange: (value: string) => void; children: React.ReactNode }) {
+  return (
+    <label className="space-y-2 text-sm font-semibold text-foreground">
+      {label}
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 font-normal outline-none transition focus:border-amber-400">
+        {children}
+      </select>
+    </label>
+  );
+}
+
+function TextField({ label, value, onChange, maxLength }: { label: string; value: string; onChange: (value: string) => void; maxLength: number }) {
+  return (
+    <label className="space-y-2 text-sm font-semibold text-foreground">
+      {label}
+      <input value={value} onChange={(event) => onChange(event.target.value)} maxLength={maxLength} required className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 font-normal outline-none transition focus:border-amber-400" />
+    </label>
+  );
+}
+
+function InfoCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-muted/20 p-4">
+      <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="mt-2 font-semibold text-foreground">{value}</p>
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+function ErrorPanel({ message }: { message: string }) {
+  return <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-200" role="alert">{message}</div>;
 }
 
 export default function ConfigureModelPage() {
   return (
-    <div className="max-w-2xl mx-auto mt-12 p-8 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl">
-      <h1 className="text-3xl font-bold text-slate-100 mb-2">Configure Training Job</h1>
-      <Suspense fallback={<p className="text-slate-400">Loading Configuration...</p>}>
-        <ConfigureModelForm />
-      </Suspense>
-    </div>
+    <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:py-14">
+      <div className="mb-8">
+        <p className="font-mono text-xs uppercase tracking-[0.28em] text-amber-500">Controlled training</p>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-5xl">Define the model before the worker builds it.</h1>
+        <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground">Every definition records its dataset, target, class order, CDK profile, Weka algorithm, and operator.</p>
+      </div>
+      <section className="rounded-3xl border border-border bg-card/60 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+        <Suspense fallback={<div className="p-12 text-center text-muted-foreground">Loading model configuration...</div>}>
+          <ConfigureModelForm />
+        </Suspense>
+      </section>
+    </main>
   );
 }

@@ -1,102 +1,38 @@
-"use client";
-
-import { useEffect, useState } from "react";
-
-interface ModelJob {
-  model_id: number;
-  name: string;
-  username: string;
-  batch_id: number;
-  data_type: string;
-  class_scheme: string;
-  feature_selection: string;
-  is_built: number;
-}
+import Link from "next/link";
+import { Database, Network } from "lucide-react";
 
 export default function PredictionListPage() {
-  const [models, setModels] = useState<ModelJob[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch("/api/models")
-      .then((res) => res.json())
-      .then((data) => {
-        setModels(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Failed to fetch models:", err);
-        setLoading(false);
-      });
-  }, []);
-
   return (
-    <div className="max-w-7xl mx-auto mt-12 space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-100">Prediction List & Models</h1>
-          <p className="text-slate-400 mt-2">Monitor the status of your machine learning models and view predictions.</p>
-        </div>
-      </div>
+    <main className="mx-auto max-w-5xl px-4 py-14 sm:px-6 lg:py-20">
+      <header>
+        <p className="font-mono text-xs uppercase tracking-[0.28em] text-blue-500">Approved inference</p>
+        <h1 className="mt-3 text-4xl font-bold tracking-tight text-foreground sm:text-6xl">Choose the registry, not a legacy batch.</h1>
+        <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground">
+          Predictions run only with explicitly published v3 builds. Dataset records remain available for provenance and model preparation.
+        </p>
+      </header>
 
-      <div className="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl overflow-hidden">
-        {loading ? (
-          <div className="p-12 text-center text-slate-400 animate-pulse">Loading model data...</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-800/50 border-b border-slate-700/50">
-                  <th className="p-4 text-slate-300 font-semibold">Model ID</th>
-                  <th className="p-4 text-slate-300 font-semibold">Name</th>
-                  <th className="p-4 text-slate-300 font-semibold">Algorithm</th>
-                  <th className="p-4 text-slate-300 font-semibold">Feature Selection</th>
-                  <th className="p-4 text-slate-300 font-semibold">Data Type</th>
-                  <th className="p-4 text-slate-300 font-semibold">Source Batch</th>
-                  <th className="p-4 text-slate-300 font-semibold">Status</th>
-                  <th className="p-4 text-slate-300 font-semibold">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {models.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="p-8 text-center text-slate-500">No models found in the database.</td>
-                  </tr>
-                ) : (
-                  models.map((model) => (
-                    <tr key={model.model_id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
-                      <td className="p-4 text-slate-400 font-mono text-sm">{model.model_id}</td>
-                      <td className="p-4 text-slate-200">{model.name}</td>
-                      <td className="p-4 text-slate-400">{model.class_scheme}</td>
-                      <td className="p-4 text-purple-400 text-sm">{model.feature_selection || 'CfsSubsetEval'}</td>
-                      <td className="p-4 text-slate-400">
-                        <span className="px-2 py-1 bg-slate-800 text-slate-300 rounded text-xs">{model.data_type}</span>
-                      </td>
-                      <td className="p-4 text-slate-400 font-mono text-sm">{String(model.batch_id).padStart(11, '0')}</td>
-                      <td className="p-4">
-                        {model.is_built === 1 ? (
-                          <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-medium rounded-full border border-emerald-500/30">Trained</span>
-                        ) : (
-                          <span className="px-3 py-1 bg-amber-500/20 text-amber-400 text-xs font-medium rounded-full border border-amber-500/30">Queued</span>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        <button 
-                          disabled={model.is_built === 0}
-                          onClick={() => window.location.href = `/prediction-list/${model.model_id}`}
-                          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors inline-block"
-                        >
-                          View Details
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+      <section className="mt-10 grid gap-5 md:grid-cols-2">
+        <Link href="/prediction-list/models" className="group relative overflow-hidden rounded-3xl border border-blue-500/20 bg-blue-500/5 p-8 shadow-xl transition hover:-translate-y-1 hover:border-blue-500/50 hover:shadow-2xl">
+          <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-blue-500/10 blur-2xl" />
+          <div className="relative">
+            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-blue-500/15 text-blue-600 dark:text-blue-300"><Network className="h-7 w-7" /></div>
+            <p className="mt-8 font-mono text-xs uppercase tracking-wider text-blue-600 dark:text-blue-300">Published only</p>
+            <h2 className="mt-2 text-2xl font-bold text-foreground">Model and molecule search</h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">Select an approved build, find an indexed molecule by SDF identifier or chemistry, and run a prediction.</p>
           </div>
-        )}
-      </div>
-    </div>
+        </Link>
+
+        <Link href="/dataset-review" className="group relative overflow-hidden rounded-3xl border border-emerald-500/20 bg-emerald-500/5 p-8 shadow-xl transition hover:-translate-y-1 hover:border-emerald-500/50 hover:shadow-2xl">
+          <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-emerald-500/10 blur-2xl" />
+          <div className="relative">
+            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"><Database className="h-7 w-7" /></div>
+            <p className="mt-8 font-mono text-xs uppercase tracking-wider text-emerald-600 dark:text-emerald-300">Durable provenance</p>
+            <h2 className="mt-2 text-2xl font-bold text-foreground">Dataset registry</h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">Review identifiers, selected properties, import outcomes, model eligibility, and linked model definitions.</p>
+          </div>
+        </Link>
+      </section>
+    </main>
   );
 }

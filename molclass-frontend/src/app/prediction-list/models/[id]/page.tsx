@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function LegacyPredictionDetailRedirect() {
+export default function LegacyModelDetailRedirect() {
   redirect("/prediction-list/models");
 }

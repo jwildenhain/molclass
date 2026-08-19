@@ -61,9 +61,48 @@ export const prediction = {
   modelDefinitionId: 39,
   modelBuildId: 512,
   moleculeId: 4711,
+  predictionJobId: 9001,
   predictedClass: "active",
   distribution: { active: 0.8123, inactive: 0.1877 },
+  responseStrength: 0.8123,
+  applicabilityScore: 0.71,
+  inApplicabilityDomain: true,
+  trainingScaffoldCount: 42,
 };
+
+export const moleculeDetail = {
+  moleculeId: 4711,
+  inchiKey: "RYYVLZVUVIJVGH-UHFFFAOYSA-N",
+  canonicalSmiles: "Cn1c(=O)c2c(ncn2C)n(C)c1=O",
+  name: "Caffeine",
+  normalizationStatus: "NORMALIZED",
+  datasetRegistrations: [
+    { datasetId: 1, datasetName: "Uncoupler screen", sourceIdentifier: "ZINC000000000123" },
+  ],
+  murckoScaffoldSmiles: "c1ncc2[nH]cnc2n1",
+};
+
+export const moleculePredictions = [
+  {
+    predictionJobId: 9001,
+    modelBuildId: 512,
+    modelDefinitionId: 39,
+    modelName: "Mitochondrial uncoupler",
+    algorithm: "RandomForest",
+    predictedClass: "active",
+    distribution: { active: 0.8123, inactive: 0.1877 },
+    confidenceScore: 0.8123,
+    applicabilityScore: 0.71,
+    inApplicabilityDomain: true,
+    createdAt: "2026-08-17T10:00:00Z",
+  },
+];
+
+// A minimal but valid depiction, standing in for the CDK-rendered SVG the real predictor
+// returns. Content doesn't matter to the tests; only that <img> resolves instead of hitting
+// the real network (there is no backend at all in this suite).
+const STUB_STRUCTURE_SVG =
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><circle cx='20' cy='20' r='10'/></svg>";
 
 export const datasets = [
   {
@@ -279,6 +318,9 @@ async function json(route: Route, body: unknown, status = 200) {
 export const routes = {
   publishedModels: /\/api\/v3\/models\?/,
   moleculeSearch: /\/api\/v3\/molecules\?/,
+  moleculeStructure: /\/api\/v3\/molecules\/\d+\/structure\.svg$/,
+  moleculeDetail: /\/api\/v3\/molecules\/\d+$/,
+  moleculePredictions: /\/api\/v3\/molecules\/\d+\/predictions/,
   predict: /\/api\/v3\/models\/\d+\/molecules\/\d+\/predict$/,
   datasets: /\/api\/v1\/datasets\?/,
   modelDatasets: /\/api\/v1\/model-datasets(\?|$)/,
@@ -290,6 +332,11 @@ export const routes = {
 export async function stubBackend(page: Page) {
   await page.route(routes.publishedModels, (route) => json(route, publishedModels));
   await page.route(routes.moleculeSearch, (route) => json(route, molecules));
+  await page.route(routes.moleculeStructure, (route) =>
+    route.fulfill({ status: 200, contentType: "image/svg+xml", body: STUB_STRUCTURE_SVG }),
+  );
+  await page.route(routes.moleculePredictions, (route) => json(route, moleculePredictions));
+  await page.route(routes.moleculeDetail, (route) => json(route, moleculeDetail));
   await page.route(routes.predict, (route) => json(route, prediction));
   await page.route(routes.datasets, (route) => json(route, { total: datasets.length, datasets }));
   await page.route(routes.modelDatasets, (route) => json(route, { datasets: modelDatasets }));
