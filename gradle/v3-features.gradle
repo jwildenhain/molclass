@@ -1,0 +1,13 @@
+tasks.register('generateV3Features', JavaExec) {
+    group = 'molclass migration'
+    description = 'Generates versioned CDK features for v3 molecules.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass.set('molclass.features.V3FeatureGenerator')
+    maxHeapSize = '6g'
+    jvmArgs '-Dweka.core.WekaPackageManager.offline=true'
+
+    if (project.hasProperty('featureArgs')) {
+        args project.property('featureArgs').toString().trim().tokenize()
+    }
+}

@@ -1,0 +1,25 @@
+tasks.register('analyzeV3Sdf', JavaExec) {
+    group = 'molclass v3'
+    description = 'Stream and analyze an SDF into the deterministic v3 analysis JSON contract.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass.set('molclass.importer.SdfAnalyzer')
+    maxHeapSize = '1g'
+    if (project.hasProperty('importArgs')) {
+        args org.apache.tools.ant.types.Commandline.translateCommandline(
+                project.property('importArgs').toString())
+    }
+}
+
+tasks.register('runV3SdfWorker', JavaExec) {
+    group = 'molclass v3'
+    description = 'Claim and execute durable v3 SDF analysis and import jobs.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass.set('molclass.importer.V3SdfWorker')
+    maxHeapSize = '1g'
+    if (project.hasProperty('importArgs')) {
+        args org.apache.tools.ant.types.Commandline.translateCommandline(
+                project.property('importArgs').toString())
+    }
+}

@@ -1,0 +1,22 @@
+tasks.register('approveV3Model', JavaExec) {
+    group = 'molclass v3'
+    description = 'Approve/publish or reject one immutable v3 model build.'
+    dependsOn classes
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'molclass.models.V3ModelApproval'
+    if (project.hasProperty('approvalArgs')) {
+        args org.apache.tools.ant.types.Commandline.translateCommandline(project.property('approvalArgs').toString())
+    }
+}
+
+tasks.register('supersedeV3Model', JavaExec) {
+    group = 'molclass v3'
+    description = 'Technically supersede one unapproved immutable v3 model build.'
+    dependsOn classes
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'molclass.models.V3ModelSupersession'
+    if (project.hasProperty('supersessionArgs')) {
+        args org.apache.tools.ant.types.Commandline.translateCommandline(
+                project.property('supersessionArgs').toString())
+    }
+}

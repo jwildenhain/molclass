@@ -1,0 +1,11 @@
+tasks.register('migrateLegacyV3', JavaExec) {
+    group = 'molclass migration'
+    description = 'Migrates legacy datasets and model definitions into molclass_v3.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass.set('molclass.migration.LegacyV3Migration')
+
+    if (project.hasProperty('migrationArgs')) {
+        args project.property('migrationArgs').toString().trim().tokenize()
+    }
+}

@@ -1,0 +1,12 @@
+tasks.register('rebuildV3Models', JavaExec) {
+    group = 'molclass migration'
+    description = 'Rebuilds migrated model definitions with Weka 3.8.7.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass.set('molclass.models.V3ModelRebuilder')
+    maxHeapSize = System.getenv('MOLCLASS_MODEL_MAX_HEAP') ?: '12g'
+    jvmArgs '-Dweka.core.WekaPackageManager.offline=true'
+    if (project.hasProperty('modelArgs')) {
+        args project.property('modelArgs').toString().trim().tokenize()
+    }
+}

@@ -1,0 +1,10 @@
+tasks.register('auditV3Production', JavaExec) {
+    group = 'verification'
+    description = 'Runs read-only MolClass v3 integrity checks and optional production gate.'
+    dependsOn classes
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'molclass.audit.V3ProductionAudit'
+    if (project.hasProperty('auditArgs')) {
+        args project.property('auditArgs').toString().trim().split(/\s+/).findAll { !it.isEmpty() }
+    }
+}
