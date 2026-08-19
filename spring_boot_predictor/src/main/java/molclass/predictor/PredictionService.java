@@ -9,6 +9,9 @@ import java.text.DecimalFormat;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+
 import jakarta.annotation.PostConstruct;
 import javax.sql.DataSource;
 
@@ -36,6 +39,9 @@ public class PredictionService {
 
     private static final Logger logger = LoggerFactory.getLogger(PredictionService.class);
     private static final DecimalFormat df = new DecimalFormat("#.########");
+
+    @Value("${molclass.legacy-models.enabled:false}")
+    private boolean legacyModelsEnabled;
 
     @Autowired
     private DataSource dataSource;
@@ -65,6 +71,10 @@ public class PredictionService {
     @PostConstruct
     public void init() throws Exception {
         logger.info("Initializing PredictionService... Loading models from disk");
+        if (!legacyModelsEnabled) {
+            logger.info("Legacy disk model loading is disabled; v3 models load lazily from MySQL.");
+            return;
+        }
 
         versionedClassifiers.put(1, new HashMap<>());
         versionedClassifiers.put(2, new HashMap<>());
@@ -84,20 +94,18 @@ public class PredictionService {
     }
 
     private void loadVersionModels(int version, String dirName) {
-        String modelsDir = "/home/jw/repos/wdc_gitlab/molclass/spring_boot_predictor/src/main/resources/" + dirName;
-        File dir = new File(modelsDir);
-        File[] modelFiles = dir.listFiles((d, name) -> name.startsWith("model_") && name.endsWith(".model"));
-
-        if (modelFiles != null) {
-            for (File mf : modelFiles) {
-                String name = mf.getName();
+        try {
+            PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+            Resource[] resources = resolver.getResources("classpath:" + dirName + "/model_*.model");
+            for (Resource r : resources) {
+                String name = r.getFilename();
                 int modelId = Integer.parseInt(name.replace("model_", "").replace(".model", ""));
                 
-                File hf = new File(dir, "header_" + modelId + ".obj");
+                Resource hf = resolver.getResource("classpath:" + dirName + "/header_" + modelId + ".obj");
                 if (hf.exists()) {
                     try {
-                        Classifier classifier = (Classifier) SerializationHelper.read(mf.getAbsolutePath());
-                        Instances header = (Instances) SerializationHelper.read(hf.getAbsolutePath());
+                        Classifier classifier = (Classifier) SerializationHelper.read(r.getInputStream());
+                        Instances header = (Instances) SerializationHelper.read(hf.getInputStream());
                         
                         versionedClassifiers.get(version).put(modelId, classifier);
                         versionedHeaders.get(version).put(modelId, header);
@@ -107,6 +115,8 @@ public class PredictionService {
                     }
                 }
             }
+        } catch (Exception e) {
+            logger.error("Failed to find resources for version " + version, e);
         }
         logger.info("Loaded " + versionedClassifiers.get(version).size() + " models for version " + version + ".");
     }
@@ -307,7 +317,24 @@ public class PredictionService {
         }
         text.append("\n");
 
-        String insertSQL = "INSERT INTO " + predmoltable + "(mol_id, pred_id, main_class, distribution, lhood) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE main_class=VALUES(main_class), distribution=VALUES(distribution), lhood=VALUES(lhood)";
+        // Fetch training set EXT fingerprints for Applicability Domain (Certainty Score)
+        java.util.List<java.util.BitSet> trainingMols = new java.util.ArrayList<>();
+        String fetchTrainingFp = "SELECT EXT FROM " + fptable + ", " + batchmoltable 
+            + " WHERE " + fptable + ".mol_id = " + batchmoltable + ".mol_id AND " 
+            + batchmoltable + ".batch_id = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(fetchTrainingFp)) {
+          pstmt.setInt(1, batchId);
+          try (ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+              String ext = rs.getString("EXT");
+              if (ext != null && !ext.isEmpty()) {
+                trainingMols.add(molclass.fingerprints.Similarity.bsFromString(ext));
+              }
+            }
+          }
+        }
+
+        String insertSQL = "INSERT INTO " + predmoltable + "(mol_id, pred_id, main_class, distribution, response_strength, certainty_score) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE main_class=VALUES(main_class), distribution=VALUES(distribution), response_strength=VALUES(response_strength), certainty_score=VALUES(certainty_score)";
         
         conn.setAutoCommit(false);
         try (PreparedStatement pstmtInsert = conn.prepareStatement(insertSQL)) {
@@ -345,23 +372,58 @@ public class PredictionService {
                 double[] dist = classifier.distributionForInstance(inst);
                 StringBuilder mol_dist = new StringBuilder();
 
+                double response_strength = 0.0;
                 for (int x = 0; x < dist.length; x++) {
                     double d = dist[x];
                     text.append(df.format(d));
                     mol_dist.append(df.format(d));
-                    if (x == (int) pred) text.append('*');
+                    if (x == (int) pred) {
+                        text.append('*');
+                        response_strength = d;
+                    }
                     text.append('\t');
                     mol_dist.append('\t');
                 }
                 text.append('\n');
 
-                double llhood = logIt(dist[0], 0.001);
+                // Calculate Certainty Score (Applicability Domain)
+                double certainty_score = 0.0;
+                String fetchQueryFp = "SELECT EXT FROM " + fptable + " WHERE mol_id = ?";
+                try (PreparedStatement pstmt = conn.prepareStatement(fetchQueryFp)) {
+                  pstmt.setInt(1, Integer.parseInt(mol_id));
+                  try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                      String extStr = rs.getString("EXT");
+                      if (extStr != null && !extStr.isEmpty() && !trainingMols.isEmpty()) {
+                        java.util.BitSet queryBs = molclass.fingerprints.Similarity.bsFromString(extStr);
+                        
+                        // Calculate similarity to all training molecules
+                        java.util.List<Double> scores = new java.util.ArrayList<>();
+                        for (java.util.BitSet trainBs : trainingMols) {
+                          scores.add(molclass.fingerprints.Similarity.calculateSimilarity(queryBs, trainBs));
+                        }
+                        
+                        // Average of top 5 neighbors
+                        scores.sort(java.util.Collections.reverseOrder());
+                        int k = Math.min(5, scores.size());
+                        double sum = 0.0;
+                        for (int m = 0; m < k; m++) {
+                          sum += scores.get(m);
+                        }
+                        if (k > 0) {
+                          certainty_score = sum / k;
+                        }
+                      }
+                    }
+                  }
+                }
 
                 pstmtInsert.setInt(1, Integer.parseInt(mol_id));
                 pstmtInsert.setInt(2, predId);
                 pstmtInsert.setString(3, pred_class);
                 pstmtInsert.setString(4, mol_dist.toString().trim());
-                pstmtInsert.setDouble(5, llhood);
+                pstmtInsert.setDouble(5, response_strength);
+                pstmtInsert.setDouble(6, certainty_score);
                 pstmtInsert.addBatch();
             }
             pstmtInsert.executeBatch();

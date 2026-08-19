@@ -10,6 +10,7 @@ import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,6 +32,8 @@ import org.openscience.cdk.isomorphism.VentoFoggia;
 import org.openscience.cdk.smiles.SmilesParser;
 import org.openscience.cdk.tools.CDKHydrogenAdder;
 import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import weka.classifiers.Classifier;
@@ -41,6 +44,7 @@ import weka.core.Utils;
 
 @Service
 public class V3PredictionService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(V3PredictionService.class);
     private static final String PRODUCTION_LABEL =
             "v3-cdk-2.12-weka-3.8.7-stratified-gzip-v1";
     private static final String ARTIFACT_FORMAT = "JAVA_SERIALIZATION_WEKA_3_8_7_GZIP";
@@ -55,7 +59,17 @@ public class V3PredictionService {
     // screen for many molecules but happens to verify true for very few (or none) of them.
     private static final int MAX_SUBSTRUCTURE_CANDIDATES_VERIFIED = 4000;
 
+    // Average Tanimoto similarity, over the nearest 5 training-set Murcko scaffolds, below
+    // which a prediction is flagged as outside the model's applicability domain. Murcko
+    // fingerprints compare bare ring/linker frameworks, not whole molecules, so this reads
+    // higher than a typical whole-molecule Tanimoto cutoff for genuinely unrelated structures.
+    // It is a documented starting point, not a validated regulatory threshold.
+    static final double APPLICABILITY_DOMAIN_THRESHOLD = 0.5;
+    private static final int APPLICABILITY_DOMAIN_NEIGHBORS = 5;
+
     private final DataSource dataSource;
+    private final MurckoScaffoldService murckoScaffoldService;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final LinkedHashMap<Long, LoadedModel> cache = new LinkedHashMap<>(16, 0.75f, true);
     private volatile Long substructureFingerprintDefinitionId;
 
@@ -68,8 +82,11 @@ public class V3PredictionService {
     @Value("${molclass.v3.max-compressed-artifact-bytes:134217728}")
     private long maxCompressedArtifactBytes;
 
-    public V3PredictionService(DataSource dataSource) {
+    public V3PredictionService(DataSource dataSource, MurckoScaffoldService murckoScaffoldService,
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
         this.dataSource = dataSource;
+        this.murckoScaffoldService = murckoScaffoldService;
+        this.objectMapper = objectMapper;
     }
 
     @PostConstruct
@@ -122,6 +139,120 @@ public class V3PredictionService {
                 }
                 return result;
             }
+        }
+    }
+
+    /** A 2D depiction of a registered molecule, rendered fresh from its stored structure. */
+    public String moleculeStructureSvg(long moleculeId) throws Exception {
+        if (moleculeId <= 0) throw new IllegalArgumentException("moleculeId must be positive");
+        IAtomContainer molecule;
+        try (Connection connection = dataSource.getConnection()) {
+            String sql = "SELECT normalized_structure,canonical_smiles FROM " + t("molecule") + " WHERE molecule_id=?";
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setLong(1, moleculeId);
+                try (ResultSet rows = statement.executeQuery()) {
+                    if (!rows.next()) throw new NoSuchElementException("unknown molecule " + moleculeId);
+                    molecule = loadCandidate(rows.getBytes(1), rows.getString(2));
+                }
+            }
+        }
+        return new org.openscience.cdk.depict.DepictionGenerator()
+                .withAtomColors()
+                .withBackgroundColor(new java.awt.Color(0, 0, 0, 0))
+                .depict(molecule)
+                .toSvgStr();
+    }
+
+    /** Identifiers, structure, and known source registrations for one molecule. */
+    public Map<String, Object> moleculeDetail(long moleculeId) throws Exception {
+        if (moleculeId <= 0) throw new IllegalArgumentException("moleculeId must be positive");
+        try (Connection connection = dataSource.getConnection()) {
+            Map<String, Object> detail;
+            String sql = "SELECT molecule_id,full_inchi_key,canonical_smiles,primary_name,normalization_status "
+                    + "FROM " + t("molecule") + " WHERE molecule_id=?";
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setLong(1, moleculeId);
+                try (ResultSet rows = statement.executeQuery()) {
+                    if (!rows.next()) throw new NoSuchElementException("unknown molecule " + moleculeId);
+                    detail = new LinkedHashMap<>();
+                    detail.put("moleculeId", rows.getLong(1));
+                    detail.put("inchiKey", rows.getString(2));
+                    detail.put("canonicalSmiles", rows.getString(3));
+                    detail.put("name", rows.getString(4));
+                    detail.put("normalizationStatus", rows.getString(5));
+                }
+            }
+
+            List<Map<String, Object>> registrations = new ArrayList<>();
+            String regSql = "SELECT d.dataset_id,d.name,dm.source_identifier FROM " + t("dataset_molecule")
+                    + " dm JOIN " + t("dataset") + " d ON d.dataset_id=dm.dataset_id WHERE dm.molecule_id=? "
+                    + "ORDER BY d.dataset_id";
+            try (PreparedStatement statement = connection.prepareStatement(regSql)) {
+                statement.setLong(1, moleculeId);
+                try (ResultSet rows = statement.executeQuery()) {
+                    while (rows.next()) {
+                        Map<String, Object> registration = new LinkedHashMap<>();
+                        registration.put("datasetId", rows.getLong(1));
+                        registration.put("datasetName", rows.getString(2));
+                        registration.put("sourceIdentifier", rows.getString(3));
+                        registrations.add(registration);
+                    }
+                }
+            }
+            detail.put("datasetRegistrations", registrations);
+
+            var scaffoldId = murckoScaffoldService.ensureScaffold(connection, moleculeId);
+            detail.put("murckoScaffoldSmiles", scaffoldId.isPresent()
+                    ? scaffoldSmiles(connection, scaffoldId.getAsLong()) : null);
+            return detail;
+        }
+    }
+
+    /** Every prediction ever run for a molecule, newest first, with the model that produced it. */
+    public List<Map<String, Object>> moleculePredictions(long moleculeId, int requestedLimit) throws Exception {
+        if (moleculeId <= 0) throw new IllegalArgumentException("moleculeId must be positive");
+        int limit = Math.max(1, Math.min(requestedLimit, 200));
+        String sql = "SELECT pr.prediction_job_id,pj.model_build_id,md.model_definition_id,md.model_name,"
+                + "md.algorithm_code,pr.predicted_class,pr.distribution_json,pr.confidence_score,"
+                + "pr.applicability_score,pr.in_applicability_domain,pr.created_at FROM "
+                + t("prediction_result") + " pr JOIN " + t("prediction_job") + " pj "
+                + "ON pj.prediction_job_id=pr.prediction_job_id JOIN " + t("model_build") + " mb "
+                + "ON mb.model_build_id=pj.model_build_id JOIN " + t("model_definition") + " md "
+                + "ON md.model_definition_id=mb.model_definition_id "
+                + "WHERE pr.molecule_id=? ORDER BY pr.created_at DESC LIMIT ?";
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, moleculeId);
+            statement.setInt(2, limit);
+            try (ResultSet rows = statement.executeQuery()) {
+                List<Map<String, Object>> result = new ArrayList<>();
+                while (rows.next()) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("predictionJobId", rows.getLong(1));
+                    row.put("modelBuildId", rows.getLong(2));
+                    row.put("modelDefinitionId", rows.getLong(3));
+                    row.put("modelName", rows.getString(4));
+                    row.put("algorithm", rows.getString(5));
+                    row.put("predictedClass", rows.getString(6));
+                    row.put("distribution", parseDistribution(rows.getString(7)));
+                    row.put("confidenceScore", rows.getDouble(8));
+                    double applicability = rows.getDouble(9);
+                    row.put("applicabilityScore", rows.wasNull() ? null : applicability);
+                    boolean inDomain = rows.getBoolean(10);
+                    row.put("inApplicabilityDomain", rows.wasNull() ? null : inDomain);
+                    row.put("createdAt", rows.getTimestamp(11));
+                    result.add(row);
+                }
+                return result;
+            }
+        }
+    }
+
+    private Map<String, Object> parseDistribution(String json) {
+        try {
+            return objectMapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<LinkedHashMap<String, Object>>() { });
+        } catch (Exception malformed) {
+            return Map.of();
         }
     }
 
@@ -341,7 +472,7 @@ public class V3PredictionService {
         }
     }
 
-    private static IAtomContainer loadCandidate(byte[] normalizedStructure, String canonicalSmiles) throws Exception {
+    static IAtomContainer loadCandidate(byte[] normalizedStructure, String canonicalSmiles) throws Exception {
         if (normalizedStructure != null && normalizedStructure.length > 0) {
             try {
                 String molfile = new String(normalizedStructure, StandardCharsets.UTF_8);
@@ -367,7 +498,7 @@ public class V3PredictionService {
     }
 
     /** Mirrors V3FeatureGenerator's molecule preparation so fingerprint bits stay comparable. */
-    private static IAtomContainer configureMolecule(IAtomContainer molecule) throws Exception {
+    static IAtomContainer configureMolecule(IAtomContainer molecule) throws Exception {
         AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms(molecule);
         CDKHydrogenAdder.getInstance(CDK_BUILDER).addImplicitHydrogens(molecule);
         Aromaticity.cdkLegacy().apply(molecule);
@@ -398,21 +529,194 @@ public class V3PredictionService {
     public Prediction predict(long modelDefinitionId, long moleculeId) throws Exception {
         if (modelDefinitionId <= 0 || moleculeId <= 0) throw new IllegalArgumentException("positive IDs required");
         try (Connection connection = dataSource.getConnection()) {
-            ModelReference reference = modelReference(connection, modelDefinitionId);
-            LoadedModel loaded = loadedModel(connection, reference);
-            Instance instance = featureInstance(connection, reference, moleculeId, loaded.header);
-            double[] distribution;
-            synchronized (loaded.classifier) {
-                distribution = loaded.classifier.distributionForInstance(instance);
+            connection.setAutoCommit(false);
+            try {
+                ModelReference reference = modelReference(connection, modelDefinitionId);
+                LoadedModel loaded = loadedModel(connection, reference);
+                Instance instance = featureInstance(connection, reference, moleculeId, loaded.header);
+                double[] distribution;
+                synchronized (loaded.classifier) {
+                    distribution = loaded.classifier.distributionForInstance(instance);
+                }
+                LinkedHashMap<String, Double> classes = new LinkedHashMap<>();
+                int best = 0;
+                for (int index = 0; index < distribution.length; index++) {
+                    classes.put(loaded.header.classAttribute().value(index), distribution[index]);
+                    if (distribution[index] > distribution[best]) best = index;
+                }
+                String predictedClass = loaded.header.classAttribute().value(best);
+                double responseStrength = distribution[best];
+
+                // The classifier's answer is the actual product of a prediction; applicability
+                // domain is supplementary context computed from Murcko scaffolds, a step that
+                // depends on cheminformatics processing (CDK aromaticity/Kekulization) of every
+                // molecule in the training set and can fail on a structurally unusual one. That
+                // must not take down the prediction itself -- degrade to "undetermined" instead,
+                // the same state already shown for acyclic molecules with no scaffold at all.
+                ApplicabilityDomain applicability;
+                try {
+                    applicability = applicabilityDomain(connection, reference.buildId, moleculeId);
+                } catch (Exception admFailure) {
+                    LOGGER.warn("applicability domain calculation failed for build {} molecule {}: {}",
+                            reference.buildId, moleculeId, admFailure.toString());
+                    applicability = ApplicabilityDomain.undefined();
+                }
+
+                long predictionJobId = persistPrediction(connection, reference.buildId, moleculeId,
+                        predictedClass, classes, responseStrength, applicability);
+                connection.commit();
+
+                return new Prediction(modelDefinitionId, reference.buildId, moleculeId, predictionJobId,
+                        predictedClass, classes, responseStrength,
+                        applicability.score(), applicability.inDomain(), applicability.trainingScaffoldCount());
+            } catch (Exception failure) {
+                connection.rollback();
+                throw failure;
             }
-            LinkedHashMap<String, Double> classes = new LinkedHashMap<>();
-            int best = 0;
-            for (int index = 0; index < distribution.length; index++) {
-                classes.put(loaded.header.classAttribute().value(index), distribution[index]);
-                if (distribution[index] > distribution[best]) best = index;
+        }
+    }
+
+    /**
+     * Applicability domain via Murcko scaffold distance: the query molecule's Bemis-Murcko
+     * framework is fingerprinted and compared (Tanimoto, on the framework only -- not the
+     * whole molecule) against the distinct frameworks present in the model's TRAIN partition.
+     * The score is the average similarity to the nearest 5 training scaffolds, mirroring the
+     * legacy whole-molecule "certainty score" in Predictor.java, but measuring distance in
+     * scaffold space rather than whole-molecule fingerprint space.
+     */
+    private ApplicabilityDomain applicabilityDomain(Connection connection, long buildId, long moleculeId)
+            throws Exception {
+        var queryScaffoldId = murckoScaffoldService.ensureScaffold(connection, moleculeId);
+        if (queryScaffoldId.isEmpty()) return ApplicabilityDomain.undefined();
+        String querySmiles = scaffoldSmiles(connection, queryScaffoldId.getAsLong());
+        BitSet queryFingerprint = murckoScaffoldService.frameworkFingerprint(querySmiles);
+
+        List<Long> trainingMoleculeIds = trainingMoleculeIds(connection, buildId);
+        if (trainingMoleculeIds.isEmpty()) return ApplicabilityDomain.undefined();
+
+        List<String> trainingScaffoldSmiles = new ArrayList<>();
+        for (long trainingMoleculeId : trainingMoleculeIds) {
+            // A single structurally unusual training molecule failing CDK's aromaticity/
+            // Kekulization pass must not blank out the applicability domain score for every
+            // other training molecule that computed fine -- skip it and keep going.
+            try {
+                var scaffoldId = murckoScaffoldService.ensureScaffold(connection, trainingMoleculeId);
+                if (scaffoldId.isPresent()) trainingScaffoldSmiles.add(scaffoldSmiles(connection, scaffoldId.getAsLong()));
+            } catch (Exception scaffoldFailure) {
+                LOGGER.warn("scaffold computation failed for training molecule {}: {}",
+                        trainingMoleculeId, scaffoldFailure.toString());
             }
-            return new Prediction(modelDefinitionId, reference.buildId, moleculeId,
-                    loaded.header.classAttribute().value(best), classes);
+        }
+        java.util.Set<String> distinctScaffolds = new java.util.LinkedHashSet<>(trainingScaffoldSmiles);
+        if (distinctScaffolds.isEmpty()) return ApplicabilityDomain.undefined();
+
+        List<Double> similarities = new ArrayList<>();
+        for (String scaffoldSmiles : distinctScaffolds) {
+            // A scaffold SMILES that was written successfully at computation time can still
+            // fail to be re-parsed here: CDK's SMILES writer and its own SmilesParser do not
+            // always agree on whether an aromatic ring system has a valid Kekule form, so a
+            // round trip that the writer accepted can still throw on the way back in. That is
+            // a property of one stored scaffold, not of the applicability domain calculation as
+            // a whole -- skip it and keep the neighbors that do fingerprint successfully.
+            try {
+                BitSet trainingFingerprint = murckoScaffoldService.frameworkFingerprint(scaffoldSmiles);
+                similarities.add((double) org.openscience.cdk.similarity.Tanimoto.calculate(queryFingerprint, trainingFingerprint));
+            } catch (Exception fingerprintFailure) {
+                LOGGER.warn("fingerprinting failed for training scaffold '{}': {}", scaffoldSmiles, fingerprintFailure.toString());
+            }
+        }
+        if (similarities.isEmpty()) return ApplicabilityDomain.undefined();
+        similarities.sort(java.util.Collections.reverseOrder());
+        int neighbors = Math.min(APPLICABILITY_DOMAIN_NEIGHBORS, similarities.size());
+        double sum = 0;
+        for (int index = 0; index < neighbors; index++) sum += similarities.get(index);
+        double score = sum / neighbors;
+        return new ApplicabilityDomain(score, score >= APPLICABILITY_DOMAIN_THRESHOLD, distinctScaffolds.size());
+    }
+
+    private String scaffoldSmiles(Connection connection, long scaffoldId) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT scaffold_smiles FROM " + t("scaffold_definition") + " WHERE scaffold_id=?")) {
+            statement.setLong(1, scaffoldId);
+            try (ResultSet rows = statement.executeQuery()) {
+                if (!rows.next()) throw new IllegalStateException("scaffold " + scaffoldId + " vanished mid-request");
+                return rows.getString(1);
+            }
+        }
+    }
+
+    private List<Long> trainingMoleculeIds(Connection connection, long buildId) throws Exception {
+        String sql = "SELECT DISTINCT m.molecule_id FROM " + t("model_training_member") + " tm JOIN "
+                + t("dataset_molecule") + " dm ON dm.dataset_molecule_id=tm.dataset_molecule_id JOIN "
+                + t("molecule") + " m ON m.molecule_id=dm.molecule_id "
+                + "WHERE tm.model_build_id=? AND tm.partition_name='TRAIN'";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, buildId);
+            try (ResultSet rows = statement.executeQuery()) {
+                List<Long> ids = new ArrayList<>();
+                while (rows.next()) ids.add(rows.getLong(1));
+                return ids;
+            }
+        }
+    }
+
+    /** Creates the job/prediction_job/prediction_result rows for one synchronous prediction. */
+    private long persistPrediction(Connection connection, long buildId, long moleculeId, String predictedClass,
+            Map<String, Double> distribution, double responseStrength, ApplicabilityDomain applicability)
+            throws Exception {
+        String distributionJson = objectMapper.writeValueAsString(distribution);
+        String payloadJson = objectMapper.writeValueAsString(Map.of(
+                "modelBuildId", buildId, "moleculeId", moleculeId));
+
+        long jobId;
+        String insertJob = "INSERT INTO " + t("job")
+                + " (job_type, status, runstep, payload_json, attempt_count, maximum_attempts, "
+                + "started_at, finished_at) VALUES ('PREDICTION','SUCCEEDED','COMPLETE',?,1,1,"
+                + "CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6))";
+        try (PreparedStatement statement = connection.prepareStatement(insertJob, Statement.RETURN_GENERATED_KEYS)) {
+            statement.setString(1, payloadJson);
+            statement.executeUpdate();
+            try (ResultSet keys = statement.getGeneratedKeys()) {
+                if (!keys.next()) throw new IllegalStateException("job insert produced no generated key");
+                jobId = keys.getLong(1);
+            }
+        }
+
+        long predictionJobId;
+        String insertPredictionJob = "INSERT INTO " + t("prediction_job")
+                + " (job_id, model_build_id, dataset_id, prediction_name, status, finished_at) "
+                + "VALUES (?, ?, NULL, 'Ad-hoc molecule prediction', 'SUCCEEDED', CURRENT_TIMESTAMP(6))";
+        try (PreparedStatement statement = connection.prepareStatement(insertPredictionJob, Statement.RETURN_GENERATED_KEYS)) {
+            statement.setLong(1, jobId);
+            statement.setLong(2, buildId);
+            statement.executeUpdate();
+            try (ResultSet keys = statement.getGeneratedKeys()) {
+                if (!keys.next()) throw new IllegalStateException("prediction_job insert produced no generated key");
+                predictionJobId = keys.getLong(1);
+            }
+        }
+
+        String insertResult = "INSERT INTO " + t("prediction_result")
+                + " (prediction_job_id, molecule_id, dataset_molecule_id, predicted_class, distribution_json, "
+                + "confidence_score, applicability_score, in_applicability_domain) VALUES (?, ?, NULL, ?, ?, ?, ?, ?)";
+        try (PreparedStatement statement = connection.prepareStatement(insertResult)) {
+            statement.setLong(1, predictionJobId);
+            statement.setLong(2, moleculeId);
+            statement.setString(3, predictedClass);
+            statement.setString(4, distributionJson);
+            statement.setDouble(5, responseStrength);
+            if (applicability.score() == null) statement.setNull(6, java.sql.Types.DOUBLE);
+            else statement.setDouble(6, applicability.score());
+            if (applicability.inDomain() == null) statement.setNull(7, java.sql.Types.TINYINT);
+            else statement.setBoolean(7, applicability.inDomain());
+            statement.executeUpdate();
+        }
+        return predictionJobId;
+    }
+
+    private record ApplicabilityDomain(Double score, Boolean inDomain, int trainingScaffoldCount) {
+        static ApplicabilityDomain undefined() {
+            return new ApplicabilityDomain(null, null, 0);
         }
     }
 
@@ -707,6 +1011,7 @@ public class V3PredictionService {
 
     private record ModelReference(long definitionId, long buildId, long featureProfileId) { }
     private record LoadedModel(Classifier classifier, Instances header) { }
-    public record Prediction(long modelDefinitionId, long modelBuildId, long moleculeId,
-            String predictedClass, Map<String, Double> distribution) { }
+    public record Prediction(long modelDefinitionId, long modelBuildId, long moleculeId, long predictionJobId,
+            String predictedClass, Map<String, Double> distribution, double responseStrength,
+            Double applicabilityScore, Boolean inApplicabilityDomain, int trainingScaffoldCount) { }
 }

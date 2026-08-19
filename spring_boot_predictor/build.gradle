@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'molclass'
-version = '2.1.0'
+version = '3.0.0'
 sourceCompatibility = '17'
 
 
@@ -16,6 +16,7 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.mariadb.jdbc:mariadb-java-client'
     def useLegacyWeka = project.hasProperty('legacyWeka')
     if (useLegacyWeka) {
@@ -23,12 +24,17 @@ dependencies {
         implementation fileTree(dir: '../lib_legacy', include: ['*.jar'])
     } else {
         // Dependencies from current molclass
-        implementation fileTree(dir: '../lib', include: ['*.jar'])
-        implementation 'nz.ac.waikato.cms.weka:weka-stable:3.8.6'
+        implementation fileTree(dir: '../lib', include: ['*.jar'], exclude: ['mysql-connector*.jar', 'h2-*.jar', 'junit-*.jar', 'hamcrest-*.jar'])
+        implementation 'nz.ac.waikato.cms.weka:weka-stable:3.8.7'
     }
     
     // We depend on the root project's classes explicitly
     implementation project(':')
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
 }
 
 tasks.withType(org.springframework.boot.gradle.tasks.bundling.BootJar) {
@@ -40,5 +46,11 @@ bootRun {
         systemProperty 'molclass.models.dir', 'models'
     } else {
         systemProperty 'molclass.models.dir', 'models_modern'
+    }
+}
+
+processResources {
+    if (!project.hasProperty('bundleLegacyModels')) {
+        exclude 'models/**', 'models_v1/**', 'models_v2/**'
     }
 }

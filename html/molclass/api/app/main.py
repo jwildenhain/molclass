@@ -1,5 +1,6 @@
-from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Dict, Any, Union, Optional
@@ -8,8 +9,13 @@ import os
 import subprocess
 import uuid
 import threading
+import smtplib
+from email.message import EmailMessage
 
 from app.database import get_db, SessionLocal
+from app.v3_uploads import router as v3_upload_router
+from app.v3_models import router as v3_model_router
+from app.v3_datasets import router as v3_dataset_router
 from app.config import settings
 from app.schemas import (
     Dataset, ModelSummary, ModelDetail, CompoundIdResponse, ModelFingerprint,
@@ -30,11 +36,27 @@ app = FastAPI(
 # Configure CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.allowed_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
+
+app.include_router(v3_upload_router)
+app.include_router(v3_model_router)
+app.include_router(v3_dataset_router)
+
+@app.middleware("http")
+async def production_route_gate(request: Request, call_next):
+    path = request.url.path
+    allowed = (
+        settings.legacy_api_enabled
+        or path.startswith("/api/v1")
+        or path in {"/docs", "/redoc", "/openapi.json"}
+    )
+    if not allowed:
+        return JSONResponse(status_code=404, content={"detail": {"code": "ROUTE_DISABLED"}})
+    return await call_next(request)
 
 @app.get("/", include_in_schema=False)
 def index():
@@ -111,6 +133,154 @@ def get_subprocess_env() -> Dict[str, str]:
         else:
             env["PERL5LIB"] = perl5lib
     return env
+
+
+def send_email_notification(to_email: str, subject: str, body: str):
+    if not to_email or to_email == "dummy@example.com" or not to_email.strip():
+        return
+    
+    from_email = settings.molclass_email
+    msg = EmailMessage()
+    msg.set_content(body)
+    msg["Subject"] = subject
+    msg["From"] = from_email
+    msg["To"] = to_email
+    
+    try:
+        with smtplib.SMTP("localhost") as s:
+            s.send_message(msg)
+        print(f"Sent email notification to: {to_email}")
+    except Exception as e:
+        print(f"Warning: Failed to send email notification to {to_email}: {e}")
+
+def delete_batch_task(batch_id: int):
+    """
+    Executes the cascade deletes natively in Python using SQLAlchemy.
+    Matches the exact deletions performed by delete_batch.pl.
+    """
+    db = SessionLocal()
+    try:
+        queries = [
+            "DELETE FROM `batchlist` WHERE batch_id = :batch_id",
+            "DELETE FROM cdk_descriptors USING cdk_descriptors, batchmols WHERE cdk_descriptors.mol_id = batchmols.mol_id AND batchmols.batch_id = :batch_id",
+            "DELETE FROM `class_models` WHERE batch_id = :batch_id",
+            "DELETE FROM fingerprints USING fingerprints, batchmols WHERE fingerprints.mol_id = batchmols.mol_id AND batchmols.batch_id = :batch_id",
+            "DELETE FROM inchi_key USING inchi_key, batchmols WHERE inchi_key.mol_id = batchmols.mol_id AND batchmols.batch_id = :batch_id",
+            "DELETE FROM moldb_molbfp USING moldb_molbfp, batchmols WHERE moldb_molbfp.mol_id = batchmols.mol_id AND batchmols.batch_id = :batch_id",
+            "DELETE FROM moldb_moldata USING moldb_moldata, batchmols WHERE moldb_moldata.mol_id = batchmols.mol_id AND batchmols.batch_id = :batch_id",
+            "DELETE FROM moldb_molfgb USING moldb_molfgb, batchmols WHERE moldb_molfgb.mol_id = batchmols.mol_id AND batchmols.batch_id = :batch_id",
+            "DELETE FROM moldb_molhfp USING moldb_molhfp, batchmols WHERE moldb_molhfp.mol_id = batchmols.mol_id AND batchmols.batch_id = :batch_id",
+            "DELETE FROM moldb_molstat USING moldb_molstat, batchmols WHERE moldb_molstat.mol_id = batchmols.mol_id AND batchmols.batch_id = :batch_id",
+            "DELETE FROM moldb_molstruc USING moldb_molstruc, batchmols WHERE moldb_molstruc.mol_id = batchmols.mol_id AND batchmols.batch_id = :batch_id",
+            "DELETE FROM `prediction_list` WHERE batch_id = :batch_id",
+            "DELETE FROM prediction_mols USING prediction_mols, batchmols WHERE prediction_mols.mol_id = batchmols.mol_id AND batchmols.batch_id = :batch_id",
+            "DELETE FROM sdftags USING sdftags, batchmols WHERE sdftags.mol_id = batchmols.mol_id AND batchmols.batch_id = :batch_id",
+            "DELETE FROM timeout_mols USING timeout_mols, batchmols WHERE timeout_mols.mol_id = batchmols.mol_id AND batchmols.batch_id = :batch_id",
+            "DELETE FROM `batchmols` WHERE batch_id = :batch_id"
+        ]
+        for query in queries:
+            db.execute(text(query), {"batch_id": batch_id})
+        db.commit()
+        print(f"Dataset deletion for batch {batch_id} complete.")
+    except Exception as e:
+        db.rollback()
+        print(f"Error deleting batch {batch_id}: {e}")
+    finally:
+        db.close()
+
+def create_model_and_predictions_task(model_id: int, username: str, pred_name_base: str, email: str):
+    """
+    Orchestrates the model creation and prediction loops natively in Python.
+    Matches the exact training/prediction orchestration of pred_model_upload.pl.
+    """
+    repo_root = find_repo_root(settings.tools_dir)
+    log_dir = os.path.join(repo_root, "log")
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # 1. Train the model: ./deploy.sh molclass.ModelBuilder <model_id>
+    cmd_builder = ["./deploy.sh", "molclass.ModelBuilder", str(model_id)]
+    try:
+        with open(os.path.join(log_dir, "output_modelbuilder.log"), "a") as out_b, \
+             open(os.path.join(log_dir, "error_modelbuilder.log"), "a") as err_b:
+            subprocess.run(
+                cmd_builder,
+                stdout=out_b,
+                stderr=err_b,
+                cwd=repo_root,
+                env=get_subprocess_env(),
+                check=True
+            )
+    except Exception as e:
+        print(f"Error building model {model_id}: {e}")
+        send_email_notification(
+            email,
+            "Model Creation Failed",
+            f"Your model creation for model {model_id} failed during Weka model building. Error: {e}"
+        )
+        return
+        
+    # Send email for model creation complete
+    model_url = f"{settings.website}/view_model_detail.php?model_id={model_id}"
+    send_email_notification(
+        email,
+        "Model Creation Complete",
+        f"Your model creation is complete. You can check the created model at {model_url}"
+    )
+
+    # 2. Query all batches from the batchlist table:
+    db = SessionLocal()
+    last_batch_id = None
+    try:
+        batches_sql = "SELECT batch_id FROM batchlist"
+        batches = db.execute(text(batches_sql)).scalars().all()
+        
+        # 3. Loop through batches, insert prediction lists, and run Predictor
+        for batch_id in batches:
+            last_batch_id = batch_id
+            pred_name = f"{pred_name_base}{batch_id}"
+            
+            insert_pred_sql = """
+                INSERT INTO prediction_list (username, batch_id, model_id, pred_name, email)
+                VALUES (:username, :batch_id, :model_id, :pred_name, 'dummy@example.com')
+            """
+            db.execute(text(insert_pred_sql), {
+                "username": username,
+                "batch_id": batch_id,
+                "model_id": model_id,
+                "pred_name": pred_name
+            })
+            db.commit()
+            
+            pred_id = db.execute(text("SELECT LAST_INSERT_ID()")).scalar()
+            
+            # Run ./deploy.sh molclass.Predictor <pred_id>
+            cmd_predictor = ["./deploy.sh", "molclass.Predictor", str(pred_id)]
+            try:
+                with open(os.path.join(log_dir, "output_predictor.log"), "a") as out_p, \
+                     open(os.path.join(log_dir, "error_predictor.log"), "a") as err_p:
+                    subprocess.run(
+                        cmd_predictor,
+                        stdout=out_p,
+                        stderr=err_p,
+                        cwd=repo_root,
+                        env=get_subprocess_env(),
+                        check=True
+                    )
+            except Exception as e:
+                print(f"Error predicting for batch {batch_id} with model {model_id}: {e}")
+                
+        # Send prediction complete email
+        if last_batch_id is not None:
+            batch_url = f"{settings.website}/view_batch_detail.php?batch_id={last_batch_id}"
+            send_email_notification(
+                email,
+                "Prediction Complete",
+                f"The Prediction for model {model_id} against all existing molecules in the database has been completed. For further details please visit {batch_url}"
+            )
+    except Exception as e:
+        print(f"Error in model prediction loop: {e}")
+    finally:
+        db.close()
 
 
 def resolve_mol_id(identifier: str, db: Session) -> int:
@@ -216,10 +386,10 @@ def get_compound_model_fingerprint(id: str, db: Session = Depends(get_db)):
         WHERE mol_id = :mol_id
     """
     try:
-        results = db.execute(text(sql), {"mol_id": mol_id}).all()
+        results = db.execute(text(sql), {"mol_id": mol_id}).mappings().all()
         predictions = {}
         for r in results:
-            predictions[f"model_{r[0]}"] = r[1]
+            predictions[f"model_{r['model_id']}"] = r['lhood']
             
         return {
             "mol_id": mol_id,
@@ -367,7 +537,7 @@ def get_compound_scaffold_matches(id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/model/create", response_model=ModelCreateResponse, tags=["Models"])
-def create_model(request: ModelCreateRequest, db: Session = Depends(get_db)):
+def create_model(request: ModelCreateRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
     Trigger the creation and training of a new machine learning model.
     Checks for duplicates, inserts the model configuration record, and spawns the training worker background job.
@@ -422,26 +592,7 @@ def create_model(request: ModelCreateRequest, db: Session = Depends(get_db)):
         model_id = db.execute(text("SELECT LAST_INSERT_ID()")).scalar()
         
         pred_name = str(request.batch_id)
-        perl_script = os.path.join(settings.tools_dir, "pred_model_upload.pl")
-        
-        cmd = [
-            "perl",
-            perl_script,
-            request.username,
-            str(model_id),
-            pred_name,
-            request.email
-        ]
-        
-        repo_root = find_repo_root(settings.tools_dir)
-        os.makedirs(os.path.join(repo_root, "log"), exist_ok=True)
-        
-        log_dir = os.path.join(settings.tools_dir, "log")
-        os.makedirs(log_dir, exist_ok=True)
-        out_log = open(os.path.join(log_dir, "output_model_creation_api.log"), "a")
-        err_log = open(os.path.join(log_dir, "error_output_model_creation_api.log"), "a")
-        
-        subprocess.Popen(cmd, stdout=out_log, stderr=err_log, cwd=repo_root, env=get_subprocess_env(), start_new_session=True)
+        background_tasks.add_task(create_model_and_predictions_task, model_id, request.username, str(request.batch_id), request.email)
         
         return ModelCreateResponse(
             model_id=model_id,
@@ -452,7 +603,7 @@ def create_model(request: ModelCreateRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/dataset/{id}", tags=["Datasets"])
-def delete_dataset(id: int, db: Session = Depends(get_db)):
+def delete_dataset(id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
     Trigger the deletion of a dataset batch.
     Validates batch presence and spawns the background Perl deletion job.
@@ -462,23 +613,10 @@ def delete_dataset(id: int, db: Session = Depends(get_db)):
     if batch_check is None:
         raise HTTPException(status_code=404, detail=f"Dataset batch with ID {id} not found")
 
-    perl_script = os.path.join(settings.tools_dir, "delete_batch.pl")
-    cmd = ["perl", perl_script, str(id)]
-    
-    try:
-        repo_root = find_repo_root(settings.tools_dir)
-        os.makedirs(os.path.join(repo_root, "log"), exist_ok=True)
-        
-        log_dir = os.path.join(settings.tools_dir, "log")
-        os.makedirs(log_dir, exist_ok=True)
-        out_log = open(os.path.join(log_dir, "output_delete_batch_api.log"), "a")
-        err_log = open(os.path.join(log_dir, "error_output_delete_batch_api.log"), "a")
-        
-        subprocess.Popen(cmd, stdout=out_log, stderr=err_log, cwd=repo_root, env=get_subprocess_env(), start_new_session=True)
-        
-        return {"message": f"Deletion job for batch {id} successfully submitted in the background."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    background_tasks.add_task(delete_batch_task, id)
+
+    return {"message": f"Deletion job for batch {id} successfully submitted in the background."}
+
 
 @app.get("/dataset/{id}/predictions", tags=["Datasets"])
 def get_dataset_predictions(id: int, db: Session = Depends(get_db)):
@@ -596,12 +734,11 @@ def run_single_prediction_task(
         if check_res.returncode != 0:
             raise RuntimeError(f"sdfcheck.pl failed: {check_res.stderr}\nStdout: {check_res.stdout}")
 
-        # Step 4: Import molecule to a temporary test batch via sdf2moldb.pl
+        # Step 4: Import molecule to a temporary test batch via SdfImporter
         info_string = f"Single molecule prediction task {task_id}"
-        perl_script = os.path.join(settings.tools_dir, "sdf2moldb.pl")
         
         import_cmd = [
-            "perl", perl_script,
+            "./deploy.sh", "molclass.SdfImporter",
             temp_sdf_path,
             "single_pred_user",
             "dummy@example.com",
@@ -613,7 +750,7 @@ def run_single_prediction_task(
         
         import_res = subprocess.run(import_cmd, capture_output=True, text=True, cwd=repo_root, env=get_subprocess_env())
         if import_res.returncode != 0:
-            raise RuntimeError(f"sdf2moldb.pl failed: {import_res.stderr}\nStdout: {import_res.stdout}")
+            raise RuntimeError(f"SdfImporter failed: {import_res.stderr}\nStdout: {import_res.stdout}")
 
         # Step 5: Find the batch_id
         batch_id_query = text("SELECT batch_id FROM batchlist WHERE info = :info")
@@ -835,3 +972,6 @@ def structure_search(request: StructureSearchRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+from app.v3_model_reviews import router as v3_model_reviews_router
+app.include_router(v3_model_reviews_router)

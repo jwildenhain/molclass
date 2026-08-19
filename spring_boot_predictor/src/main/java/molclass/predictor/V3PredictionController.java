@@ -2,7 +2,11 @@ package molclass.predictor;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,6 +42,28 @@ public class V3PredictionController {
             @RequestParam("smiles") String smiles,
             @RequestParam(value = "limit", defaultValue = "25") int limit) throws Exception {
         return service.substructureSearch(smiles, limit);
+    }
+
+    @GetMapping(value = "/molecules/{moleculeId}/structure.svg", produces = "image/svg+xml")
+    public ResponseEntity<String> moleculeStructure(@PathVariable long moleculeId) throws Exception {
+        // A molecule's stored structure is immutable once normalized, so the depiction for a
+        // given molecule_id never changes and can be cached hard by the browser.
+        return ResponseEntity.ok()
+                .contentType(MediaType.valueOf("image/svg+xml"))
+                .cacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic().immutable())
+                .body(service.moleculeStructureSvg(moleculeId));
+    }
+
+    @GetMapping("/molecules/{moleculeId}")
+    public Map<String, Object> molecule(@PathVariable long moleculeId) throws Exception {
+        return service.moleculeDetail(moleculeId);
+    }
+
+    @GetMapping("/molecules/{moleculeId}/predictions")
+    public List<Map<String, Object>> moleculePredictions(
+            @PathVariable long moleculeId,
+            @RequestParam(value = "limit", defaultValue = "50") int limit) throws Exception {
+        return service.moleculePredictions(moleculeId, limit);
     }
 
     @PostMapping("/models/{modelDefinitionId}/molecules/{moleculeId}/predict")

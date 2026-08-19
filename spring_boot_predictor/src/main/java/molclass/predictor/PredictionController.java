@@ -2,6 +2,7 @@ package molclass.predictor;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
+@ConditionalOnProperty(name = "molclass.legacy-api.enabled", havingValue = "true")
 @RestController
 public class PredictionController {
 
@@ -93,12 +95,27 @@ public class PredictionController {
 
     @GetMapping("/api/models")
     public List<Map<String, Object>> getModels() {
-        return jdbcTemplate.queryForList("SELECT model_id, name, username, batch_id, data_type, class_tag, class_scheme, feature_selection, email, IF(model_data IS NULL, 0, 1) as is_built FROM class_models ORDER BY model_id DESC LIMIT 100");
+        return jdbcTemplate.queryForList("SELECT model_id, name, classes, username, batch_id, data_type, class_tag, class_scheme, feature_selection, email, IF(model_data IS NULL, 0, 1) as is_built FROM class_models ORDER BY model_id DESC LIMIT 100");
     }
 
     @GetMapping("/api/dataset-reviews")
     public List<Map<String, Object>> getDatasetReviews() {
-        return jdbcTemplate.queryForList("SELECT batch_id, name, description FROM dataset_reviews ORDER BY batch_id ASC");
+        return jdbcTemplate.queryForList("SELECT batch_id, filename as name, info as description FROM batchlist ORDER BY batch_id ASC");
+    }
+
+    @GetMapping("/api/batches/{id}")
+    public Map<String, Object> getBatchById(@PathVariable("id") int id) {
+        return jdbcTemplate.queryForMap("SELECT batch_id, filename as name, info as description FROM batchlist WHERE batch_id = ?", id);
+    }
+
+    @GetMapping("/api/batches/{id}/predictions")
+    public List<Map<String, Object>> getPredictionsByBatchId(@PathVariable("id") int id) {
+        return jdbcTemplate.queryForList("SELECT m.classes, m.data_type, m.class_tag, m.class_scheme, p.pred_id, p.model_id FROM prediction_list p JOIN class_models m ON p.model_id = m.model_id WHERE p.batch_id = ? ORDER BY p.pred_id ASC", id);
+    }
+
+    @GetMapping("/api/models/{id}")
+    public Map<String, Object> getModelById(@PathVariable("id") int id) {
+        return jdbcTemplate.queryForMap("SELECT model_id, classes, data_type, class_tag, class_scheme, batch_id, printout FROM class_models WHERE model_id = ?", id);
     }
 
     @PostMapping("/api/models/queue")
