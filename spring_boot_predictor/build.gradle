@@ -23,8 +23,24 @@ dependencies {
         // Dependencies from original molclass (legacy VM environment)
         implementation fileTree(dir: '../lib_legacy', include: ['*.jar'])
     } else {
-        // Dependencies from current molclass
-        implementation fileTree(dir: '../lib', include: ['*.jar'], exclude: ['mysql-connector*.jar', 'h2-*.jar', 'junit-*.jar', 'hamcrest-*.jar'])
+        // Dependencies from current molclass. cdk-2.12.jar and the vendored weka jars are
+        // excluded here: this file's own source (V3PredictionService etc.) references CDK
+        // classes directly, so it needs a real compile-time CDK dependency -- `implementation
+        // project(':')` below does NOT provide one, since Gradle only exposes a project's
+        // `implementation`-scoped dependencies to consumers at runtime, not compile time (that's
+        // what `api` is for, and the root build intentionally doesn't use it). The vendored
+        // cdk-2.12.jar was filling that gap. Declaring the same Maven cdk-bundle the root project
+        // uses, directly, gives this module its own correct compile-time AND runtime CDK from one
+        // canonical source instead of two physically different jars providing overlapping classes
+        // (cdk-2.12.jar vs. the ~115 cdk-bundle Maven modules; weka-stable-3.8.6.jar vs.
+        // weka-stable-3.8.7.jar). CDK's own discovery merges resources across the whole classpath,
+        // so having both copies was usually harmless there, but the Weka side is a real hazard:
+        // two jars defining the same class names have no such merging -- whichever one Gradle
+        // happens to order first on the classpath silently wins, with no error either way.
+        implementation fileTree(dir: '../lib', include: ['*.jar'], exclude: [
+                'mysql-connector*.jar', 'h2-*.jar', 'junit-*.jar', 'hamcrest-*.jar',
+                'cdk-2.12.jar', 'weka-stable-3.8.6.jar', 'weka-src.jar'])
+        implementation 'org.openscience.cdk:cdk-bundle:2.12'
         implementation 'nz.ac.waikato.cms.weka:weka-stable:3.8.7'
     }
     

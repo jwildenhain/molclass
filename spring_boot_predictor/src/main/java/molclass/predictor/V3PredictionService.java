@@ -925,12 +925,33 @@ public class V3PredictionService {
                 while (type.isArray()) type = type.getComponentType();
                 if (type.isPrimitive()) return ObjectInputFilter.Status.ALLOWED;
                 String name = type.getName();
-                return name.startsWith("weka.") || name.startsWith("libsvm.")
+                boolean allowed = name.startsWith("weka.") || name.startsWith("libsvm.")
                         || name.startsWith("java.lang.") || name.startsWith("java.util.")
                         || name.startsWith("java.math.") || name.startsWith("java.time.")
                         || name.equals("java.io.File") || name.startsWith("no.uib.cipr.matrix.")
-                        || name.startsWith("Jama.") ? ObjectInputFilter.Status.ALLOWED
-                                : ObjectInputFilter.Status.REJECTED;
+                        || name.startsWith("Jama.")
+                        // First-party Weka subclasses the training pipeline can embed in a
+                        // serialized artifact's Filter/ASEvaluation fields. Named exactly, not by
+                        // a "molclass." prefix -- that would silently admit any future class added
+                        // to this package, defeating the point of an allowlist. Any published model
+                        // whose training set crosses V3ModelRebuilder's parallel-SMOTE threshold
+                        // (config.parallelSmoteMinInstances, 5000 by default) serializes a
+                        // DeterministicParallelSmote filter instead of plain weka.filters.SMOTE;
+                        // model definitions 103/104's RobustCfsSubsetEval is the other case.
+                        // Without these two, every such model fails every prediction with a bare
+                        // 500 -- discovered exactly that way, tracked down via the log line above.
+                        || name.equals("molclass.models.DeterministicParallelSmote")
+                        || name.equals("molclass.models.RobustCfsSubsetEval");
+                if (!allowed) {
+                    // The filter's whole point is to fail closed on anything unlisted, so this
+                    // stays a REJECTED, not an allowlist addition -- but silently rejecting with
+                    // no record of *which* class tripped it turned one real model-artifact bug
+                    // into a from-scratch stack-trace hunt. Logging the class name costs nothing
+                    // security-wise (the artifact bytes are already trusted enough to be read this
+                    // far) and turns the next occurrence into a one-line diagnosis.
+                    LOGGER.warn("deserialization filter rejected class not in the allowlist: {}", name);
+                }
+                return allowed ? ObjectInputFilter.Status.ALLOWED : ObjectInputFilter.Status.REJECTED;
             });
             return input.readObject();
         }
