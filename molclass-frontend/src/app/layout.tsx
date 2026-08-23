@@ -35,6 +35,7 @@ export default function RootLayout({
                       <Link href="/model-creation" className="text-muted-foreground hover:text-foreground hover:bg-muted px-3 py-2 rounded-md text-sm font-medium transition-colors">Model Creation</Link>
                       <Link href="/search" className="text-muted-foreground hover:text-foreground hover:bg-muted px-3 py-2 rounded-md text-sm font-medium transition-colors">Search</Link>
                       <Link href="/model-review" className="text-muted-foreground hover:text-foreground hover:bg-muted px-3 py-2 rounded-md text-sm font-medium transition-colors">Model Review</Link>
+                      <Link href="/help" className="text-muted-foreground hover:text-foreground hover:bg-muted px-3 py-2 rounded-md text-sm font-medium transition-colors">Help</Link>
                       <Link href="/news" className="text-muted-foreground hover:text-foreground hover:bg-muted px-3 py-2 rounded-md text-sm font-medium transition-colors">News</Link>
                       <Link href="/details" className="text-muted-foreground hover:text-foreground hover:bg-muted px-3 py-2 rounded-md text-sm font-medium transition-colors">Details</Link>
                     </div>

@@ -47,13 +47,18 @@ export default function DetailsPage() {
               <p>Henley-on-Thames, UK</p>
             </div>
             <div className="mt-6 md:mt-0">
-              <a href="mailto:jan.wildenhain@ed.ac.uk" className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-colors inline-block">
-                Contact via Email
+              <a
+                href="https://www.linkedin.com/in/jan-wildenhain-39908610/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-colors inline-block"
+              >
+                Contact via LinkedIn
               </a>
             </div>
           </div>
           <p className="text-sm text-slate-500 italic mt-4">
-            If you did not get a response to an email please do not hesitate to resend your email. We are very much interested in your feedback.
+            If you did not get a response, please do not hesitate to reach out again. We are very much interested in your feedback.
           </p>
         </section>
 

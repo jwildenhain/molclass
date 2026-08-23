@@ -12,6 +12,7 @@ const ROUTES = [
   { link: "Model Creation", path: "/model-creation", heading: "Choose a dataset with a verified target." },
   { link: "Search", path: "/search", heading: "Search" },
   { link: "Model Review", path: "/model-review", heading: "Model build review" },
+  { link: "Help", path: "/help", heading: "Help" },
   { link: "News", path: "/news", heading: "News" },
   { link: "Details", path: "/details", heading: "About MolClass" },
 ] as const;
