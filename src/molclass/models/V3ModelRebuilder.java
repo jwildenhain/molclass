@@ -1147,10 +1147,32 @@ public final class V3ModelRebuilder {
                     base=createAdaBoostM1Classifier();
                 }
                 case "Ensemble"->{
-                    className="weka.classifiers.meta.StackingC";options="-B \"weka.classifiers.trees.J48\" -B \"weka.classifiers.lazy.IBk -K 25\" -M \"weka.classifiers.functions.LinearRegression\"";
-                    weka.classifiers.lazy.IBk neighbour=new weka.classifiers.lazy.IBk();neighbour.setKNN(25);
+                    weka.classifiers.trees.RandomForest forest=new weka.classifiers.trees.RandomForest();
+                    forest.setNumIterations(100);forest.setNumFeatures(0);forest.setSeed(2);
+                    forest.setNumExecutionSlots(config.threads);
+
+                    weka.classifiers.lazy.IBk neighbour=new weka.classifiers.lazy.IBk();
+                    KnnTuningContract.Plan tuning=KnnTuningContract.forTrainingInstances(training.numInstances());
+                    Classifier neighbourClassifier;String neighbourOptions;
+                    if(!tuning.tuned()){
+                        neighbour.setKNN(1);neighbourClassifier=neighbour;
+                        neighbourOptions="weka.classifiers.lazy.IBk -K 1";
+                    }else{
+                        String parameter=tuning.parameter();
+                        weka.classifiers.meta.CVParameterSelection tunedNeighbour=new weka.classifiers.meta.CVParameterSelection();
+                        tunedNeighbour.setNumFolds(tuning.folds());tunedNeighbour.setClassifier(neighbour);
+                        tunedNeighbour.addCVParameter(parameter);neighbourClassifier=tunedNeighbour;
+                        neighbourOptions="weka.classifiers.meta.CVParameterSelection -X "+tuning.folds()
+                                +" -P \""+parameter+"\" -W weka.classifiers.lazy.IBk";
+                    }
+
+                    className="weka.classifiers.meta.StackingC";
+                    options="-B \"weka.classifiers.trees.RandomForest -I 100 -K 0 -S 2\" -B \""
+                            +neighbourOptions+"\" -B \"weka.classifiers.bayes.NaiveBayes\""
+                            +" -M \"weka.classifiers.functions.LinearRegression\"";
                     weka.classifiers.meta.StackingC classifier=new weka.classifiers.meta.StackingC();
-                    classifier.setClassifiers(new Classifier[]{new weka.classifiers.trees.J48(),neighbour});
+                    classifier.setClassifiers(new Classifier[]{
+                            forest,neighbourClassifier,new weka.classifiers.bayes.NaiveBayes()});
                     classifier.setMetaClassifier(new weka.classifiers.functions.LinearRegression());base=classifier;
                 }
                 case "NaiveBayes"->{className="weka.classifiers.bayes.NaiveBayes";base=new weka.classifiers.bayes.NaiveBayes();}
