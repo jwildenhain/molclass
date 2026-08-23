@@ -48,6 +48,32 @@ test("the model table's columns sort on click", async ({ page }) => {
   await expect(dataRows.first()).toContainText("Mitochondrial uncoupler");
 });
 
+test("a model's display name can be renamed inline", async ({ page }) => {
+  let lastBody: unknown = null;
+  await page.route(routes.renameModelDefinition, async (route) => {
+    lastBody = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ modelDefinitionId: 39, name: (lastBody as { model_name: string }).model_name }),
+    });
+  });
+
+  await page.goto("/search?tab=models");
+  // Scope by the build id, which stays put in edit mode — the row's own name
+  // moves into an <input> whose value doesn't count as matchable text.
+  const row = page.getByRole("row").filter({ hasText: "build #512" });
+  await expect(row).toBeVisible();
+
+  await row.getByRole("button", { name: "Mitochondrial uncoupler" }).click();
+  const input = row.getByRole("textbox");
+  await input.fill("Renamed uncoupler model");
+  await row.getByRole("button", { name: "Save" }).click();
+
+  await expect(row.getByText("Renamed uncoupler model")).toBeVisible();
+  await expect.poll(() => lastBody).toEqual({ model_name: "Renamed uncoupler model" });
+});
+
 test("the search form sends the typed query to the registry", async ({ page }) => {
   await page.goto("/search?tab=models");
   await expect(page.getByRole("row").filter({ hasText: "Mitochondrial uncoupler" })).toBeVisible();

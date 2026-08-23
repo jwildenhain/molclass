@@ -1,9 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, MouseEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Activity, Database, RefreshCw, Search, X } from "lucide-react";
+import { Activity, Check, Database, Pencil, RefreshCw, Search, X } from "lucide-react";
 import { MoleculeStructure } from "@/components/MoleculeStructure";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import { nextSort, SortableHeader, type SortDirection } from "@/components/SortableHeader";
@@ -13,6 +13,99 @@ function compareNullableNumber(a: number | null, b: number | null, dir: 1 | -1) 
   if (a == null) return 1;
   if (b == null) return -1;
   return (a - b) * dir;
+}
+
+function ModelNameCell({
+  model,
+  onSaved,
+}: {
+  model: PublishedModel;
+  onSaved: (modelDefinitionId: number, name: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(model.name ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  function startEdit(event: MouseEvent) {
+    event.stopPropagation();
+    setDraft(model.name ?? `Model ${model.modelDefinitionId}`);
+    setSaveError("");
+    setEditing(true);
+  }
+
+  async function save() {
+    const trimmed = draft.trim();
+    if (!trimmed) {
+      setSaveError("Name can't be empty.");
+      return;
+    }
+    setSaving(true);
+    setSaveError("");
+    try {
+      const response = await fetchWithTimeout(`/api/v1/model-definitions/${model.modelDefinitionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model_name: trimmed }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { detail?: { code?: string } } | null;
+        throw new Error(payload?.detail?.code === "MODEL_DEFINITION_NOT_FOUND" ? "Model no longer exists." : "Could not rename the model.");
+      }
+      onSaved(model.modelDefinitionId, trimmed);
+      setEditing(false);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Could not rename the model.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="min-w-[220px] max-w-xs" onClick={(event) => event.stopPropagation()}>
+        <input
+          autoFocus
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setEditing(false);
+            if (event.key === "Enter") void save();
+          }}
+          maxLength={255}
+          className="w-full rounded-lg border border-blue-400/60 bg-background/80 px-2.5 py-1.5 text-sm font-semibold text-foreground outline-none focus:ring-2 focus:ring-blue-500/30"
+        />
+        {saveError && <p className="mt-1 text-xs text-red-500">{saveError}</p>}
+        <div className="mt-1.5 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={saving}
+            className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-bold text-white transition hover:bg-blue-500 disabled:cursor-wait disabled:opacity-60"
+          >
+            <Check className="h-3.5 w-3.5" />
+            {saving ? "Saving..." : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            disabled={saving}
+            className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button type="button" onClick={startEdit} className="group flex items-center gap-1.5 text-left">
+      <span className="font-semibold text-foreground">{model.name || `Model ${model.modelDefinitionId}`}</span>
+      <Pencil className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
+    </button>
+  );
 }
 
 interface PublishedModel {
@@ -141,6 +234,10 @@ export function ModelMoleculeSearchPanel() {
     event.preventDefault();
     loadModels(modelQuery);
   };
+
+  function handleModelRenamed(modelDefinitionId: number, name: string) {
+    setModels((current) => current.map((m) => (m.modelDefinitionId === modelDefinitionId ? { ...m, name } : m)));
+  }
 
   function toggleModel(modelDefinitionId: number) {
     setSelectedModelIds((current) => {
@@ -344,7 +441,7 @@ export function ModelMoleculeSearchPanel() {
                         />
                       </td>
                       <td className="p-4">
-                        <div className="font-semibold text-foreground">{model.name || `Model ${model.modelDefinitionId}`}</div>
+                        <ModelNameCell model={model} onSaved={handleModelRenamed} />
                         <div className="text-xs text-muted-foreground mt-1">
                           v3 #{model.modelDefinitionId} · legacy #{model.legacyModelId ?? "n/a"} · build #{model.modelBuildId}
                         </div>

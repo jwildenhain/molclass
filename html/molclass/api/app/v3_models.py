@@ -36,6 +36,10 @@ FEATURE_SELECTIONS = (
 FEATURE_SELECTION_CODES = {item["code"] for item in FEATURE_SELECTIONS}
 
 
+class ModelNameUpdateRequest(BaseModel):
+    model_name: str = Field(min_length=1, max_length=255)
+
+
 class ModelDefinitionRequest(BaseModel):
     dataset_id: int = Field(gt=0)
     target_property_id: int = Field(gt=0)
@@ -345,3 +349,44 @@ def create_model_definition(
         "declaredClassLabels": declared_labels,
         "positiveClassLabel": request.positive_class_label,
     }
+
+
+@router.patch("/model-definitions/{model_definition_id}")
+def rename_model_definition(
+    model_definition_id: int,
+    request: ModelNameUpdateRequest,
+    db: Session = Depends(get_v3_db),
+):
+    model_name = request.model_name.strip()
+    if not model_name:
+        raise HTTPException(status_code=422, detail={"code": "NAME_REQUIRED"})
+    try:
+        result = db.execute(
+            text("UPDATE model_definition SET model_name=:model_name,updated_at=UTC_TIMESTAMP(6) WHERE model_definition_id=:id"),
+            {"model_name": model_name, "id": model_definition_id},
+        )
+        if result.rowcount == 0:
+            db.rollback()
+            raise HTTPException(status_code=404, detail={"code": "MODEL_DEFINITION_NOT_FOUND"})
+        db.execute(
+            text(
+                """
+                INSERT INTO audit_event
+                    (actor,action_code,entity_type,entity_id,event_details_json,created_at)
+                VALUES
+                    ('web-operator','MODEL_DEFINITION_RENAMED','MODEL_DEFINITION',:entity_id,
+                     :details,UTC_TIMESTAMP(6))
+                """
+            ),
+            {
+                "entity_id": str(model_definition_id),
+                "details": json.dumps({"modelName": model_name}, separators=(",", ":")),
+            },
+        )
+        db.commit()
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        raise
+    return {"modelDefinitionId": model_definition_id, "name": model_name}
