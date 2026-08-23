@@ -373,7 +373,7 @@ export default function ModelReviewPage() {
       setDecisionError("Only the latest build awaiting approval can receive a decision.");
       return;
     }
-    if (!reviewer.trim() || !reviewToken || !decisionNote.trim()) {
+    if (!reviewer.trim() || !reviewToken.trim() || !decisionNote.trim()) {
       setDecisionError("Reviewer, review token, and decision note are required.");
       return;
     }
@@ -400,7 +400,7 @@ export default function ModelReviewPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-MolClass-Review-Token": reviewToken,
+            "X-MolClass-Review-Token": reviewToken.trim(),
           },
           body: JSON.stringify({
             decision,
