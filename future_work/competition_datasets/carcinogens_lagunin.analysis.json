@@ -1,0 +1,48 @@
+{
+  "analysisVersion": "v3-sdf-analyzer-1",
+  "analyzedAt": "2026-08-23T09:19:48.405381431Z",
+  "originalFilename": "carcinogens_lagunin.sdf",
+  "contentSha256": "6f0425ff2317f534a6fb957e6bd67a51e55a69c2b11b156a9cc05c0c7b11fb97",
+  "contentLength": 622554,
+  "totalRecords": 280,
+  "validRecords": 280,
+  "malformedRecords": 0,
+  "missingFinalDelimiter": false,
+  "autoSelectedIdentifier": "Identifier",
+  "identifierConfirmationRequired": true,
+  "identifierPriority": ["identifier","compound_id","Compound_ID","ID","MOL_ID"],
+  "properties": [
+    {
+      "name": "Carcinogen",
+      "presentCount": 280,
+      "missingCount": 0,
+      "blankCount": 0,
+      "distinctCount": 2,
+      "duplicateTagRecords": 0,
+      "minimumLength": 1,
+      "maximumLength": 1,
+      "inferredSqlType": "INT",
+      "storageRecommendation": "WIDE",
+      "identifierEligible": false,
+      "examples": ["1","1","1"],
+      "duplicateExamples": ["1","1","1"]
+    },
+    {
+      "name": "Identifier",
+      "presentCount": 280,
+      "missingCount": 0,
+      "blankCount": 0,
+      "distinctCount": 280,
+      "duplicateTagRecords": 0,
+      "minimumLength": 6,
+      "maximumLength": 8,
+      "inferredSqlType": "VARCHAR(8)",
+      "storageRecommendation": "WIDE",
+      "identifierEligible": true,
+      "examples": ["Drug_1","Drug_2","Drug_3"],
+      "duplicateExamples": []
+    }
+  ],
+  "malformedExamples": [],
+  "warnings": []
+}

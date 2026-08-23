@@ -1,0 +1,48 @@
+{
+  "analysisVersion": "v3-sdf-analyzer-1",
+  "analyzedAt": "2026-08-23T09:20:04.843385855Z",
+  "originalFilename": "herg_karim.sdf",
+  "contentSha256": "6f7aef278e4b2c29da8411f0c4ceb55c20b670dff1d2b5962227570eb9b4cbe6",
+  "contentLength": 36527298,
+  "totalRecords": 13445,
+  "validRecords": 13445,
+  "malformedRecords": 0,
+  "missingFinalDelimiter": false,
+  "autoSelectedIdentifier": "Identifier",
+  "identifierConfirmationRequired": true,
+  "identifierPriority": ["identifier","compound_id","Compound_ID","ID","MOL_ID"],
+  "properties": [
+    {
+      "name": "Identifier",
+      "presentCount": 13445,
+      "missingCount": 0,
+      "blankCount": 0,
+      "distinctCount": 13445,
+      "duplicateTagRecords": 0,
+      "minimumLength": 1,
+      "maximumLength": 5,
+      "inferredSqlType": "INT",
+      "storageRecommendation": "WIDE",
+      "identifierEligible": true,
+      "examples": ["0","1","2"],
+      "duplicateExamples": []
+    },
+    {
+      "name": "hERG",
+      "presentCount": 13445,
+      "missingCount": 0,
+      "blankCount": 0,
+      "distinctCount": 2,
+      "duplicateTagRecords": 0,
+      "minimumLength": 1,
+      "maximumLength": 1,
+      "inferredSqlType": "INT",
+      "storageRecommendation": "WIDE",
+      "identifierEligible": false,
+      "examples": ["1","0","0"],
+      "duplicateExamples": ["0","0","0"]
+    }
+  ],
+  "malformedExamples": [],
+  "warnings": []
+}

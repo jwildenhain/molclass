@@ -1,0 +1,48 @@
+{
+  "analysisVersion": "v3-sdf-analyzer-1",
+  "analyzedAt": "2026-08-23T09:19:24.865236944Z",
+  "originalFilename": "herg.sdf",
+  "contentSha256": "2d133886833c1a5a24fcad643840c997810d499655779fbffffd1d6737aabd7a",
+  "contentLength": 1544330,
+  "totalRecords": 655,
+  "validRecords": 655,
+  "malformedRecords": 0,
+  "missingFinalDelimiter": false,
+  "autoSelectedIdentifier": null,
+  "identifierConfirmationRequired": true,
+  "identifierPriority": ["identifier","compound_id","Compound_ID","ID","MOL_ID"],
+  "properties": [
+    {
+      "name": "Identifier",
+      "presentCount": 655,
+      "missingCount": 0,
+      "blankCount": 0,
+      "distinctCount": 616,
+      "duplicateTagRecords": 0,
+      "minimumLength": 3,
+      "maximumLength": 119,
+      "inferredSqlType": "VARCHAR(119)",
+      "storageRecommendation": "WIDE",
+      "identifierEligible": false,
+      "examples": ["DEMETHYLASTEMIZOLE","GBR-12909","LY-97241"],
+      "duplicateExamples": ["nan","nan","nan"]
+    },
+    {
+      "name": "hERG",
+      "presentCount": 655,
+      "missingCount": 0,
+      "blankCount": 0,
+      "distinctCount": 2,
+      "duplicateTagRecords": 0,
+      "minimumLength": 1,
+      "maximumLength": 1,
+      "inferredSqlType": "INT",
+      "storageRecommendation": "WIDE",
+      "identifierEligible": false,
+      "examples": ["1","1","1"],
+      "duplicateExamples": ["1","1","1"]
+    }
+  ],
+  "malformedExamples": [],
+  "warnings": ["No property is non-blank and unique across every valid molecule."]
+}

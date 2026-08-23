@@ -1,0 +1,48 @@
+{
+  "analysisVersion": "v3-sdf-analyzer-1",
+  "analyzedAt": "2026-08-23T09:19:35.677192258Z",
+  "originalFilename": "ames.sdf",
+  "contentSha256": "47a0dbdc82fbd7993c75ac9d86f622f52f3ccbd0503d0cea2298d1c9c740262e",
+  "contentLength": 11092798,
+  "totalRecords": 7278,
+  "validRecords": 7278,
+  "malformedRecords": 0,
+  "missingFinalDelimiter": false,
+  "autoSelectedIdentifier": "Identifier",
+  "identifierConfirmationRequired": true,
+  "identifierPriority": ["identifier","compound_id","Compound_ID","ID","MOL_ID"],
+  "properties": [
+    {
+      "name": "AMES",
+      "presentCount": 7278,
+      "missingCount": 0,
+      "blankCount": 0,
+      "distinctCount": 2,
+      "duplicateTagRecords": 0,
+      "minimumLength": 1,
+      "maximumLength": 1,
+      "inferredSqlType": "INT",
+      "storageRecommendation": "WIDE",
+      "identifierEligible": false,
+      "examples": ["1","1","0"],
+      "duplicateExamples": ["1","1","1"]
+    },
+    {
+      "name": "Identifier",
+      "presentCount": 7278,
+      "missingCount": 0,
+      "blankCount": 0,
+      "distinctCount": 7278,
+      "duplicateTagRecords": 0,
+      "minimumLength": 6,
+      "maximumLength": 9,
+      "inferredSqlType": "VARCHAR(9)",
+      "storageRecommendation": "WIDE",
+      "identifierEligible": true,
+      "examples": ["Drug 0","Drug 1","Drug 2"],
+      "duplicateExamples": []
+    }
+  ],
+  "malformedExamples": [],
+  "warnings": []
+}

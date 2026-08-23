@@ -1,0 +1,48 @@
+{
+  "analysisVersion": "v3-sdf-analyzer-1",
+  "analyzedAt": "2026-08-23T09:19:46.380474156Z",
+  "originalFilename": "skin_reaction.sdf",
+  "contentSha256": "78c91c6d42f49a829e6ef0e5721dcd4647b7ede52b60ad2d94d9cfec2555d12b",
+  "contentLength": 579861,
+  "totalRecords": 404,
+  "validRecords": 404,
+  "malformedRecords": 0,
+  "missingFinalDelimiter": false,
+  "autoSelectedIdentifier": "Identifier",
+  "identifierConfirmationRequired": true,
+  "identifierPriority": ["identifier","compound_id","Compound_ID","ID","MOL_ID"],
+  "properties": [
+    {
+      "name": "Identifier",
+      "presentCount": 404,
+      "missingCount": 0,
+      "blankCount": 0,
+      "distinctCount": 404,
+      "duplicateTagRecords": 0,
+      "minimumLength": 5,
+      "maximumLength": 175,
+      "inferredSqlType": "VARCHAR(175)",
+      "storageRecommendation": "WIDE",
+      "identifierEligible": true,
+      "examples": ["(16-b)-21-(Acetyloxy)-17-hydroxy-16-methylpregna-1,4,9(11)-triene-3,20-dione","(2-Bromo-5-propoxyphenyl)-(2-hydroxy-4-methoxyphenyl)methanone","(2E)-2-Methyl-2-butenal"],
+      "duplicateExamples": []
+    },
+    {
+      "name": "SkinReaction",
+      "presentCount": 404,
+      "missingCount": 0,
+      "blankCount": 0,
+      "distinctCount": 2,
+      "duplicateTagRecords": 0,
+      "minimumLength": 1,
+      "maximumLength": 1,
+      "inferredSqlType": "INT",
+      "storageRecommendation": "WIDE",
+      "identifierEligible": false,
+      "examples": ["0","0","0"],
+      "duplicateExamples": ["0","0","0"]
+    }
+  ],
+  "malformedExamples": [],
+  "warnings": []
+}

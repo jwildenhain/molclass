@@ -1,0 +1,48 @@
+{
+  "analysisVersion": "v3-sdf-analyzer-1",
+  "analyzedAt": "2026-08-23T09:19:54.291495649Z",
+  "originalFilename": "clintox.sdf",
+  "contentSha256": "ab75a9d94eeef771b92a735c257babb0e440114a5d200e16e89b70ba31742e94",
+  "contentLength": 3438329,
+  "totalRecords": 1478,
+  "validRecords": 1478,
+  "malformedRecords": 0,
+  "missingFinalDelimiter": false,
+  "autoSelectedIdentifier": "Identifier",
+  "identifierConfirmationRequired": true,
+  "identifierPriority": ["identifier","compound_id","Compound_ID","ID","MOL_ID"],
+  "properties": [
+    {
+      "name": "ClinToxic",
+      "presentCount": 1478,
+      "missingCount": 0,
+      "blankCount": 0,
+      "distinctCount": 2,
+      "duplicateTagRecords": 0,
+      "minimumLength": 1,
+      "maximumLength": 1,
+      "inferredSqlType": "INT",
+      "storageRecommendation": "WIDE",
+      "identifierEligible": false,
+      "examples": ["0","0","0"],
+      "duplicateExamples": ["0","0","0"]
+    },
+    {
+      "name": "Identifier",
+      "presentCount": 1478,
+      "missingCount": 0,
+      "blankCount": 0,
+      "distinctCount": 1478,
+      "duplicateTagRecords": 0,
+      "minimumLength": 6,
+      "maximumLength": 9,
+      "inferredSqlType": "VARCHAR(9)",
+      "storageRecommendation": "WIDE",
+      "identifierEligible": true,
+      "examples": ["Drug 0","Drug 1","Drug 2"],
+      "duplicateExamples": []
+    }
+  ],
+  "malformedExamples": [],
+  "warnings": []
+}

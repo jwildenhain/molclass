@@ -1,0 +1,48 @@
+{
+  "analysisVersion": "v3-sdf-analyzer-1",
+  "analyzedAt": "2026-08-23T09:19:44.372752780Z",
+  "originalFilename": "dili.sdf",
+  "contentSha256": "ed0ca0d45169751b57d678f04421413559654a232fc679de78347cc9882570b6",
+  "contentLength": 1003091,
+  "totalRecords": 475,
+  "validRecords": 475,
+  "malformedRecords": 0,
+  "missingFinalDelimiter": false,
+  "autoSelectedIdentifier": "Identifier",
+  "identifierConfirmationRequired": true,
+  "identifierPriority": ["identifier","compound_id","Compound_ID","ID","MOL_ID"],
+  "properties": [
+    {
+      "name": "DILI",
+      "presentCount": 475,
+      "missingCount": 0,
+      "blankCount": 0,
+      "distinctCount": 2,
+      "duplicateTagRecords": 0,
+      "minimumLength": 1,
+      "maximumLength": 1,
+      "inferredSqlType": "INT",
+      "storageRecommendation": "WIDE",
+      "identifierEligible": false,
+      "examples": ["0","0","0"],
+      "duplicateExamples": ["0","0","0"]
+    },
+    {
+      "name": "Identifier",
+      "presentCount": 475,
+      "missingCount": 0,
+      "blankCount": 0,
+      "distinctCount": 475,
+      "duplicateTagRecords": 0,
+      "minimumLength": 5,
+      "maximumLength": 10,
+      "inferredSqlType": "DECIMAL(9,1)",
+      "storageRecommendation": "WIDE",
+      "identifierEligible": true,
+      "examples": ["187.0","247.0","298.0"],
+      "duplicateExamples": []
+    }
+  ],
+  "malformedExamples": [],
+  "warnings": []
+}
