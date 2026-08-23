@@ -29,7 +29,8 @@ export default function DetailsPage() {
             <ul className="mt-3 list-disc space-y-2 pl-5 text-muted-foreground leading-relaxed">
               <li>Parallelized SMOTE oversampling for large, imbalanced training sets, cutting model build time without changing the resampled output (still fully deterministic).</li>
               <li>Redesigned the Ensemble classifier around RandomForest, a cross-validated auto-tuned KNN, and NaiveBayes, measurably improving holdout accuracy over the previous design.</li>
-              <li>Hardened the prediction service: deduplicated overlapping CDK/Weka dependencies and closed a model-deserialization gap that had been silently failing every prediction from ensemble-family models.</li>
+              <li>Hardened the prediction service by deduplicating overlapping CDK/Weka dependencies.</li>
+              <li>Refactored the backend model loader from eagerly deserializing all ~115 trained models into memory at startup to an on-demand, size-capped cache (four models by default) &mdash; an estimated 25&ndash;30&times; smaller resident model memory footprint at steady state, with a multi-hundred-megabyte deserialization pass removed from startup entirely.</li>
               <li>Benchmarked against the Tox21 Data Challenge: a default RandomForest-on-JUMBO setup matches DeepTox, the competition&rsquo;s winning method (see <a href="/news" className="text-indigo-400 hover:underline">News</a>).</li>
               <li>Consolidated structure and model search into a single interface with molecule thumbnails, multi-molecule batch prediction, and per-model AUC/F1 metrics.</li>
               <li>Added live progress reporting during SDF upload and import, replacing a static &ldquo;queued&rdquo; message with real record-by-record counts.</li>
@@ -42,7 +43,7 @@ export default function DetailsPage() {
           <div className="bg-muted/30 p-6 rounded-xl border border-border/50 flex flex-col md:flex-row justify-between items-start md:items-center">
             <div className="text-muted-foreground">
               <p className="font-bold text-foreground">Jan Wildenhain</p>
-              <p>EPAM</p>
+              <p>Consultant Data Analytics &amp; AI, EPAM</p>
               <p>Henley-on-Thames, UK</p>
             </div>
             <div className="mt-6 md:mt-0">
