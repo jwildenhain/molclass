@@ -46,6 +46,16 @@ app.include_router(v3_upload_router)
 app.include_router(v3_model_router)
 app.include_router(v3_dataset_router)
 
+def _is_data_intake_route(method: str, path: str) -> bool:
+    if method != "POST":
+        return False
+    if path == "/api/v1/uploads":
+        return True
+    if path.startswith("/api/v1/uploads/") and path.endswith("/imports"):
+        return True
+    return path == "/api/v1/model-definitions"
+
+
 @app.middleware("http")
 async def production_route_gate(request: Request, call_next):
     path = request.url.path
@@ -56,6 +66,11 @@ async def production_route_gate(request: Request, call_next):
     )
     if not allowed:
         return JSONResponse(status_code=404, content={"detail": {"code": "ROUTE_DISABLED"}})
+    # A read-only deployment (serving search/predictions against already-approved
+    # models) blocks new data entering the pipeline at all: uploads, import
+    # triggers, and new model definitions. Existing data stays fully readable.
+    if not settings.data_intake_enabled and _is_data_intake_route(request.method, path):
+        return JSONResponse(status_code=403, content={"detail": {"code": "DATA_INTAKE_DISABLED"}})
     return await call_next(request)
 
 @app.get("/", include_in_schema=False)

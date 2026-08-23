@@ -74,6 +74,15 @@ tasks.named('run') {
     jvmArgs '-Dweka.core.WekaPackageManager.offline=true'
 }
 
+tasks.named('installDist') {
+    // bounce-0.18.jar is both vendored in lib/ and pulled transitively via the
+    // cdk-bundle Maven dependency, so the two copies collide when installDist
+    // merges the whole runtime classpath into one lib/ directory. Same class of
+    // conflict spring_boot_predictor/build.gradle already works around for its
+    // BootJar task.
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 test {
     useJUnit()
     maxHeapSize = "4g"

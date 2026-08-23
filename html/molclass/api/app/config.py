@@ -59,14 +59,21 @@ class Settings:
         self.model_approval_timeout_seconds = _integer(
             "MOLCLASS_MODEL_APPROVAL_TIMEOUT_SECONDS", 120
         )
+        # os.getenv's default argument is evaluated eagerly even when the env var is
+        # set, so parents[4] must stay behind an explicit branch: images that don't
+        # preserve the nested html/molclass/api/app/ layout (e.g. this one, which
+        # COPYs app/ straight to /app/app) have fewer than 4 parents and raise
+        # IndexError before os.getenv ever gets to ignore the fallback.
+        repo_root_env = os.getenv("MOLCLASS_REPO_ROOT")
         self.approval_repo_root = Path(
-            os.getenv("MOLCLASS_REPO_ROOT", str(Path(__file__).resolve().parents[4]))
+            repo_root_env if repo_root_env else str(Path(__file__).resolve().parents[4])
         ).resolve()
 
         self.upload_root = Path(os.getenv("MOLCLASS_UPLOAD_ROOT", "uploads/v3")).resolve()
         self.max_upload_bytes = _integer("MOLCLASS_MAX_UPLOAD_BYTES", 2 * 1024 * 1024 * 1024)
         self.upload_retention_days = _integer("MOLCLASS_UPLOAD_RETENTION_DAYS", 30)
         self.legacy_api_enabled = _boolean("MOLCLASS_LEGACY_API_ENABLED", False)
+        self.data_intake_enabled = _boolean("MOLCLASS_DATA_INTAKE_ENABLED", True)
         origins = os.getenv(
             "MOLCLASS_ALLOWED_ORIGINS",
             "http://127.0.0.1:3000,http://localhost:3000",

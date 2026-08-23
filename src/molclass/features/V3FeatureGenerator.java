@@ -345,7 +345,7 @@ public final class V3FeatureGenerator {
                     result.next();
                     if (result.getInt(1) != 1) {
                         throw new IllegalStateException(
-                                "V3__feature_generation_tracking.sql has not been applied");
+                                "V03__feature_generation_tracking.sql has not been applied");
                     }
                 }
             }

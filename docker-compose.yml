@@ -40,7 +40,15 @@ services:
       MOLCLASS_DB_PASSWORD: "${MOLCLASS_DB_PASSWORD:?set MOLCLASS_DB_PASSWORD in an untracked environment file}"
       MOLCLASS_UPLOAD_ROOT: /var/lib/molclass/uploads
       MOLCLASS_LEGACY_API_ENABLED: "false"
+      MOLCLASS_DATA_INTAKE_ENABLED: "${MOLCLASS_DATA_INTAKE_ENABLED:-true}"
       MOLCLASS_ALLOWED_ORIGINS: "http://127.0.0.1:${MOLCLASS_FRONTEND_PORT:-3000},http://localhost:${MOLCLASS_FRONTEND_PORT:-3000}"
+      # Without this, Settings() falls back to Path(__file__).parents[4], which assumes the
+      # nested html/molclass/api/app/ source layout. This image only copies app/ to /app/app,
+      # two levels short of that, so the fallback raises IndexError before the app can boot.
+      # The api image never gets gradlew or the Java project either way, so approval_repo_root
+      # having no real gradlew under it is fine -- _approval_mutation_available() just stays
+      # false, same as if approval were unconfigured.
+      MOLCLASS_REPO_ROOT: /app
     ports:
       - "127.0.0.1:${MOLCLASS_API_PORT:-8000}:8000"
     volumes:

@@ -401,7 +401,7 @@ public final class LegacyV3Migration {
                     result.next();
                     if (result.getInt(1) != 1) {
                         throw new IllegalStateException(
-                                "V2__legacy_migration_tracking.sql has not been applied");
+                                "V02__legacy_migration_tracking.sql has not been applied");
                     }
                 }
             }
