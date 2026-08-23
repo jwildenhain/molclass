@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ClipboardList, Gauge, Layers, RefreshCw, ShieldCheck } from "lucide-react";
+import { ClipboardList, Gauge, Layers, RefreshCw } from "lucide-react";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 type ReviewListItem = {
@@ -327,6 +327,13 @@ export default function ModelReviewPage() {
     [items],
   );
 
+  useEffect(() => {
+    setSelectedId(null);
+    setReview(null);
+    setError(null);
+    setErrorSource(null);
+  }, [statusFilter]);
+
   async function selectReview(modelDefinitionId: number) {
     setSelectedId(modelDefinitionId);
     setReview(null);
@@ -449,10 +456,6 @@ export default function ModelReviewPage() {
               transactional approval service.
             </p>
           </div>
-          <div className="inline-flex items-center gap-2 self-start rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm text-blue-600 dark:text-blue-300">
-            <ShieldCheck className="h-4 w-4" />
-            Java transaction remains authoritative
-          </div>
         </div>
       </header>
 
@@ -481,7 +484,7 @@ export default function ModelReviewPage() {
       )}
 
       <section className="grid gap-6 xl:grid-cols-[380px_1fr]">
-        <aside className="rounded-2xl border border-border bg-card/60 shadow-2xl backdrop-blur-xl">
+        <aside className="flex flex-col rounded-2xl border border-border bg-card/60 shadow-2xl backdrop-blur-xl">
           <div className="grid gap-3 border-b border-border p-5">
             <label className="text-sm font-semibold text-foreground">
               Search definitions
@@ -511,7 +514,7 @@ export default function ModelReviewPage() {
             <span className="text-xs text-muted-foreground">{loadingList ? "loading" : filteredItems.length}</span>
           </div>
 
-          <div className="max-h-[640px] space-y-2 overflow-y-auto p-5">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-5">
             {!loadingList && filteredItems.length === 0 && (
               <p className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
                 No definitions match this filter.
