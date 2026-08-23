@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { RefreshCw } from "lucide-react";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 type Dataset = {
   datasetId: number;
@@ -38,12 +40,19 @@ export default function DatasetReviewPage() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [retryToken, setRetryToken] = useState(0);
+
+  const retry = useCallback(() => {
+    setLoading(true);
+    setError("");
+    setRetryToken((token) => token + 1);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
-        const response = await fetch("/api/v1/datasets?limit=250", { cache: "no-store" });
+        const response = await fetchWithTimeout("/api/v1/datasets?limit=250", { cache: "no-store" });
         const payload = await apiJson<{ total: number; datasets: Dataset[] }>(response);
         if (!cancelled) {
           setDatasets(payload.datasets);
@@ -57,7 +66,7 @@ export default function DatasetReviewPage() {
     };
     void load();
     return () => { cancelled = true; };
-  }, []);
+  }, [retryToken]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -116,7 +125,19 @@ export default function DatasetReviewPage() {
         </div>
 
         {loading && <div className="p-12 text-center text-muted-foreground">Loading durable dataset records...</div>}
-        {error && <div className="m-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-200">{error}</div>}
+        {error && (
+          <div className="m-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-200">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={retry}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-500/10 dark:text-red-200"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Retry
+            </button>
+          </div>
+        )}
         {!loading && !error && filtered.length === 0 && <div className="p-12 text-center text-muted-foreground">No dataset matches these filters.</div>}
 
         {!loading && !error && filtered.length > 0 && (

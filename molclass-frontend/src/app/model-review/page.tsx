@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ClipboardList, Gauge, Layers, ShieldCheck } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ClipboardList, Gauge, Layers, RefreshCw, ShieldCheck } from "lucide-react";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 type ReviewListItem = {
   modelDefinitionId: number;
@@ -258,6 +259,12 @@ export default function ModelReviewPage() {
   const [loadingList, setLoadingList] = useState(true);
   const [loadingReview, setLoadingReview] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorSource, setErrorSource] = useState<"list" | "review" | null>(null);
+  const [listRetryToken, setListRetryToken] = useState(0);
+
+  const retryList = useCallback(() => {
+    setListRetryToken((token) => token + 1);
+  }, []);
 
   const [reviewer, setReviewer] = useState("");
   const [reviewToken, setReviewToken] = useState("");
@@ -272,8 +279,9 @@ export default function ModelReviewPage() {
     async function load() {
       setLoadingList(true);
       setError(null);
+      setErrorSource(null);
       try {
-        const response = await fetch("/api/v1/model-reviews?limit=250", {
+        const response = await fetchWithTimeout("/api/v1/model-reviews?limit=250", {
           cache: "no-store",
           headers: { Accept: "application/json" },
         });
@@ -285,6 +293,7 @@ export default function ModelReviewPage() {
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : "Model reviews could not be loaded.");
+          setErrorSource("list");
         }
       } finally {
         if (!cancelled) setLoadingList(false);
@@ -295,7 +304,7 @@ export default function ModelReviewPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [listRetryToken]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -323,12 +332,13 @@ export default function ModelReviewPage() {
     setReview(null);
     setLoadingReview(true);
     setError(null);
+    setErrorSource(null);
     setDecisionError(null);
     setDecisionNotice(null);
     setDecisionNote("");
     setReviewToken("");
     try {
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `/api/v1/model-definitions/${modelDefinitionId}/review`,
         { cache: "no-store", headers: { Accept: "application/json" } },
       );
@@ -338,6 +348,7 @@ export default function ModelReviewPage() {
       setReview((await response.json()) as ModelReview);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Model review could not be loaded.");
+      setErrorSource("review");
     } finally {
       setLoadingReview(false);
     }
@@ -456,8 +467,16 @@ export default function ModelReviewPage() {
       </section>
 
       {error && (
-        <div role="alert" className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm text-red-700 dark:text-red-200">
-          {error}
+        <div role="alert" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm text-red-700 dark:text-red-200">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => (errorSource === "review" && selectedId !== null ? selectReview(selectedId) : retryList())}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-500/10 dark:text-red-200"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Retry
+          </button>
         </div>
       )}
 

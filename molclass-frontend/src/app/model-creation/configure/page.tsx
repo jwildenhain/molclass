@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
+import { RefreshCw } from "lucide-react";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 type ClassLabel = { label: string; supportCount: number };
 type Target = {
@@ -91,6 +93,13 @@ function ConfigureModelForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<CreationResult | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
+
+  const retry = useCallback(() => {
+    setLoading(true);
+    setError("");
+    setRetryToken((token) => token + 1);
+  }, []);
 
   useEffect(() => {
     if (!datasetIdValid) return;
@@ -98,8 +107,8 @@ function ConfigureModelForm() {
     const load = async () => {
       try {
         const [datasetResponse, optionsResponse] = await Promise.all([
-          fetch(`/api/v1/model-datasets/${datasetId}`, { cache: "no-store" }),
-          fetch("/api/v1/model-options", { cache: "no-store" }),
+          fetchWithTimeout(`/api/v1/model-datasets/${datasetId}`, { cache: "no-store" }),
+          fetchWithTimeout("/api/v1/model-options", { cache: "no-store" }),
         ]);
         const nextDataset = await apiJson<Dataset>(datasetResponse, "The selected dataset is not model-ready.");
         const nextOptions = await apiJson<ModelOptions>(optionsResponse, "Model options are unavailable.");
@@ -120,7 +129,7 @@ function ConfigureModelForm() {
     };
     void load();
     return () => { cancelled = true; };
-  }, [datasetId, datasetIdValid]);
+  }, [datasetId, datasetIdValid, retryToken]);
 
   const selectedTarget = useMemo(
     () => dataset?.targets.find((target) => target.propertyId === Number(targetPropertyId)) ?? null,
@@ -151,7 +160,7 @@ function ConfigureModelForm() {
     setSubmitting(true);
     setError("");
     try {
-      const response = await fetch("/api/v1/model-definitions", {
+      const response = await fetchWithTimeout("/api/v1/model-definitions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -176,7 +185,7 @@ function ConfigureModelForm() {
 
   if (!datasetIdValid) return <ErrorPanel message="A valid dataset_id query parameter is required." />;
   if (loading) return <div className="p-12 text-center text-muted-foreground">Loading verified model configuration...</div>;
-  if (error && !dataset) return <ErrorPanel message={error} />;
+  if (error && !dataset) return <ErrorPanel message={error} onRetry={retry} />;
   if (!dataset || !options || !selectedTarget) return <ErrorPanel message="The selected dataset has no supported target property." />;
 
   if (result) {
@@ -301,8 +310,25 @@ function InfoCard({ label, value, detail }: { label: string; value: string; deta
   );
 }
 
-function ErrorPanel({ message }: { message: string }) {
-  return <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-200" role="alert">{message}</div>;
+function ErrorPanel({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <div
+      role="alert"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-200"
+    >
+      <span>{message}</span>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-500/10 dark:text-red-200"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Retry
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default function ConfigureModelPage() {

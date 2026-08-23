@@ -2,9 +2,10 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Activity, ArrowLeft, Beaker, Clock, Search } from "lucide-react";
+import { Activity, ArrowLeft, Beaker, Clock, RefreshCw, Search } from "lucide-react";
 import Link from "next/link";
 import { MoleculeStructure } from "@/components/MoleculeStructure";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 interface MoleculeDetail {
   moleculeId: number;
@@ -70,8 +71,8 @@ export default function MoleculeDetailPage() {
     setError(null);
     try {
       const [detailResponse, historyResponse] = await Promise.all([
-        fetch(`/api/v3/molecules/${moleculeId}`, { cache: "no-store" }),
-        fetch(`/api/v3/molecules/${moleculeId}/predictions?limit=50`, { cache: "no-store" }),
+        fetchWithTimeout(`/api/v3/molecules/${moleculeId}`, { cache: "no-store" }),
+        fetchWithTimeout(`/api/v3/molecules/${moleculeId}/predictions?limit=50`, { cache: "no-store" }),
       ]);
       if (!detailResponse.ok) throw new Error(await detailResponse.text());
       if (!historyResponse.ok) throw new Error(await historyResponse.text());
@@ -98,7 +99,7 @@ export default function MoleculeDetailPage() {
     event.preventDefault();
     setSearchingModels(true);
     try {
-      const response = await fetch(`/api/v3/models?limit=100&query=${encodeURIComponent(modelQuery)}`);
+      const response = await fetchWithTimeout(`/api/v3/models?limit=100&query=${encodeURIComponent(modelQuery)}`);
       if (!response.ok) throw new Error(await response.text());
       setModels(await response.json());
     } catch {
@@ -112,7 +113,7 @@ export default function MoleculeDetailPage() {
     void (async () => {
       setSearchingModels(true);
       try {
-        const response = await fetch("/api/v3/models?limit=100&query=");
+        const response = await fetchWithTimeout("/api/v3/models?limit=100&query=");
         if (response.ok) setModels(await response.json());
       } finally {
         setSearchingModels(false);
@@ -161,8 +162,18 @@ export default function MoleculeDetailPage() {
         <Link href="/search" className="inline-flex items-center gap-1 text-sm font-semibold text-blue-500 hover:underline">
           <ArrowLeft className="h-4 w-4" /> Back to registry
         </Link>
-        <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm text-red-500">
-          {error || "Molecule not found"}
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm text-red-500">
+          <span>{error || "Molecule not found"}</span>
+          {error && Number.isFinite(moleculeId) && moleculeId > 0 && (
+            <button
+              type="button"
+              onClick={() => void loadMolecule()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-500/10 dark:text-red-200"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Retry
+            </button>
+          )}
         </div>
       </div>
     );

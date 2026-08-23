@@ -3,8 +3,9 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Activity, Database, Search, X } from "lucide-react";
+import { Activity, Database, RefreshCw, Search, X } from "lucide-react";
 import { MoleculeStructure } from "@/components/MoleculeStructure";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 interface PublishedModel {
   modelDefinitionId: number;
@@ -81,7 +82,7 @@ export function ModelMoleculeSearchPanel() {
       const found = await Promise.all(
         ids.map(async (id) => {
           try {
-            const response = await fetch(`/api/v3/molecules/${id}`, { cache: "no-store" });
+            const response = await fetchWithTimeout(`/api/v3/molecules/${id}`, { cache: "no-store" });
             if (!response.ok) return null;
             return (await response.json()) as Molecule;
           } catch {
@@ -99,7 +100,7 @@ export function ModelMoleculeSearchPanel() {
     setLoadingModels(true);
     setError(null);
     try {
-      const response = await fetch(`/api/v3/models?limit=100&query=${encodeURIComponent(query)}`);
+      const response = await fetchWithTimeout(`/api/v3/models?limit=100&query=${encodeURIComponent(query)}`);
       if (!response.ok) throw new Error(await response.text());
       setModels(await response.json());
     } catch (cause) {
@@ -113,7 +114,7 @@ export function ModelMoleculeSearchPanel() {
     let cancelled = false;
     const load = async () => {
       try {
-        const response = await fetch("/api/v3/models?limit=100&query=");
+        const response = await fetchWithTimeout("/api/v3/models?limit=100&query=");
         if (!response.ok) throw new Error(await response.text());
         const payload = (await response.json()) as PublishedModel[];
         if (cancelled) return;
@@ -220,8 +221,16 @@ export function ModelMoleculeSearchPanel() {
       </header>
 
       {error && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm text-red-500">
-          {error}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm text-red-500">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => void loadModels(modelQuery)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-500/10 dark:text-red-200"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Retry
+          </button>
         </div>
       )}
 
