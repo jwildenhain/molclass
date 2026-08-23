@@ -6,6 +6,14 @@ import { useSearchParams } from "next/navigation";
 import { Activity, Database, RefreshCw, Search, X } from "lucide-react";
 import { MoleculeStructure } from "@/components/MoleculeStructure";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+import { nextSort, SortableHeader, type SortDirection } from "@/components/SortableHeader";
+
+function compareNullableNumber(a: number | null, b: number | null, dir: 1 | -1) {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  return (a - b) * dir;
+}
 
 interface PublishedModel {
   modelDefinitionId: number;
@@ -160,6 +168,33 @@ export function ModelMoleculeSearchPanel() {
     setOutcomes([]);
   }
 
+  type ModelSortKey = "model" | "algorithm" | "features" | "split" | "holdout" | "auc" | "f1";
+  const [modelSort, setModelSort] = useState<{ key: ModelSortKey; direction: SortDirection } | null>(null);
+  const toggleModelSort = (key: ModelSortKey) => setModelSort((current) => nextSort(key, current));
+
+  const sortedModels = useMemo(() => {
+    if (!modelSort) return models;
+    const dir = modelSort.direction === "asc" ? 1 : -1;
+    return [...models].sort((a, b) => {
+      switch (modelSort.key) {
+        case "model":
+          return (a.name || `Model ${a.modelDefinitionId}`).localeCompare(b.name || `Model ${b.modelDefinitionId}`) * dir;
+        case "algorithm":
+          return a.algorithm.localeCompare(b.algorithm) * dir;
+        case "features":
+          return a.featureProfile.localeCompare(b.featureProfile) * dir;
+        case "split":
+          return ((a.trainingCount + a.validationCount + a.holdoutCount) - (b.trainingCount + b.validationCount + b.holdoutCount)) * dir;
+        case "holdout":
+          return compareNullableNumber(a.holdoutAccuracy, b.holdoutAccuracy, dir as 1 | -1);
+        case "auc":
+          return compareNullableNumber(a.holdoutAuc, b.holdoutAuc, dir as 1 | -1);
+        case "f1":
+          return compareNullableNumber(a.holdoutF1, b.holdoutF1, dir as 1 | -1);
+      }
+    });
+  }, [models, modelSort]);
+
   const selectedModels = models.filter((model) => selectedModelIds.has(model.modelDefinitionId));
   const selectedMolecules = Array.from(selectedMoleculeIds)
     .map((id) => moleculeCache.get(id))
@@ -281,17 +316,17 @@ export function ModelMoleculeSearchPanel() {
               <thead>
                 <tr className="bg-muted/50 border-b border-border/50">
                   <th className="p-4 text-muted-foreground font-semibold w-10"></th>
-                  <th className="p-4 text-muted-foreground font-semibold">Model</th>
-                  <th className="p-4 text-muted-foreground font-semibold">Algorithm</th>
-                  <th className="p-4 text-muted-foreground font-semibold">Features</th>
-                  <th className="p-4 text-muted-foreground font-semibold">Split</th>
-                  <th className="p-4 text-muted-foreground font-semibold">Holdout</th>
-                  <th className="p-4 text-muted-foreground font-semibold">AUC</th>
-                  <th className="p-4 text-muted-foreground font-semibold">F1</th>
+                  <SortableHeader label="Model" className="p-4 text-muted-foreground" active={modelSort?.key === "model"} direction={modelSort?.key === "model" ? modelSort.direction : "asc"} onClick={() => toggleModelSort("model")} />
+                  <SortableHeader label="Algorithm" className="p-4 text-muted-foreground" active={modelSort?.key === "algorithm"} direction={modelSort?.key === "algorithm" ? modelSort.direction : "asc"} onClick={() => toggleModelSort("algorithm")} />
+                  <SortableHeader label="Features" className="p-4 text-muted-foreground" active={modelSort?.key === "features"} direction={modelSort?.key === "features" ? modelSort.direction : "asc"} onClick={() => toggleModelSort("features")} />
+                  <SortableHeader label="Split" className="p-4 text-muted-foreground" active={modelSort?.key === "split"} direction={modelSort?.key === "split" ? modelSort.direction : "asc"} onClick={() => toggleModelSort("split")} />
+                  <SortableHeader label="Holdout" className="p-4 text-muted-foreground" active={modelSort?.key === "holdout"} direction={modelSort?.key === "holdout" ? modelSort.direction : "asc"} onClick={() => toggleModelSort("holdout")} />
+                  <SortableHeader label="AUC" className="p-4 text-muted-foreground" active={modelSort?.key === "auc"} direction={modelSort?.key === "auc" ? modelSort.direction : "asc"} onClick={() => toggleModelSort("auc")} />
+                  <SortableHeader label="F1" className="p-4 text-muted-foreground" active={modelSort?.key === "f1"} direction={modelSort?.key === "f1" ? modelSort.direction : "asc"} onClick={() => toggleModelSort("f1")} />
                 </tr>
               </thead>
               <tbody>
-                {models.map((model) => {
+                {sortedModels.map((model) => {
                   const checked = selectedModelIds.has(model.modelDefinitionId);
                   return (
                     <tr

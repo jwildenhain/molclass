@@ -32,6 +32,22 @@ test("lists published builds with their split and holdout evidence", async ({ pa
   await expect(secondRow).toContainText("n/a");
 });
 
+test("the model table's columns sort on click", async ({ page }) => {
+  await page.goto("/search?tab=models");
+  await expect(page.getByRole("row").filter({ hasText: "Mitochondrial uncoupler" })).toBeVisible();
+
+  const algorithmHeader = page.getByRole("columnheader", { name: "Algorithm" });
+  const dataRows = page.locator("tbody tr");
+
+  // Ascending: "KNN" (Model 98) sorts before "RandomForest" (Mitochondrial uncoupler).
+  await algorithmHeader.getByRole("button").click();
+  await expect(dataRows.first()).toContainText("Model 98");
+
+  // Clicking the same header again reverses to descending.
+  await algorithmHeader.getByRole("button").click();
+  await expect(dataRows.first()).toContainText("Mitochondrial uncoupler");
+});
+
 test("the search form sends the typed query to the registry", async ({ page }) => {
   await page.goto("/search?tab=models");
   await expect(page.getByRole("row").filter({ hasText: "Mitochondrial uncoupler" })).toBeVisible();

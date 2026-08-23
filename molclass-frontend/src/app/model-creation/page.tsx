@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+import { nextSort, SortableHeader, type SortDirection } from "@/components/SortableHeader";
 
 type ModelTarget = {
   propertyId: number;
@@ -214,6 +215,29 @@ export default function ModelCreationPage() {
     );
   }, [datasets, query]);
 
+  type SortKey = "id" | "category" | "records" | "targets" | "status";
+  const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
+  const toggleSort = (key: SortKey) => setSort((current) => nextSort(key, current));
+
+  const sorted = useMemo(() => {
+    if (!sort) return filtered;
+    const dir = sort.direction === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      switch (sort.key) {
+        case "id":
+          return (a.datasetId - b.datasetId) * dir;
+        case "category":
+          return categorize(a.description).label.localeCompare(categorize(b.description).label) * dir;
+        case "records":
+          return (a.importedRecords - b.importedRecords) * dir;
+        case "targets":
+          return (a.targets.length - b.targets.length) * dir;
+        case "status":
+          return a.status.localeCompare(b.status) * dir;
+      }
+    });
+  }, [filtered, sort]);
+
   const totalRecords = useMemo(() => datasets.reduce((sum, d) => sum + d.importedRecords, 0), [datasets]);
   const totalTargets = useMemo(() => datasets.reduce((sum, d) => sum + d.targets.length, 0), [datasets]);
   const needsReview = useMemo(
@@ -311,17 +335,17 @@ export default function ModelCreationPage() {
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="bg-muted/40 text-xs uppercase tracking-wider text-muted-foreground">
                 <tr>
-                  <th className="w-20 px-5 py-4">ID</th>
-                  <th className="px-5 py-4">Category</th>
+                  <SortableHeader label="ID" className="w-20 px-5 py-4" active={sort?.key === "id"} direction={sort?.key === "id" ? sort.direction : "asc"} onClick={() => toggleSort("id")} />
+                  <SortableHeader label="Category" className="px-5 py-4" active={sort?.key === "category"} direction={sort?.key === "category" ? sort.direction : "asc"} onClick={() => toggleSort("category")} />
                   <th className="px-5 py-4">What is this dataset?</th>
-                  <th className="px-5 py-4">Records</th>
-                  <th className="px-5 py-4">Targets</th>
-                  <th className="px-5 py-4">Import state</th>
+                  <SortableHeader label="Records" className="px-5 py-4" active={sort?.key === "records"} direction={sort?.key === "records" ? sort.direction : "asc"} onClick={() => toggleSort("records")} />
+                  <SortableHeader label="Targets" className="px-5 py-4" active={sort?.key === "targets"} direction={sort?.key === "targets" ? sort.direction : "asc"} onClick={() => toggleSort("targets")} />
+                  <SortableHeader label="Import state" className="px-5 py-4" active={sort?.key === "status"} direction={sort?.key === "status" ? sort.direction : "asc"} onClick={() => toggleSort("status")} />
                   <th className="px-5 py-4 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filtered.map((dataset) => {
+                {sorted.map((dataset) => {
                   const category = categorize(dataset.description);
                   const CategoryIcon = category.icon;
                   return (

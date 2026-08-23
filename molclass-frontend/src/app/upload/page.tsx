@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, DragEvent, FormEvent } from "react";
+import { nextSort, SortableHeader, type SortDirection } from "@/components/SortableHeader";
 
 type Phase = "select" | "uploading" | "analyzing" | "configure" | "queued";
 
@@ -130,6 +131,28 @@ export default function UploadPage() {
     () => analysis?.properties.filter((property) => property.identifierEligible) ?? [],
     [analysis],
   );
+
+  type PropertySortKey = "name" | "coverage" | "distinct" | "type";
+  const [propertySort, setPropertySort] = useState<{ key: PropertySortKey; direction: SortDirection } | null>(null);
+  const toggleUploadSort = (key: PropertySortKey) => setPropertySort((current) => nextSort(key, current));
+
+  const sortedProperties = useMemo(() => {
+    const properties = analysis?.properties ?? [];
+    if (!propertySort) return properties;
+    const dir = propertySort.direction === "asc" ? 1 : -1;
+    return [...properties].sort((a, b) => {
+      switch (propertySort.key) {
+        case "name":
+          return a.name.localeCompare(b.name) * dir;
+        case "coverage":
+          return (a.presentCount - b.presentCount) * dir;
+        case "distinct":
+          return (a.distinctCount - b.distinctCount) * dir;
+        case "type":
+          return a.inferredSqlType.localeCompare(b.inferredSqlType) * dir;
+      }
+    });
+  }, [analysis, propertySort]);
 
   const reset = () => {
     setPhase("select");
@@ -469,14 +492,14 @@ export default function UploadPage() {
                           <tr>
                             <th className="px-4 py-3">Import</th>
                             <th className="px-4 py-3">Identifier</th>
-                            <th className="px-4 py-3">Property</th>
-                            <th className="px-4 py-3">Coverage</th>
-                            <th className="px-4 py-3">Distinct</th>
-                            <th className="px-4 py-3">MySQL type</th>
+                            <SortableHeader label="Property" className="px-4 py-3" active={propertySort?.key === "name"} direction={propertySort?.key === "name" ? propertySort.direction : "asc"} onClick={() => toggleUploadSort("name")} />
+                            <SortableHeader label="Coverage" className="px-4 py-3" active={propertySort?.key === "coverage"} direction={propertySort?.key === "coverage" ? propertySort.direction : "asc"} onClick={() => toggleUploadSort("coverage")} />
+                            <SortableHeader label="Distinct" className="px-4 py-3" active={propertySort?.key === "distinct"} direction={propertySort?.key === "distinct" ? propertySort.direction : "asc"} onClick={() => toggleUploadSort("distinct")} />
+                            <SortableHeader label="MySQL type" className="px-4 py-3" active={propertySort?.key === "type"} direction={propertySort?.key === "type" ? propertySort.direction : "asc"} onClick={() => toggleUploadSort("type")} />
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                          {analysis.properties.map((property) => (
+                          {sortedProperties.map((property) => (
                             <tr key={property.name} className="bg-background/30">
                               <td className="px-4 py-3">
                                 <input
