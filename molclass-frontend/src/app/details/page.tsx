@@ -1,10 +1,11 @@
 export default function DetailsPage() {
   return (
     <div className="max-w-4xl mx-auto mt-12 space-y-12">
-      <div className="text-center space-y-4">
-        <h1 className="text-4xl font-bold text-foreground">About MolClass</h1>
-        <p className="text-xl text-muted-foreground">High-throughput bioactivity prediction via modern machine learning ensembles.</p>
-      </div>
+      <header>
+        <p className="font-mono text-xs uppercase tracking-[0.28em] text-blue-500">Project info</p>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-5xl">About MolClass</h1>
+        <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">High-throughput bioactivity prediction via modern machine learning ensembles.</p>
+      </header>
 
       <div className="bg-card/50 backdrop-blur-md rounded-2xl border border-border shadow-2xl p-8 space-y-8">
         
