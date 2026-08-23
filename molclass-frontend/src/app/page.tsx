@@ -46,8 +46,8 @@ export default function Home() {
           </div>
         </Link>
 
-        {/* Structure Search Card */}
-        <Link href="/structure-search" className="group relative p-1 rounded-2xl bg-gradient-to-br from-purple-500/30 to-pink-500/30 hover:from-purple-500/50 hover:to-pink-500/50 transition-all duration-300 shadow-xl shadow-purple-900/20">
+        {/* Search Card */}
+        <Link href="/search" className="group relative p-1 rounded-2xl bg-gradient-to-br from-purple-500/30 to-pink-500/30 hover:from-purple-500/50 hover:to-pink-500/50 transition-all duration-300 shadow-xl shadow-purple-900/20">
           <div className="bg-card/80 backdrop-blur-sm p-8 rounded-xl h-full border border-border/50 flex flex-col justify-between group-hover:bg-card/60 transition-colors">
             <div>
               <div className="w-12 h-12 rounded-lg bg-purple-500/20 flex items-center justify-center mb-6 border border-purple-500/30">

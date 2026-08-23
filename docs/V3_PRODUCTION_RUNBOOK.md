@@ -481,7 +481,7 @@ Run the JAR under a supervisor using predictor-only database credentials.
 curl --fail --silent --show-error http://127.0.0.1:3000/
 curl --fail --silent --show-error http://127.0.0.1:3000/upload
 curl --fail --silent --show-error http://127.0.0.1:3000/model-review
-curl --fail --silent --show-error http://127.0.0.1:3000/structure-search
+curl --fail --silent --show-error http://127.0.0.1:3000/search
 ```
 
 Verify in a browser that upload analysis, property selection, import progress,

@@ -13,7 +13,7 @@ export default function PredictionListPage() {
       </header>
 
       <section className="mt-10 grid gap-5 md:grid-cols-2">
-        <Link href="/prediction-list/models" className="group relative overflow-hidden rounded-3xl border border-blue-500/20 bg-blue-500/5 p-8 shadow-xl transition hover:-translate-y-1 hover:border-blue-500/50 hover:shadow-2xl">
+        <Link href="/search?tab=models" className="group relative overflow-hidden rounded-3xl border border-blue-500/20 bg-blue-500/5 p-8 shadow-xl transition hover:-translate-y-1 hover:border-blue-500/50 hover:shadow-2xl">
           <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-blue-500/10 blur-2xl" />
           <div className="relative">
             <div className="grid h-14 w-14 place-items-center rounded-2xl bg-blue-500/15 text-blue-600 dark:text-blue-300"><Network className="h-7 w-7" /></div>

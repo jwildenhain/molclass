@@ -57,6 +57,20 @@ type ImportAccepted = {
   idempotentReplay: boolean;
 };
 
+type ImportRunStatus = {
+  importRunId: number;
+  datasetId: number;
+  datasetName: string;
+  status: string;
+  totalRecords: number;
+  successRecords: number;
+  failedRecords: number;
+  notProcessedRecords: number;
+  job: { status: string; errorMessage: string | null } | null;
+};
+
+const TERMINAL_IMPORT_STATUSES = new Set(["SUCCEEDED", "PARTIAL", "FAILED", "CANCELLED"]);
+
 const phases: Array<{ key: Phase; number: string; label: string }> = [
   { key: "select", number: "01", label: "Upload" },
   { key: "analyzing", number: "02", label: "Analyze" },
@@ -107,6 +121,7 @@ export default function UploadPage() {
   const [datasetName, setDatasetName] = useState("");
   const [description, setDescription] = useState("");
   const [importResult, setImportResult] = useState<ImportAccepted | null>(null);
+  const [importStatus, setImportStatus] = useState<ImportRunStatus | null>(null);
   const [submittingImport, setSubmittingImport] = useState(false);
   const [error, setError] = useState("");
 
@@ -128,6 +143,7 @@ export default function UploadPage() {
     setDatasetName("");
     setDescription("");
     setImportResult(null);
+    setImportStatus(null);
     setError("");
     if (inputRef.current) inputRef.current.value = "";
   };
@@ -210,6 +226,38 @@ export default function UploadPage() {
       if (timer) clearTimeout(timer);
     };
   }, [phase, uploadId]);
+
+  useEffect(() => {
+    if (phase !== "queued" || importResult === null) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/v1/imports/${importResult.importRunId}`, { cache: "no-store" });
+        const status = await apiJson<ImportRunStatus>(response, "Could not read import progress.");
+        if (cancelled) return;
+        setImportStatus(status);
+
+        const done = TERMINAL_IMPORT_STATUSES.has(status.status)
+          || status.job?.status === "FAILED"
+          || status.job?.status === "CANCELLED";
+        if (done) return;
+
+        timer = setTimeout(poll, 1500);
+      } catch {
+        if (cancelled) return;
+        timer = setTimeout(poll, 3000);
+      }
+    };
+
+    void poll();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [phase, importResult]);
 
   const submitUpload = async (event: FormEvent) => {
     event.preventDefault();
@@ -498,25 +546,88 @@ export default function UploadPage() {
               </form>
             )}
 
-            {phase === "queued" && importResult && (
-              <div className="space-y-6">
-                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-7">
-                  <p className="font-mono text-xs uppercase tracking-[0.24em] text-emerald-300">Import accepted</p>
-                  <h2 className="mt-3 text-2xl font-bold text-foreground">Dataset {importResult.datasetId} is in the durable queue.</h2>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-                    Job {importResult.jobId} will commit one molecule record at a time. A malformed molecule is audited and skipped without rolling back successful records.
-                  </p>
-                  <div className="mt-5 flex flex-wrap gap-3 font-mono text-xs text-emerald-200">
-                    <span className="rounded-lg bg-black/20 px-3 py-2">run {importResult.importRunId}</span>
-                    <span className="rounded-lg bg-black/20 px-3 py-2">status {importResult.status}</span>
-                    {importResult.idempotentReplay && <span className="rounded-lg bg-black/20 px-3 py-2">idempotent replay</span>}
+            {phase === "queued" && importResult && (() => {
+              const processed = importStatus
+                ? importStatus.successRecords + importStatus.failedRecords + importStatus.notProcessedRecords
+                : 0;
+              const total = importStatus?.totalRecords ?? 0;
+              const percent = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+              const done = importStatus ? TERMINAL_IMPORT_STATUSES.has(importStatus.status) : false;
+              const failedOrSkipped = importStatus
+                ? importStatus.failedRecords + importStatus.notProcessedRecords
+                : 0;
+              const tone = !done
+                ? { border: "border-sky-500/30", bg: "bg-sky-500/10", label: "text-sky-300", bar: "bg-sky-500" }
+                : importStatus?.status === "SUCCEEDED"
+                  ? { border: "border-emerald-500/30", bg: "bg-emerald-500/10", label: "text-emerald-300", bar: "bg-emerald-500" }
+                  : importStatus?.status === "PARTIAL"
+                    ? { border: "border-amber-500/30", bg: "bg-amber-500/10", label: "text-amber-300", bar: "bg-amber-500" }
+                    : { border: "border-red-500/30", bg: "bg-red-500/10", label: "text-red-300", bar: "bg-red-500" };
+              return (
+                <div className="space-y-6">
+                  <div className={`rounded-2xl border ${tone.border} ${tone.bg} p-7`}>
+                    <p className={`font-mono text-xs uppercase tracking-[0.24em] ${tone.label}`}>
+                      {done ? `Import ${importStatus?.status.toLowerCase()}` : "Loading molecules"}
+                    </p>
+                    <h2 className="mt-3 text-2xl font-bold text-foreground">
+                      {done
+                        ? `Dataset ${importResult.datasetId} finished importing.`
+                        : `Dataset ${importResult.datasetId} is loading into the registry.`}
+                    </h2>
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+                      Job {importResult.jobId} commits one molecule record at a time. A malformed molecule is audited and skipped without rolling back successful records.
+                    </p>
+
+                    {importStatus && total > 0 && (
+                      <div className="mt-6">
+                        <div className="flex items-baseline justify-between text-sm">
+                          <span className="font-semibold text-foreground">
+                            {processed.toLocaleString()} of {total.toLocaleString()} records loaded
+                          </span>
+                          <span className="font-mono text-xs text-muted-foreground">{percent}%</span>
+                        </div>
+                        <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-black/20">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${tone.bar}`}
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-3 font-mono text-xs">
+                          <span className="rounded-lg bg-black/20 px-3 py-2 text-emerald-200">
+                            {importStatus.successRecords.toLocaleString()} succeeded
+                          </span>
+                          {importStatus.failedRecords > 0 && (
+                            <span className="rounded-lg bg-black/20 px-3 py-2 text-red-200">
+                              {importStatus.failedRecords.toLocaleString()} failed
+                            </span>
+                          )}
+                          {importStatus.notProcessedRecords > 0 && (
+                            <span className="rounded-lg bg-black/20 px-3 py-2 text-amber-200">
+                              {importStatus.notProcessedRecords.toLocaleString()} not processed
+                            </span>
+                          )}
+                        </div>
+                        {done && failedOrSkipped > 0 && (
+                          <p className="mt-4 text-sm leading-6 text-muted-foreground">
+                            {failedOrSkipped.toLocaleString()} record{failedOrSkipped === 1 ? "" : "s"} did not import cleanly.
+                            The dataset is still usable with the records that succeeded.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="mt-5 flex flex-wrap gap-3 font-mono text-xs text-muted-foreground">
+                      <span className="rounded-lg bg-black/20 px-3 py-2">run {importResult.importRunId}</span>
+                      <span className="rounded-lg bg-black/20 px-3 py-2">status {importStatus?.status ?? importResult.status}</span>
+                      {importResult.idempotentReplay && <span className="rounded-lg bg-black/20 px-3 py-2">idempotent replay</span>}
+                    </div>
                   </div>
+                  <button type="button" onClick={reset} className="rounded-xl border border-border px-5 py-3 font-semibold text-foreground transition hover:border-sky-500/50 hover:bg-sky-500/5">
+                    Import another dataset
+                  </button>
                 </div>
-                <button type="button" onClick={reset} className="rounded-xl border border-border px-5 py-3 font-semibold text-foreground transition hover:border-sky-500/50 hover:bg-sky-500/5">
-                  Import another dataset
-                </button>
-              </div>
-            )}
+              );
+            })()}
 
             {error && (
               <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200" role="alert">

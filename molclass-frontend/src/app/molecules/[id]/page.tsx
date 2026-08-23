@@ -158,7 +158,7 @@ export default function MoleculeDetailPage() {
   if (error || !molecule) {
     return (
       <div className="mx-auto mt-12 max-w-3xl">
-        <Link href="/structure-search" className="inline-flex items-center gap-1 text-sm font-semibold text-blue-500 hover:underline">
+        <Link href="/search" className="inline-flex items-center gap-1 text-sm font-semibold text-blue-500 hover:underline">
           <ArrowLeft className="h-4 w-4" /> Back to registry
         </Link>
         <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm text-red-500">
@@ -170,7 +170,7 @@ export default function MoleculeDetailPage() {
 
   return (
     <div className="max-w-6xl mx-auto mt-12 space-y-8">
-      <Link href="/structure-search" className="inline-flex items-center gap-1 text-sm font-semibold text-blue-500 hover:underline">
+      <Link href="/search" className="inline-flex items-center gap-1 text-sm font-semibold text-blue-500 hover:underline">
         <ArrowLeft className="h-4 w-4" /> Back to registry
       </Link>
 

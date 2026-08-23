@@ -106,7 +106,13 @@ public class V3PredictionService {
                 .append("mb.training_count,mb.validation_count,mb.holdout_count,mb.excluded_count,")
                 .append("mb.published_at,(SELECT me.metric_value FROM ").append(t("model_evaluation"))
                 .append(" me WHERE me.model_build_id=mb.model_build_id AND me.evaluation_set='HOLDOUT'")
-                .append(" AND me.metric_code='ACCURACY' LIMIT 1) holdout_accuracy FROM ")
+                .append(" AND me.metric_code='ACCURACY' LIMIT 1) holdout_accuracy,")
+                .append("(SELECT me.metric_value FROM ").append(t("model_evaluation"))
+                .append(" me WHERE me.model_build_id=mb.model_build_id AND me.evaluation_set='HOLDOUT'")
+                .append(" AND me.metric_code='WEIGHTED_AUC' LIMIT 1) holdout_auc,")
+                .append("(SELECT me.metric_value FROM ").append(t("model_evaluation"))
+                .append(" me WHERE me.model_build_id=mb.model_build_id AND me.evaluation_set='HOLDOUT'")
+                .append(" AND me.metric_code='WEIGHTED_F1' LIMIT 1) holdout_f1 FROM ")
                 .append(t("model_definition")).append(" md JOIN ").append(t("model_build"))
                 .append(" mb ON mb.model_build_id=md.published_model_build_id JOIN ")
                 .append(t("feature_profile")).append(" fp ON fp.feature_profile_id=md.feature_profile_id")
@@ -135,6 +141,8 @@ public class V3PredictionService {
                     row.put("holdoutCount", rows.getLong(9));row.put("excludedCount", rows.getLong(10));
                     row.put("publishedAt", rows.getTimestamp(11));
                     double accuracy = rows.getDouble(12);row.put("holdoutAccuracy", rows.wasNull() ? null : accuracy);
+                    double auc = rows.getDouble(13);row.put("holdoutAuc", rows.wasNull() ? null : auc);
+                    double f1 = rows.getDouble(14);row.put("holdoutF1", rows.wasNull() ? null : f1);
                     result.add(row);
                 }
                 return result;

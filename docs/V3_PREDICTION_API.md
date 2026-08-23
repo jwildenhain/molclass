@@ -2,7 +2,7 @@
 
 The Spring Boot predictor exposes only human-published v3 builds under `/api/v3`.
 
-- `GET /api/v3/models?query=&limit=100` searches published model names, algorithms, profiles, and legacy IDs.
+- `GET /api/v3/models?query=&limit=100` searches published model names, algorithms, profiles, and legacy IDs. Each result carries `holdoutAccuracy`, `holdoutAuc` (`WEIGHTED_AUC`), and `holdoutF1` (`WEIGHTED_F1`) pulled from `model_evaluation` for that build's `HOLDOUT` set; any metric missing for a build (e.g. a degenerate confusion matrix) comes back `null` rather than a synthetic 0.
 - `GET /api/v3/molecules?query=&limit=25` performs indexed exact lookup by molecule ID, InChIKey, SDF source identifier, or canonical SMILES, then falls back to a primary-name prefix.
 - `POST /api/v3/models/{modelDefinitionId}/molecules/{moleculeId}/predict` predicts one existing v3 molecule.
 

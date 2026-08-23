@@ -1,6 +1,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -9,6 +10,11 @@ from app.database import get_v3_db
 
 router = APIRouter(prefix="/api/v1", tags=["v3 datasets"])
 DATASET_STATUSES = {"MIGRATED", "IMPORTING", "READY", "PARTIAL", "FAILED"}
+
+
+class DatasetUpdateRequest(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=65535)
 
 
 @router.get("/datasets")
@@ -95,4 +101,37 @@ def datasets(
             }
             for row in rows
         ],
+    }
+
+
+@router.patch("/datasets/{dataset_id}")
+def update_dataset(
+    dataset_id: int,
+    request: DatasetUpdateRequest,
+    db: Session = Depends(get_v3_db),
+):
+    fields = request.model_dump(exclude_unset=True)
+    if not fields:
+        raise HTTPException(status_code=422, detail={"code": "NO_FIELDS_TO_UPDATE"})
+    if "name" in fields and fields["name"] is not None:
+        fields["name"] = fields["name"].strip()
+        if not fields["name"]:
+            raise HTTPException(status_code=422, detail={"code": "NAME_REQUIRED"})
+    set_clause = ",".join(f"{column}=:{column}" for column in fields)
+    result = db.execute(
+        text(f"UPDATE dataset SET {set_clause} WHERE dataset_id=:dataset_id"),
+        {**fields, "dataset_id": dataset_id},
+    )
+    if result.rowcount == 0:
+        db.rollback()
+        raise HTTPException(status_code=404, detail={"code": "DATASET_NOT_FOUND"})
+    db.commit()
+    row = db.execute(
+        text("SELECT dataset_id,name,description FROM dataset WHERE dataset_id=:dataset_id"),
+        {"dataset_id": dataset_id},
+    ).mappings().one()
+    return {
+        "datasetId": row["dataset_id"],
+        "name": row["name"],
+        "description": row["description"],
     }

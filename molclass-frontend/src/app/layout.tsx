@@ -33,7 +33,7 @@ export default function RootLayout({
                     <div className="flex items-baseline space-x-4">
                       <Link href="/upload" className="text-muted-foreground hover:text-foreground hover:bg-muted px-3 py-2 rounded-md text-sm font-medium transition-colors">Upload</Link>
                       <Link href="/model-creation" className="text-muted-foreground hover:text-foreground hover:bg-muted px-3 py-2 rounded-md text-sm font-medium transition-colors">Model Creation</Link>
-                      <Link href="/structure-search" className="text-muted-foreground hover:text-foreground hover:bg-muted px-3 py-2 rounded-md text-sm font-medium transition-colors">Structure Search</Link>
+                      <Link href="/search" className="text-muted-foreground hover:text-foreground hover:bg-muted px-3 py-2 rounded-md text-sm font-medium transition-colors">Search</Link>
                       <Link href="/model-review" className="text-muted-foreground hover:text-foreground hover:bg-muted px-3 py-2 rounded-md text-sm font-medium transition-colors">Model Review</Link>
                       <Link href="/prediction-list" className="text-muted-foreground hover:text-foreground hover:bg-muted px-3 py-2 rounded-md text-sm font-medium transition-colors">Prediction List</Link>
                       <Link href="/details" className="text-muted-foreground hover:text-foreground hover:bg-muted px-3 py-2 rounded-md text-sm font-medium transition-colors">Details</Link>
@@ -47,8 +47,8 @@ export default function RootLayout({
                     </summary>
                     <ul className="absolute right-0 mt-2 w-52 space-y-1 rounded-md border border-border bg-background p-2 shadow-lg">
                       <li>
-                        <Link href="/structure-search" className="block rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                          Structure Search
+                        <Link href="/search" className="block rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                          Search
                         </Link>
                       </li>
                       <li>

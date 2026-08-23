@@ -10,7 +10,7 @@ import { stubBackend } from "./fixtures/backend";
 const ROUTES = [
   { link: "Upload", path: "/upload", heading: "Inspect the chemistry before it enters the model pipeline." },
   { link: "Model Creation", path: "/model-creation", heading: "Choose a dataset with a verified target." },
-  { link: "Structure Search", path: "/structure-search", heading: "Find a molecule without loading a model." },
+  { link: "Search", path: "/search", heading: "Search" },
   { link: "Model Review", path: "/model-review", heading: "Model build review" },
   { link: "Prediction List", path: "/prediction-list", heading: "Choose the registry, not a legacy batch." },
   { link: "Details", path: "/details", heading: "About MolClass" },
@@ -54,7 +54,7 @@ test("mobile viewport exposes navigation through the Menu disclosure", async ({ 
   await expect(menu).toBeVisible();
   await menu.click();
 
-  await expect(nav.getByRole("link", { name: "Structure Search", exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Search", exact: true })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Model Review", exact: true })).toBeVisible();
 });
 

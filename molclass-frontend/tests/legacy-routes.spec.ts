@@ -14,8 +14,10 @@ import { stubBackend } from "./fixtures/backend";
 const REDIRECTS = [
   { from: "/prediction-list/batches", to: "/dataset-review" },
   { from: "/prediction-list/batches/1", to: "/dataset-review" },
-  { from: "/prediction-list/1", to: "/prediction-list/models" },
-  { from: "/prediction-list/models/1", to: "/prediction-list/models" },
+  { from: "/prediction-list/1", to: "/search\\?tab=models" },
+  { from: "/prediction-list/models/1", to: "/search\\?tab=models" },
+  { from: "/prediction-list/models", to: "/search\\?tab=models" },
+  { from: "/structure-search", to: "/search" },
 ];
 
 test.beforeEach(async ({ page }) => {
@@ -38,7 +40,7 @@ test("the prediction hub offers the registry views, not legacy batches", async (
   const modelCard = page.getByRole("link", { name: /Model and molecule search/ });
   const datasetCard = page.getByRole("link", { name: /Dataset registry/ });
 
-  await expect(modelCard).toHaveAttribute("href", "/prediction-list/models");
+  await expect(modelCard).toHaveAttribute("href", "/search?tab=models");
   await expect(datasetCard).toHaveAttribute("href", "/dataset-review");
 });
 

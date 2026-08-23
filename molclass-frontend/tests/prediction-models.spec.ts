@@ -8,9 +8,10 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("lists published builds with their split and holdout evidence", async ({ page }) => {
-  await page.goto("/prediction-list/models");
+  await page.goto("/search?tab=models");
 
-  await expect(page.getByRole("heading", { level: 1, name: "Classification models" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Search" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Classification models" })).toBeVisible();
   await expect(page.getByText(`${publishedModels.length} published`)).toBeVisible();
 
   const headers = page.getByRole("columnheader");
@@ -32,7 +33,7 @@ test("lists published builds with their split and holdout evidence", async ({ pa
 });
 
 test("the search form sends the typed query to the registry", async ({ page }) => {
-  await page.goto("/prediction-list/models");
+  await page.goto("/search?tab=models");
   await expect(page.getByRole("row").filter({ hasText: "Mitochondrial uncoupler" })).toBeVisible();
 
   const request = page.waitForRequest((candidate) =>
@@ -46,7 +47,7 @@ test("the search form sends the typed query to the registry", async ({ page }) =
 
 test("explains an empty registry instead of showing a bare table", async ({ page }) => {
   await stubEndpoint(page, routes.publishedModels, []);
-  await page.goto("/prediction-list/models");
+  await page.goto("/search?tab=models");
 
   await expect(page.getByRole("heading", { name: "No published v3 models" })).toBeVisible();
   await expect(page.getByText("Rebuilt models remain unavailable here until a human approves them.")).toBeVisible();
@@ -55,16 +56,19 @@ test("explains an empty registry instead of showing a bare table", async ({ page
 
 test("surfaces a registry failure as an error, never as an empty success", async ({ page }) => {
   await stubEndpoint(page, routes.publishedModels, { detail: "predictor unavailable" }, 503);
-  await page.goto("/prediction-list/models");
+  await page.goto("/search?tab=models");
 
   await expect(page.getByText(/predictor unavailable/)).toBeVisible();
   await expect(page.getByRole("table")).toHaveCount(0);
 });
 
 test("runs a prediction once a model and a molecule are selected", async ({ page }) => {
-  await page.goto("/prediction-list/models");
+  // Molecules are picked on the structure-search tab and handed over via ?molecules=;
+  // this panel has no inline molecule search of its own.
+  await page.goto("/search?tab=models&molecules=4711");
 
   const runButton = page.getByRole("button", { name: "Run approved model" });
+  await expect(page.getByText("Caffeine")).toBeVisible();
   await expect(runButton).toBeDisabled();
 
   const modelCheckbox = page.getByRole("row")
@@ -73,12 +77,6 @@ test("runs a prediction once a model and a molecule are selected", async ({ page
   await modelCheckbox.check();
   await expect(modelCheckbox).toBeChecked();
   await expect(page.getByText("1 of 2 selected")).toBeVisible();
-  await expect(runButton).toBeDisabled();
-
-  await page.getByPlaceholder("Compound identifier").fill("caffeine");
-  await page.getByRole("button", { name: "Search" }).nth(1).click();
-
-  await page.getByRole("button", { name: /ZINC000000000123/ }).click();
   await expect(runButton).toBeEnabled();
 
   await runButton.click();
@@ -94,15 +92,13 @@ test("runs a prediction once a model and a molecule are selected", async ({ page
 
 test("reports a failed prediction without clearing the selection", async ({ page }) => {
   await stubEndpoint(page, routes.predict, { detail: "no artifact published for build" }, 409);
-  await page.goto("/prediction-list/models");
+  await page.goto("/search?tab=models&molecules=4711");
+  await expect(page.getByText("Caffeine")).toBeVisible();
 
   const modelCheckbox = page.getByRole("row")
     .filter({ hasText: "Mitochondrial uncoupler" })
     .getByRole("checkbox");
   await modelCheckbox.check();
-  await page.getByPlaceholder("Compound identifier").fill("caffeine");
-  await page.getByRole("button", { name: "Search" }).nth(1).click();
-  await page.getByRole("button", { name: /ZINC000000000123/ }).click();
   await page.getByRole("button", { name: "Run approved model" }).click();
 
   await expect(page.getByText(/no artifact published for build/)).toBeVisible();
