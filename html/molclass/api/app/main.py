@@ -16,6 +16,7 @@ from app.database import get_db, SessionLocal
 from app.v3_uploads import router as v3_upload_router
 from app.v3_models import router as v3_model_router
 from app.v3_datasets import router as v3_dataset_router
+from app.v3_molecules import router as v3_molecules_router
 from app.config import settings
 from app.schemas import (
     Dataset, ModelSummary, ModelDetail, CompoundIdResponse, ModelFingerprint,
@@ -45,6 +46,7 @@ app.add_middleware(
 app.include_router(v3_upload_router)
 app.include_router(v3_model_router)
 app.include_router(v3_dataset_router)
+app.include_router(v3_molecules_router)
 
 def _is_data_intake_route(method: str, path: str) -> bool:
     if method != "POST":
@@ -52,6 +54,8 @@ def _is_data_intake_route(method: str, path: str) -> bool:
     if path == "/api/v1/uploads":
         return True
     if path.startswith("/api/v1/uploads/") and path.endswith("/imports"):
+        return True
+    if path == "/api/v1/molecules/predict":
         return True
     return path == "/api/v1/model-definitions"
 

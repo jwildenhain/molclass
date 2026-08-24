@@ -248,7 +248,9 @@ def get_job(job_id: int, db: Session = Depends(get_v3_db)):
                    j.cancel_requested_at,j.error_code,j.error_message,j.created_at,
                    j.started_at,j.heartbeat_at,j.finished_at,
                    ir.import_run_id,ir.dataset_id,ir.total_records,ir.success_records,
-                   ir.failed_records,ir.not_processed_records
+                   ir.failed_records,ir.not_processed_records,
+                   (SELECT je.event_details_json FROM job_event je
+                     WHERE je.job_id=j.job_id ORDER BY je.job_event_id DESC LIMIT 1) AS result
               FROM job j
               LEFT JOIN import_run ir ON ir.job_id=j.job_id
              WHERE j.job_id=:job_id
@@ -258,7 +260,10 @@ def get_job(job_id: int, db: Session = Depends(get_v3_db)):
     ).mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail={"code": "JOB_NOT_FOUND"})
-    return dict(row)
+    job = dict(row)
+    if job["result"]:
+        job["result"] = _analysis(job["result"])
+    return job
 
 
 @router.post("/uploads/{upload_id}/imports", status_code=status.HTTP_202_ACCEPTED)

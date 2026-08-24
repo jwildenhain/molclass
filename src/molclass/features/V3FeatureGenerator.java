@@ -726,6 +726,79 @@ public final class V3FeatureGenerator {
         }
     }
 
+    /**
+     * Computes and persists the standard descriptor/fingerprint set for one already-inserted
+     * molecule, for the ad-hoc single-molecule prediction pipeline. Unlike a batch {@link
+     * Generator} run, this never touches the shared descriptor_generation / fingerprint_definition
+     * / feature_profile_component catalog rows, and takes no cross-run lock -- it only reads the
+     * catalog identities a normal batch run has already established, on the connection the caller
+     * supplies. A model-specific feature_profile only ever *selects* a subset of this same
+     * standard set (see the hardcoded profile map in {@link Generator#linkFeatureProfiles}), so
+     * computing all of it up front works for prediction against any model, not just one profile.
+     *
+     * Throws IllegalStateException if a batch feature-generation run has never established the
+     * catalog rows this reads -- there is deliberately no fallback that would create them here,
+     * since that is exactly the shared, lock-guarded mutation this method exists to avoid.
+     */
+    public static void registerFeaturesForMolecule(
+            Connection connection, String schema, long jobId,
+            long moleculeId, byte[] structure, String canonicalSmiles) throws Exception {
+        long descriptorGenerationId = requireDescriptorGenerationId(connection, schema);
+        List<FingerprintDefinition> definitions = requireFingerprintDefinitions(connection, schema);
+        DescriptorCatalog catalog = DescriptorCatalog.create();
+        FeatureCalculator calculator = new FeatureCalculator(catalog, definitions);
+        FeatureResult result = calculator.calculate(moleculeId, structure, canonicalSmiles);
+        try (FeatureWriter writer = new FeatureWriter(
+                connection, schema, descriptorGenerationId, definitions, jobId, 1)) {
+            writer.write(result);
+            writer.commit();
+        }
+        if ("FAILED".equals(result.descriptor().status())) {
+            throw new IllegalStateException(
+                    "descriptor calculation failed: " + result.descriptor().errorMessage());
+        }
+    }
+
+    private static long requireDescriptorGenerationId(Connection connection, String schema)
+            throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT descriptor_generation_id FROM " + table(schema, "descriptor_generation")
+                        + " WHERE generation_name = ?")) {
+            statement.setString(1, DESCRIPTOR_NAME);
+            try (ResultSet row = statement.executeQuery()) {
+                if (!row.next()) {
+                    throw new IllegalStateException(
+                            "no descriptor_generation row for '" + DESCRIPTOR_NAME + "' -- "
+                                    + "run generateV3Features at least once before ad-hoc registration");
+                }
+                return row.getLong(1);
+            }
+        }
+    }
+
+    private static List<FingerprintDefinition> requireFingerprintDefinitions(
+            Connection connection, String schema) throws Exception {
+        List<FingerprintDefinition> result = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT fingerprint_definition_id FROM " + table(schema, "fingerprint_definition")
+                        + " WHERE fingerprint_code = ? AND generation_version = ?")) {
+            for (FingerprintSpec spec : FINGERPRINTS) {
+                statement.setString(1, spec.code());
+                statement.setString(2, GENERATION_VERSION);
+                try (ResultSet row = statement.executeQuery()) {
+                    if (!row.next()) {
+                        throw new IllegalStateException(
+                                "no fingerprint_definition row for '" + spec.code() + "' -- "
+                                        + "run generateV3Features at least once before ad-hoc registration");
+                    }
+                    result.add(new FingerprintDefinition(
+                            spec, row.getLong(1), createFingerprinter(spec.code()).getSize()));
+                }
+            }
+        }
+        return List.copyOf(result);
+    }
+
     private static final class FeatureCalculator {
         private final List<IMolecularDescriptor> descriptors;
         private final List<String> descriptorNames;

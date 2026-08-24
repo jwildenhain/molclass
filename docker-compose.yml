@@ -91,8 +91,13 @@ services:
       db:
         condition: service_healthy
     read_only: true
+    # exec, not just size/mode: CDK's InChI generation extracts a native library
+    # (jna-inchi) to /tmp and mmaps it PROT_EXEC. Docker's tmpfs mounts noexec by
+    # default, which fails that mmap with "failed to map segment from shared
+    # object" -- V3SdfImporter's InChI step was silently falling back to its
+    # no-InChI/salted-hash identity path for every single molecule as a result.
     tmpfs:
-      - /tmp:size=2g,mode=1777
+      - /tmp:size=2g,mode=1777,exec
     cap_drop:
       - ALL
     security_opt:
@@ -126,6 +131,37 @@ services:
       - no-new-privileges:true
     pids_limit: 512
     mem_limit: "${MOLCLASS_MODEL_WORKER_MEMORY:-16g}"
+
+  molecule-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: molecule-worker
+    restart: unless-stopped
+    command: ["--poll-seconds", "2", "--lease-seconds", "120"]
+    environment:
+      MOLCLASS_JDBC_URL: jdbc:mysql://db:3306/molclass_v3
+      MOLCLASS_V3_SCHEMA: molclass_v3
+      MOLCLASS_DB_USER: "${MOLCLASS_DB_USER:-molclass_app}"
+      MOLCLASS_DB_PASSWORD: "${MOLCLASS_DB_PASSWORD:?set MOLCLASS_DB_PASSWORD in an untracked environment file}"
+      MOLCLASS_PREDICTOR_URL: "http://predictor:8082"
+    depends_on:
+      db:
+        condition: service_healthy
+      predictor:
+        condition: service_healthy
+    read_only: true
+    # exec: see the identical comment on sdf-worker's tmpfs above -- same InChI
+    # native-library mmap requirement, needed here too since
+    # V3AdhocMoleculeRegistrar calls the same InChIGeneratorFactory.
+    tmpfs:
+      - /tmp:size=1g,mode=1777,exec
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: "${MOLCLASS_MOLECULE_WORKER_MEMORY:-1g}"
 
   predictor:
     build:

@@ -13,8 +13,20 @@ USER molclass
 EXPOSE 8082
 ENTRYPOINT ["java", "-jar", "app.jar"]
 
-FROM eclipse-temurin:17-jre-alpine AS sdf-worker
-RUN addgroup -S molclass && adduser -S -G molclass molclass
+FROM eclipse-temurin:17-jre AS sdf-worker
+# Not -alpine: CDK's InChI generation loads a prebuilt native library (jna-inchi).
+# Two separate problems compound here, found by fixing one at a time and watching
+# the failure mode change: (1) it's compiled against glibc, and the segfault deep
+# inside the native InChI algorithm (not a load failure) only shows up once
+# loading itself is possible -- Alpine's musl libc is not ABI-compatible enough,
+# gcompat's partial shim included; (2) separately, docker-compose.yml's tmpfs
+# mount for /tmp needs the `exec` option, since JNA extracts and mmaps this
+# library from there (see that file for details). Both were needed together --
+# fixing only the tmpfs option surfaced the segfault instead of hiding it as a
+# clean load failure. V3SdfImporter's InChI step was silently falling back to
+# its no-InChI/salted-hash identity path for every single molecule as a result
+# of whichever of the two was still broken.
+RUN groupadd --system molclass && useradd --system --gid molclass --home /app molclass
 WORKDIR /app
 # installDist names its output dir after settings.gradle's rootProject.name (MolClass), not
 # the lowercase artifact/entrypoint naming used elsewhere in this file.
@@ -43,3 +55,13 @@ COPY --from=builder --chown=molclass:molclass /app/build/install/MolClass/lib ./
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 USER molclass
 ENTRYPOINT ["java", "-cp", "/app/lib/*", "molclass.models.V3ModelPipelineWorker"]
+
+FROM eclipse-temurin:17-jre AS molecule-worker
+# Not -alpine -- see the sdf-worker stage above for the full explanation.
+# V3AdhocMoleculeRegistrar calls the same InChIGeneratorFactory.
+RUN groupadd --system molclass && useradd --system --gid molclass --home /app molclass
+WORKDIR /app
+COPY --from=builder --chown=molclass:molclass /app/build/install/MolClass/lib ./lib
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+USER molclass
+ENTRYPOINT ["java", "-cp", "/app/lib/*", "molclass.molecules.V3MoleculePredictWorker"]
