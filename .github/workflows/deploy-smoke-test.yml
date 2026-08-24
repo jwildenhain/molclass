@@ -4,6 +4,10 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  schedule:
+    # 03:17 UTC nightly -- off-peak, minutes offset from :00 to avoid the
+    # top-of-hour scheduling crowd GitHub's docs warn can delay runs.
+    - cron: '17 3 * * *'
   workflow_dispatch:
 
 jobs:
