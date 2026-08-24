@@ -1,110 +1,108 @@
 # Installation & Deployment Guide
 
+MolClass runs as a set of Docker Compose services. There is no other supported
+way to run the current version — the Java pipeline (CDK/Weka), the FastAPI
+service, and the Next.js frontend are built and wired together through
+`docker-compose.yml`.
+
 ## Prerequisites
 
-- **Java 8+** (JDK) installed and `java`/`javac` available on `$PATH`.
-- **Gradle** workflow is managed via the project wrapper (`./gradlew`).
-- **MySQL server** reachable from the host where the application will run.
-- Internet access (to download required JARs and Gradle distribution if not cached).
+- Docker Engine with the Compose plugin (`docker compose version` should work).
+- Enough RAM for the JVM workers. The example configuration below assumes a
+  large host; if you're on something modest (a few GB, shared with other
+  services), lower `MOLCLASS_MODEL_WORKER_MEMORY` and the other `*_MEMORY`
+  variables accordingly — they're hard `mem_limit` ceilings, not reservations,
+  and the JVM workers respect them (`-XX:MaxRAMPercentage`), so a smaller
+  number just means smaller models train more slowly, not a crash, as long as
+  it's not smaller than what a given job actually needs.
+- Internet access during the first build (Gradle and npm both resolve
+  dependencies from their public registries).
 
 ## 1. Clone the repository
 
 ```bash
-git clone <repository-url> /home/jw/repos/wdc_gitlab/molclass
-cd /home/jw/repos/wdc_gitlab/molclass
+git clone https://github.com/jwildenhain/molclass.git
+cd molclass
 ```
 
-## 2. Resolve library dependencies
+## 2. Configure secrets
 
-The project depends on the following external JARs (placed in the `lib/` directory):
-
-| JAR | Version | Purpose |
-|-----|---------|---------|
-| `HikariCP-5.0.1.jar` | 5.0.1 | High‑performance JDBC connection pool |
-| `mysql-connector-java-8.0.33.jar` | 8.0.33 | MySQL JDBC driver |
-| `h2-2.2.224.jar` | 2.2.224 | In‑memory DB for unit tests |
-| `junit-4.13.2.jar` | 4.13.2 | Unit‑testing framework |
-| `hamcrest-core-1.3.jar` | 1.3 | Assertion library used by JUnit |
-
-If any of these JARs are missing, run the provided script (step 3) – it will download them automatically.
-
-## 3. Run the **setup script**
-
-A helper script `setup.sh` will:
-1. Download missing JARs from Maven Central.
-2. Verify the presence of `lib/`.
-3. Create a convenience `classpath.sh` file that exports the full classpath.
+Copy the example environment file and fill in both required secrets:
 
 ```bash
-chmod +x setup.sh
-./setup.sh
+cp .env.example .env
 ```
 
-After successful execution you will see a message like:
-```
-[setup] All required JARs are present.
-[setup] Classpath file created at ./classpath.sh
-```
+`.env` is untracked (gitignored) on purpose — never commit it. At minimum,
+replace `MOLCLASS_DB_ROOT_PASSWORD` and `MOLCLASS_DB_PASSWORD` with long
+random values (`openssl rand -hex 32` works well for both). Everything else
+in `.env.example` has a sane default; see the comments in that file for what
+each variable controls (ports, per-service memory limits, model-worker thread
+count, and `MOLCLASS_DATA_INTAKE_ENABLED` for a read-only deployment).
 
-## 4. Build the project
+## 3. Build and start
 
 ```bash
-./gradlew clean build
+docker compose build
+docker compose up -d
 ```
 
-Artifacts are built with Gradle and the jar is produced under `build/libs/`.
+The first build compiles the Java pipeline and both the API and frontend
+images — expect it to take a few minutes. `docker compose up -d` starts all
+six services (`db`, `api`, `sdf-worker`, `model-worker`, `molecule-worker`,
+`predictor`, `frontend`) and creates the database schema automatically from
+`sql/v3/` on first boot.
 
-## 5. MySQL configuration
-
-Edit **`DatabaseUtils.props`** (located at the project root) with your MySQL connection details:
-
-```properties
-jdbcURL=jdbc:mysql://<HOST>/<DATABASE>
-# Example:
-# jdbcURL=jdbc:mysql://localhost/molclass
-
-# Credentials (default values are shown – replace with your own)
-# Username and password are read by the application via XML configuration files.
-# If you use the default XML (`molclass.conf.xml`), set the corresponding tags:
-#   <hostname>localhost</hostname>
-#   <database>molclass</database>
-#   <rw_user>your_user</rw_user>
-#   <rw_password>your_password</rw_password>
-```
-
-> **Tip:** The `molclass.conf.xml` file already contains placeholders. Updating the XML tags will make the Java code pick up the new values automatically.
-
-## 6. Deploy / Run the application
-
-A deployment script `deploy.sh` is provided. It:
-- Uses the Gradle wrapper (`./gradlew`) as the canonical execution path.
-- Runs a connectivity check using `DBConnectionTest`.
-- Starts the desired Java class (e.g., `Predictor`, `SdfImporter`, etc.).
+## 4. Verify it's running
 
 ```bash
-chmod +x deploy.sh
-./deploy.sh Predictor   # runs the Predictor main class via molclass.Main
+docker compose ps
 ```
 
-You can replace `Predictor` with any mapped launcher name (for example `SdfImporter`) or a fully-qualified class name.
-
-### Deploy script details
-The script performs the following steps:
-1. Validates launcher prerequisites and local dependencies.
-2. Validates MySQL connectivity via `DBConnectionTest`.
-3. Executes the Java program using Gradle (`./gradlew run --args="...")`.
-4. Logs are printed directly to STDOUT/ERR.
-
-## 7. Running unit tests
+All services should show `healthy` (or, for the two workers, just running —
+they don't have HTTP health checks). Then:
 
 ```bash
-./gradlew test
+curl http://127.0.0.1:8000/api/v1/health/readiness   # API
 ```
-The test suite uses the in‑memory H2 database, so no MySQL server is required for tests.
 
----
-### Quick one‑liner to bootstrap everything
+and open `http://127.0.0.1:3000` in a browser — that's the frontend, bound to
+`127.0.0.1` by default. For a public deployment, put a reverse proxy (Apache,
+nginx, Caddy) in front of it with TLS; `docker-compose.yml` intentionally
+doesn't do this for you, since domain and certificate setup is
+environment-specific.
+
+## 5. Load some data
+
+Upload an SDF file through the web UI's `/upload` page, or `POST` it to
+`/api/v1/uploads`. This only works if `MOLCLASS_DATA_INTAKE_ENABLED` is at its
+default (`true`, or unset) — a deployment explicitly configured as read-only
+won't accept new uploads.
+
+## Configuration reference
+
+See `.env.example` for the full list of tunables (ports, per-service memory
+limits, model-worker thread count and timeouts). `docker-compose.yml` is the
+source of truth for what each one actually does.
+
+## Programmatic / agent access
+
+[`mcp-server/`](mcp-server/) exposes search and prediction as MCP tools for
+AI assistants and agent workflows — see its own README for setup.
+
+## Local development (without Docker)
+
+For iterating on the Java pipeline or the FastAPI service directly against a
+local MariaDB instead of rebuilding containers, see the scripts under
+`tools/` (`setup-local-api-account.sh`, `run-api-local.sh`,
+`run_v3_worker.sh`, `build-frontend.sh`, `install-systemd-units.sh`) — each
+has a comment block explaining what it does and in what order to run them.
+This path is for contributors working on MolClass itself; for just running
+the application, use Docker Compose above.
+
+## Running tests
+
 ```bash
-./setup.sh && ./gradlew clean build && ./deploy.sh Predictor
+./gradlew test                              # Java
+cd molclass-frontend && npm run lint && npm run typecheck && npx playwright test
 ```
-
