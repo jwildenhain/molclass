@@ -53,6 +53,7 @@ function formatDate(value: string) {
 export default function MoleculeDetailPage() {
   const params = useParams<{ id: string }>();
   const moleculeId = Number(params.id);
+  const moleculeIdInvalid = !Number.isFinite(moleculeId) || moleculeId <= 0;
 
   const [molecule, setMolecule] = useState<MoleculeDetail | null>(null);
   const [history, setHistory] = useState<PredictionHistoryEntry[]>([]);
@@ -86,14 +87,12 @@ export default function MoleculeDetailPage() {
   }
 
   useEffect(() => {
-    if (!Number.isFinite(moleculeId) || moleculeId <= 0) {
-      setError("Invalid molecule ID");
-      setLoading(false);
-      return;
-    }
-    void loadMolecule();
+    if (moleculeIdInvalid) return;
+    void (async () => {
+      await loadMolecule();
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [moleculeId]);
+  }, [moleculeId, moleculeIdInvalid]);
 
   const searchModels = async (event: FormEvent) => {
     event.preventDefault();
@@ -152,19 +151,19 @@ export default function MoleculeDetailPage() {
     await loadMolecule();
   };
 
-  if (loading) {
+  if (loading && !moleculeIdInvalid) {
     return <div className="mx-auto mt-20 max-w-3xl text-center text-muted-foreground">Loading molecule...</div>;
   }
 
-  if (error || !molecule) {
+  if (moleculeIdInvalid || error || !molecule) {
     return (
       <div className="mx-auto mt-12 max-w-3xl">
         <Link href="/search" className="inline-flex items-center gap-1 text-sm font-semibold text-blue-500 hover:underline">
           <ArrowLeft className="h-4 w-4" /> Back to registry
         </Link>
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm text-red-500">
-          <span>{error || "Molecule not found"}</span>
-          {error && Number.isFinite(moleculeId) && moleculeId > 0 && (
+          <span>{moleculeIdInvalid ? "Invalid molecule ID" : (error || "Molecule not found")}</span>
+          {!moleculeIdInvalid && error && (
             <button
               type="button"
               onClick={() => void loadMolecule()}

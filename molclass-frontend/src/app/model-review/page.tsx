@@ -327,12 +327,13 @@ export default function ModelReviewPage() {
     [items],
   );
 
-  useEffect(() => {
+  function changeStatusFilter(nextStatusFilter: string) {
+    setStatusFilter(nextStatusFilter);
     setSelectedId(null);
     setReview(null);
     setError(null);
     setErrorSource(null);
-  }, [statusFilter]);
+  }
 
   async function selectReview(modelDefinitionId: number) {
     setSelectedId(modelDefinitionId);
@@ -499,7 +500,7 @@ export default function ModelReviewPage() {
               Definition state
               <select
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
+                onChange={(event) => changeStatusFilter(event.target.value)}
                 className="mt-2 w-full rounded-xl border border-border bg-background/70 px-4 py-3 font-normal text-foreground outline-none transition focus:border-blue-400"
               >
                 {FILTERS.map((filter) => (
