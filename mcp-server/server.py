@@ -2,13 +2,16 @@
 """MCP server exposing MolClass molecule search and prediction as tools.
 
 Talks to a running MolClass deployment's v3 prediction API (see
-spring_boot_predictor/src/main/java/molclass/predictor/V3PredictionController.java).
-Predictions only work for molecules already indexed in that deployment's database --
-this server cannot register brand-new structures, since the production API
-deliberately has no route for that (see the FAQ page in molclass-frontend).
+spring_boot_predictor/src/main/java/molclass/predictor/V3PredictionController.java)
+for search/predict on already-indexed molecules, and its ad-hoc registration API
+(see html/molclass/api/app/v3_molecules.py) for genuinely new structures. The
+latter is disabled on any deployment with MOLCLASS_DATA_INTAKE_ENABLED=false
+(the FAQ page in molclass-frontend explains why) -- submit_and_predict will
+return a clear DATA_INTAKE_DISABLED error on those, not a crash.
 """
 import json
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -17,6 +20,7 @@ import httpx
 from mcp.server.fastmcp import FastMCP
 
 BASE_URL = os.environ.get("MOLCLASS_BASE_URL", "http://127.0.0.1:8082").rstrip("/")
+API_URL = os.environ.get("MOLCLASS_API_URL", "http://127.0.0.1:8000").rstrip("/")
 DAILY_LIMIT = int(os.environ.get("MOLCLASS_MCP_DAILY_LIMIT", "100"))
 STATE_PATH = Path(
     os.environ.get("MOLCLASS_MCP_STATE_FILE", str(Path.home() / ".molclass-mcp" / "usage.json"))
@@ -53,6 +57,21 @@ def _get(path: str, params: dict[str, Any] | None = None) -> Any:
 
 def _post(path: str) -> Any:
     response = httpx.post(f"{BASE_URL}{path}", timeout=60.0)
+    response.raise_for_status()
+    return response.json()
+
+
+def _api_post(path: str, json_body: dict[str, Any]) -> tuple[int, Any]:
+    response = httpx.post(f"{API_URL}{path}", json=json_body, timeout=30.0)
+    try:
+        body = response.json()
+    except ValueError:
+        body = response.text
+    return response.status_code, body
+
+
+def _api_get(path: str) -> Any:
+    response = httpx.get(f"{API_URL}{path}", timeout=30.0)
     response.raise_for_status()
     return response.json()
 
@@ -114,6 +133,58 @@ def predict(model_definition_id: int, molecule_id: int) -> dict[str, Any]:
     if isinstance(result, dict):
         result["_quotaRemainingToday"] = DAILY_LIMIT - usage["count"]
     return result
+
+
+@mcp.tool()
+def submit_and_predict(
+    smiles: str, model_definition_id: int, timeout_seconds: int = 120
+) -> dict[str, Any]:
+    """Register a brand-new molecule from a raw SMILES string and predict against one model.
+
+    Unlike predict(), the molecule does not need to already be indexed -- this registers
+    it, computes its descriptors, and predicts, then waits (polling) for the whole
+    pipeline to finish. Disabled on deployments configured as read-only (search/predict
+    only, no new data) -- returns a DATA_INTAKE_DISABLED error on those rather than
+    hanging. Counts as one molecule of this server's daily quota, spent only if the
+    pipeline actually completes successfully.
+    """
+    usage = _load_usage()
+    if usage["count"] >= DAILY_LIMIT:
+        return {
+            "error": "DAILY_QUOTA_EXCEEDED",
+            "message": (
+                f"This MCP server allows {DAILY_LIMIT} predictions per day; "
+                "that limit has been reached for today (UTC). Try again after 00:00 UTC."
+            ),
+        }
+    status_code, body = _api_post(
+        "/api/v1/molecules/predict",
+        {"smiles": smiles, "model_definition_id": model_definition_id},
+    )
+    if status_code != 202:
+        return {"error": "SUBMIT_FAILED", "httpStatus": status_code, "detail": body}
+
+    job_id = body["jobId"]
+    deadline = time.monotonic() + max(1, timeout_seconds)
+    while time.monotonic() < deadline:
+        job = _api_get(f"/api/v1/jobs/{job_id}")
+        if job["status"] == "SUCCEEDED":
+            usage["count"] += 1
+            _save_usage(usage)
+            result = job["result"] or {}
+            result["_quotaRemainingToday"] = DAILY_LIMIT - usage["count"]
+            return result
+        if job["status"] == "FAILED":
+            return {
+                "error": job.get("error_code") or "PIPELINE_FAILED",
+                "message": job.get("error_message"),
+            }
+        time.sleep(2)
+    return {
+        "error": "TIMED_OUT",
+        "message": f"Job {job_id} did not finish within {timeout_seconds}s; it may still complete -- check back later.",
+        "jobId": job_id,
+    }
 
 
 @mcp.tool()
