@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from pydantic import BaseModel
+from typing import Optional, Dict
 
 class Dataset(BaseModel):
     batch_id: int
@@ -43,18 +43,6 @@ class ModelFingerprint(BaseModel):
     mol_id: int
     predictions: Dict[str, Optional[float]]
 
-class ModelCreateRequest(BaseModel):
-    batch_id: int
-    classifier: str
-    data_type: str
-    class_scheme: str
-    email: str
-    username: str
-
-class ModelCreateResponse(BaseModel):
-    model_id: int
-    message: str
-
 class SimilarityResponse(BaseModel):
     mol_id: int
     ext: float
@@ -71,35 +59,4 @@ class TextSearchResponse(BaseModel):
     mol_name: Optional[str] = None
     inchi_key: Optional[str] = None
     smiles: Optional[str] = None
-
-class SinglePredictionRequest(BaseModel):
-    identifier_type: str = Field(..., description="Either 'smiles' or 'inchi'")
-    identifier: str = Field(..., description="The SMILES or InChI identifier string")
-    model_ids: List[int] = Field(..., description="List of model IDs to run predictions against")
-
-class SinglePredictionTaskResponse(BaseModel):
-    task_id: str
-    status: str
-    message: str
-
-class PredictionTaskStatusResponse(BaseModel):
-    task_id: str
-    status: str
-    processed_count: int
-    total_count: int
-    results: Dict[int, Optional[Dict[str, Any]]]
-    error: Optional[str] = None
-
-
-class StructureSearchRequest(BaseModel):
-    search_type: str = Field(..., description="Either 'similarity' or 'substructure'")
-    query_type: str = Field(..., description="Either 'smiles' or 'inchi'")
-    query_string: str = Field(..., description="The SMILES or InChI query string")
-    fingerprint_type: Optional[str] = Field("maccs", description="Either 'maccs', 'pubchem', or 'kr'")
-    limit: Optional[int] = Field(100, description="Max number of results to return")
-    threshold: Optional[float] = Field(0.8, description="Minimum Tanimoto similarity (only for similarity search)")
-
-class StructureSearchResult(BaseModel):
-    mol_id: int
-    similarity: Optional[float] = None
 
