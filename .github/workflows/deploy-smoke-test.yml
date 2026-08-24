@@ -1,0 +1,119 @@
+name: Deployment Smoke Test
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Disk space before build
+      run: df -h /
+
+    - name: Write CI-only environment file
+      run: |
+        cat > .env <<EOF
+        MOLCLASS_DB_ROOT_PASSWORD=$(openssl rand -hex 32)
+        MOLCLASS_DB_PASSWORD=$(openssl rand -hex 32)
+        MOLCLASS_INNODB_BUFFER_POOL=256M
+        MOLCLASS_API_MEMORY=512m
+        MOLCLASS_SDF_WORKER_MEMORY=768m
+        MOLCLASS_MODEL_WORKER_MEMORY=512m
+        MOLCLASS_MOLECULE_WORKER_MEMORY=512m
+        MOLCLASS_PREDICTOR_MEMORY=1536m
+        MOLCLASS_FRONTEND_MEMORY=512m
+        EOF
+      # Ephemeral, runner-local secrets for a database that's destroyed at the end of
+      # this job -- not the production credentials, so generating fresh ones here is
+      # fine. Every *_MEMORY var overrides docker-compose.yml's production-sized
+      # defaults (e.g. model-worker's 16g) down to what's needed to boot idle on a
+      # shared 16GB runner; nothing here trains a model, so headroom for that isn't
+      # needed.
+
+    - name: Build images
+      run: docker compose build
+
+    - name: Start the stack
+      run: docker compose up -d --wait --wait-timeout 300
+
+    - name: Service health checks
+      run: |
+        set -euo pipefail
+        curl -sf http://127.0.0.1:8000/api/v1/health/readiness
+        echo
+        curl -sf http://127.0.0.1:8082/actuator/health/readiness
+        echo
+        curl -sf -o /dev/null -w 'frontend: %{http_code}\n' http://127.0.0.1:3000/
+
+    - name: Upload -> import round trip
+      run: |
+        set -euo pipefail
+
+        upload_json=$(curl -sf -X POST http://127.0.0.1:8000/api/v1/uploads \
+          -F "file=@test_duplicate.sdf")
+        upload_id=$(jq -r '.uploadId' <<<"$upload_json")
+        echo "uploaded: uploadId=$upload_id"
+
+        status=""
+        for _ in $(seq 1 30); do
+          status=$(curl -sf http://127.0.0.1:8000/api/v1/uploads/"$upload_id" | jq -r '.status')
+          echo "upload status: $status"
+          [ "$status" = "ANALYZED" ] && break
+          [ "$status" = "ANALYSIS_FAILED" ] && { echo "::error::SDF analysis failed"; exit 1; }
+          sleep 2
+        done
+        [ "$status" = "ANALYZED" ] || { echo "::error::timed out waiting for analysis"; exit 1; }
+
+        import_json=$(curl -sf -X POST http://127.0.0.1:8000/api/v1/uploads/"$upload_id"/imports \
+          -H 'Content-Type: application/json' \
+          -d '{"dataset_name":"CI smoke test","identifier_property":"ID","identifier_confirmed":true}')
+        import_run_id=$(jq -r '.importRunId' <<<"$import_json")
+        dataset_id=$(jq -r '.datasetId' <<<"$import_json")
+        echo "import queued: importRunId=$import_run_id datasetId=$dataset_id"
+
+        status=""
+        for _ in $(seq 1 30); do
+          status=$(curl -sf http://127.0.0.1:8000/api/v1/imports/"$import_run_id" | jq -r '.status')
+          echo "import status: $status"
+          case "$status" in
+            SUCCEEDED|PARTIAL) break ;;
+            FAILED) echo "::error::import failed"; curl -s http://127.0.0.1:8000/api/v1/imports/"$import_run_id" | jq .; exit 1 ;;
+          esac
+          sleep 2
+        done
+        case "$status" in
+          SUCCEEDED|PARTIAL) ;;
+          *) echo "::error::timed out waiting for import"; exit 1 ;;
+        esac
+
+        imported=$(curl -sf "http://127.0.0.1:8000/api/v1/datasets?query=$dataset_id" \
+          | jq -r --argjson id "$dataset_id" '.datasets[] | select(.datasetId == $id) | .importedRecords')
+        echo "imported records: $imported"
+        [ "${imported:-0}" -ge 1 ] || { echo "::error::expected at least 1 imported record"; exit 1; }
+
+        echo "Upload -> import round trip passed."
+      # Doesn't exercise model training/prediction: training runs on an empty CI
+      # database with no approved model to predict against, and approval is a
+      # deliberate human action gated behind a canonical audited transaction --
+      # not something this job should simulate or bypass. This checks the path
+      # that actually breaks in practice (build correctness, upload permissions,
+      # the job queue, worker wiring), same as the deployment bugs fixed by hand
+      # on tyerschem2 this project has already hit.
+
+    - name: Container status
+      if: always()
+      run: docker compose ps
+
+    - name: Logs on failure
+      if: failure()
+      run: docker compose logs
+
+    - name: Tear down
+      if: always()
+      run: docker compose down -v
