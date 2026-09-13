@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
+import Script from "next/script";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -20,6 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} bg-background text-foreground min-h-screen flex flex-col transition-colors duration-300`}>
+        <Script src="/chemgrid-analytics.js" strategy="afterInteractive" />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {/* Navigation Bar */}
           <nav className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-md border-b border-border shadow-sm">
