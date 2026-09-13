@@ -1,0 +1,31 @@
+[Unit]
+Description=MolClass Next.js frontend (LAN listener on 192.168.7.231)
+Documentation=file:///mnt/wdc_store/gitlab/molclass/docs/V3_MODEL_REVIEW.md
+After=network-online.target molclass-api.service molclass-predictor.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+WorkingDirectory=/mnt/wdc_store/gitlab/molclass/molclass-frontend
+
+# A second, interface-specific listener keeps the ordinary localhost service
+# available while exposing MolClass only on the requested wired-LAN address.
+Environment=NODE_ENV=production
+Environment=HOSTNAME=192.168.7.231
+Environment=PORT=3000
+
+ExecStart=/usr/bin/env node /mnt/wdc_store/gitlab/molclass/molclass-frontend/.next/standalone/server.js
+
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=molclass-frontend-lan
+
+[Install]
+WantedBy=default.target

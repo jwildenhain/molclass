@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Installs the three MolClass services as systemd *user* units.
+# Installs the four MolClass services as systemd *user* units.
 #
 # User units are used deliberately: they need no root, they run as the account
 # that already owns the repository and the 0600 credential files in
@@ -12,7 +12,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 unit_source="$repo_root/tools/systemd"
 unit_target="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-units=(molclass-api.service molclass-predictor.service molclass-frontend.service)
+units=(molclass-api.service molclass-predictor.service molclass-frontend.service molclass-frontend-lan.service)
 
 if [[ "$EUID" -eq 0 ]]; then
     printf 'Run this as your normal user, not root: these are systemd --user units.\n' >&2

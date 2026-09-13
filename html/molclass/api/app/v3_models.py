@@ -73,7 +73,7 @@ def _target_rows(db: Session, dataset_id: Optional[int] = None):
                AND pd.active=1
                AND pd.storage_mode='WIDE'
                AND dp.distinct_count BETWEEN 2 AND 100
-            """ + where + " ORDER BY d.dataset_id DESC,pd.original_name"
+            """ + where + " ORDER BY d.dataset_id ASC,pd.original_name"
         ),
         {} if dataset_id is None else {"dataset_id": dataset_id},
     ).mappings().all()

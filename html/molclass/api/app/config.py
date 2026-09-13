@@ -74,6 +74,7 @@ class Settings:
         self.upload_retention_days = _integer("MOLCLASS_UPLOAD_RETENTION_DAYS", 30)
         self.legacy_api_enabled = _boolean("MOLCLASS_LEGACY_API_ENABLED", False)
         self.data_intake_enabled = _boolean("MOLCLASS_DATA_INTAKE_ENABLED", True)
+        self.configuration_enabled = _boolean("MOLCLASS_CONFIGURATION_ENABLED", True)
         origins = os.getenv(
             "MOLCLASS_ALLOWED_ORIGINS",
             "http://127.0.0.1:3000,http://localhost:3000",

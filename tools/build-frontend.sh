@@ -15,9 +15,8 @@ cd "$frontend"
 
 npm run build
 
-mkdir -p .next/standalone/.next
-cp -r public/. .next/standalone/public 2>/dev/null || true
-cp -r .next/static .next/standalone/.next/static
+# npm's postbuild lifecycle stages public/ and .next/static/ even when operators
+# invoke `npm run build` directly. Keep this wrapper as the documented entry point.
 
 printf 'Standalone build staged at %s/.next/standalone/server.js\n' "$frontend"
 printf 'Restart the service with: systemctl --user restart molclass-frontend\n'

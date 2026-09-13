@@ -41,6 +41,7 @@ services:
       MOLCLASS_UPLOAD_ROOT: /var/lib/molclass/uploads
       MOLCLASS_LEGACY_API_ENABLED: "false"
       MOLCLASS_DATA_INTAKE_ENABLED: "${MOLCLASS_DATA_INTAKE_ENABLED:-true}"
+      MOLCLASS_CONFIGURATION_ENABLED: "${MOLCLASS_CONFIGURATION_ENABLED:-true}"
       MOLCLASS_ALLOWED_ORIGINS: "http://127.0.0.1:${MOLCLASS_FRONTEND_PORT:-3000},http://localhost:${MOLCLASS_FRONTEND_PORT:-3000}"
       # Without this, Settings() falls back to Path(__file__).parents[4], which assumes the
       # nested html/molclass/api/app/ source layout. This image only copies app/ to /app/app,
@@ -206,6 +207,7 @@ services:
       args:
         API_URL: http://api:8000
         PREDICTOR_API_URL: http://predictor:8082
+        MOLCLASS_CONFIGURATION_ENABLED: "${MOLCLASS_CONFIGURATION_ENABLED:-true}"
     restart: unless-stopped
     environment:
       API_URL: http://api:8000

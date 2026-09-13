@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 # Import the FastAPI app defined in the project.
 from app.main import app, get_db  # type: ignore
+from app.config import settings  # type: ignore
 
 # ----------------------------------------------------------------------
 # Mock database session
@@ -169,6 +170,20 @@ def test_root_endpoint(client: TestClient):
     data = resp.json()
     assert "instructions" in data
     assert "api_documentation" in data
+
+
+def test_configuration_disabled_blocks_dataset_rename(client: TestClient, monkeypatch):
+    monkeypatch.setattr(settings, "configuration_enabled", False)
+    response = client.patch("/api/v1/datasets/1", json={"name": "Renamed"})
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.json() == {"detail": {"code": "SERVER_CONFIGURATION_DISABLED"}}
+
+
+def test_configuration_disabled_blocks_model_creation(client: TestClient, monkeypatch):
+    monkeypatch.setattr(settings, "configuration_enabled", False)
+    response = client.post("/api/v1/model-definitions", json={})
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.json() == {"detail": {"code": "SERVER_CONFIGURATION_DISABLED"}}
 
 def test_get_datasets(client: TestClient):
     resp = client.get("/dataset")

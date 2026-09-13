@@ -17,6 +17,10 @@ import {
   X,
 } from "lucide-react";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+import {
+  serverConfigurationEnabled,
+  showServerConfigurationDisabled,
+} from "@/lib/serverCapabilities";
 import { nextSort, SortableHeader, type SortDirection } from "@/components/SortableHeader";
 
 type ModelTarget = {
@@ -93,6 +97,10 @@ function DescriptionCell({
   const [saveError, setSaveError] = useState("");
 
   function startEdit() {
+    if (!serverConfigurationEnabled) {
+      showServerConfigurationDisabled();
+      return;
+    }
     setDraft(dataset.description ?? "");
     setSaveError("");
     setEditing(true);
@@ -216,7 +224,7 @@ export default function ModelCreationPage() {
   }, [datasets, query]);
 
   type SortKey = "id" | "category" | "records" | "targets" | "status";
-  const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
+  const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection } | null>({ key: "id", direction: "asc" });
   const toggleSort = (key: SortKey) => setSort((current) => nextSort(key, current));
 
   const sorted = useMemo(() => {
@@ -261,7 +269,7 @@ export default function ModelCreationPage() {
               Model intake
             </div>
             <h1 className="mt-4 max-w-3xl text-3xl font-bold tracking-tight text-foreground sm:text-5xl">
-              Choose a dataset with a verified target.
+              Choose a dataset with a verified target to build a model.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
               Only model-eligible v3 datasets and properties with 2 to 100 observed classes appear here.
@@ -270,8 +278,8 @@ export default function ModelCreationPage() {
           </div>
           <div className="relative grid grid-cols-3 gap-3">
             <div className="rounded-2xl border border-border bg-background/50 px-4 py-3 shadow-lg sm:px-5 sm:py-4">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground sm:text-xs">Eligible</p>
-              <p className="mt-1 font-mono text-2xl font-bold text-foreground sm:text-3xl">{loading ? "--" : datasets.length}</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground sm:text-xs">Models</p>
+              <p className="mt-1 font-mono text-2xl font-bold text-foreground sm:text-3xl">{loading ? "--" : totalTargets.toLocaleString()}</p>
             </div>
             <div className="rounded-2xl border border-border bg-background/50 px-4 py-3 shadow-lg sm:px-5 sm:py-4">
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground sm:text-xs">Records</p>
@@ -283,8 +291,8 @@ export default function ModelCreationPage() {
               </p>
             </div>
             <div className="rounded-2xl border border-border bg-background/50 px-4 py-3 shadow-lg sm:px-5 sm:py-4">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground sm:text-xs">Targets</p>
-              <p className="mt-1 font-mono text-2xl font-bold text-foreground sm:text-3xl">{loading ? "--" : totalTargets.toLocaleString()}</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground sm:text-xs">Datasets</p>
+              <p className="mt-1 font-mono text-2xl font-bold text-foreground sm:text-3xl">{loading ? "--" : datasets.length.toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -382,12 +390,22 @@ export default function ModelCreationPage() {
                         </span>
                       </td>
                       <td className="px-5 py-5 text-right">
-                        <Link
-                          href={`/model-creation/configure?dataset_id=${dataset.datasetId}`}
-                          className="inline-flex whitespace-nowrap rounded-xl bg-amber-400 px-4 py-2.5 font-bold text-slate-950 transition hover:bg-amber-300"
-                        >
-                          Configure model
-                        </Link>
+                        {serverConfigurationEnabled ? (
+                          <Link
+                            href={`/model-creation/configure?dataset_id=${dataset.datasetId}`}
+                            className="inline-flex whitespace-nowrap rounded-xl bg-amber-400 px-4 py-2.5 font-bold text-slate-950 transition hover:bg-amber-300"
+                          >
+                            Configure model
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={showServerConfigurationDisabled}
+                            className="inline-flex whitespace-nowrap rounded-xl bg-amber-400 px-4 py-2.5 font-bold text-slate-950 transition hover:bg-amber-300"
+                          >
+                            Configure model
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

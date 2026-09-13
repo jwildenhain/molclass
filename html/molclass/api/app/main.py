@@ -50,6 +50,12 @@ def _is_data_intake_route(method: str, path: str) -> bool:
     return path == "/api/v1/model-definitions"
 
 
+def _is_configuration_route(method: str, path: str) -> bool:
+    if method == "POST" and path == "/api/v1/model-definitions":
+        return True
+    return method == "PATCH" and path.startswith("/api/v1/datasets/")
+
+
 @app.middleware("http")
 async def production_route_gate(request: Request, call_next):
     path = request.url.path
@@ -63,6 +69,11 @@ async def production_route_gate(request: Request, call_next):
     # A read-only deployment (serving search/predictions against already-approved
     # models) blocks new data entering the pipeline at all: uploads, import
     # triggers, and new model definitions. Existing data stays fully readable.
+    if not settings.configuration_enabled and _is_configuration_route(request.method, path):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": {"code": "SERVER_CONFIGURATION_DISABLED"}},
+        )
     if not settings.data_intake_enabled and _is_data_intake_route(request.method, path):
         return JSONResponse(status_code=403, content={"detail": {"code": "DATA_INTAKE_DISABLED"}})
     return await call_next(request)

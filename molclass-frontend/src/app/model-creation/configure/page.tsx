@@ -6,6 +6,11 @@ import type { FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+import {
+  serverConfigurationDisabledMessage,
+  serverConfigurationEnabled,
+  showServerConfigurationDisabled,
+} from "@/lib/serverCapabilities";
 
 type ClassLabel = { label: string; supportCount: number };
 type Target = {
@@ -95,6 +100,10 @@ function ConfigureModelForm() {
   const [result, setResult] = useState<CreationResult | null>(null);
   const [retryToken, setRetryToken] = useState(0);
 
+  useEffect(() => {
+    if (!serverConfigurationEnabled) showServerConfigurationDisabled();
+  }, []);
+
   const retry = useCallback(() => {
     setLoading(true);
     setError("");
@@ -102,7 +111,7 @@ function ConfigureModelForm() {
   }, []);
 
   useEffect(() => {
-    if (!datasetIdValid) return;
+    if (!datasetIdValid || !serverConfigurationEnabled) return;
     let cancelled = false;
     const load = async () => {
       try {
@@ -183,6 +192,7 @@ function ConfigureModelForm() {
     }
   };
 
+  if (!serverConfigurationEnabled) return <ErrorPanel message={serverConfigurationDisabledMessage} />;
   if (!datasetIdValid) return <ErrorPanel message="A valid dataset_id query parameter is required." />;
   if (loading) return <div className="p-12 text-center text-muted-foreground">Loading verified model configuration...</div>;
   if (error && !dataset) return <ErrorPanel message={error} onRetry={retry} />;

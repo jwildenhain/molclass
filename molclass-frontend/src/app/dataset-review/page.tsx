@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+import {
+  serverConfigurationEnabled,
+  showServerConfigurationDisabled,
+} from "@/lib/serverCapabilities";
 
 type Dataset = {
   datasetId: number;
@@ -174,9 +178,15 @@ export default function DatasetReviewPage() {
 
                   <div className="lg:text-right">
                     {dataset.modelEligible ? (
-                      <Link href={`/model-creation/configure?dataset_id=${dataset.datasetId}`} className="inline-flex rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-500/20 dark:text-emerald-200">
-                        Configure model
-                      </Link>
+                      serverConfigurationEnabled ? (
+                        <Link href={`/model-creation/configure?dataset_id=${dataset.datasetId}`} className="inline-flex rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-500/20 dark:text-emerald-200">
+                          Configure model
+                        </Link>
+                      ) : (
+                        <button type="button" onClick={showServerConfigurationDisabled} className="inline-flex rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-500/20 dark:text-emerald-200">
+                          Configure model
+                        </button>
+                      )
                     ) : (
                       <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Not model eligible</span>
                     )}

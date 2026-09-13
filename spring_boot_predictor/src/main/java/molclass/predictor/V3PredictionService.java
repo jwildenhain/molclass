@@ -267,14 +267,15 @@ public class V3PredictionService {
     public List<Map<String, Object>> searchMolecules(String rawQuery, int requestedLimit)
             throws Exception {
         String query = rawQuery == null ? "" : rawQuery.trim();
-        if (query.isEmpty()) return List.of();
         if (query.length() > 512) {
             throw new IllegalArgumentException("molecule query must not exceed 512 characters");
         }
         int limit = Math.max(1, Math.min(requestedLimit, 100));
         LinkedHashMap<Long, Map<String, Object>> result = new LinkedHashMap<>();
         try (Connection connection = dataSource.getConnection()) {
-            if (WILDCARD.matcher(query).find()) {
+            if (query.isEmpty()) {
+                addMoleculesForBrowse(connection, result, limit);
+            } else if (WILDCARD.matcher(query).find()) {
                 String likePattern = toLikePattern(query);
                 addMoleculesByNamePattern(connection, result, likePattern, limit);
                 if (result.size() < limit) {
@@ -294,6 +295,17 @@ public class V3PredictionService {
             }
         }
         return new ArrayList<>(result.values()).subList(0, Math.min(result.size(), limit));
+    }
+
+    private void addMoleculesForBrowse(Connection connection,
+            LinkedHashMap<Long, Map<String, Object>> result, int limit) throws Exception {
+        String sql = "SELECT m.molecule_id,m.full_inchi_key,LEFT(m.canonical_smiles,512),m.primary_name,"
+                + "m.normalization_status,NULL source_identifier FROM " + t("molecule")
+                + " m ORDER BY m.molecule_id LIMIT ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, limit);
+            collectMolecules(statement, result);
+        }
     }
 
     /**
