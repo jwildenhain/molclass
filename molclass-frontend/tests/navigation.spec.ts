@@ -9,7 +9,7 @@ import { stubBackend } from "./fixtures/backend";
 
 const ROUTES = [
   { link: "Upload", path: "/upload", heading: "Inspect the chemistry before it enters the model pipeline." },
-  { link: "Model Creation", path: "/model-creation", heading: "Choose a dataset with a verified target." },
+  { link: "Model Creation", path: "/model-creation", heading: "Choose a dataset with a verified target to build a model." },
   { link: "Search", path: "/search", heading: "Search" },
   { link: "Model Review", path: "/model-review", heading: "Model build review" },
   { link: "Help", path: "/help", heading: "Help" },
