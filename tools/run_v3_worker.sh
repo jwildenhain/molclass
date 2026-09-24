@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Run a v3 queue worker outside Docker, against the local MariaDB.
 #
-#   tools/run_v3_worker.sh sdf   [--poll-seconds 2 --lease-seconds 120]
-#   tools/run_v3_worker.sh model [--poll-seconds 30 --threads 8]
+#   tools/run_v3_worker.sh sdf      [--poll-seconds 2 --lease-seconds 120]
+#   tools/run_v3_worker.sh model    [--poll-seconds 30 --threads 8]
+#   tools/run_v3_worker.sh molecule [--poll-seconds 5 --lease-seconds 120]
 #
 # Credentials come from an untracked .env at the repository root (see
 # .env.example). They are sourced, never echoed.
@@ -14,9 +15,10 @@ cd "$ROOT"
 role="${1:-}"
 shift || true
 case "$role" in
-  sdf)   main="molclass.importer.V3SdfWorker" ;;
-  model) main="molclass.models.V3ModelPipelineWorker" ;;
-  *) echo "usage: $0 {sdf|model} [worker args...]" >&2; exit 2 ;;
+  sdf)      main="molclass.importer.V3SdfWorker" ;;
+  model)    main="molclass.models.V3ModelPipelineWorker" ;;
+  molecule) main="molclass.molecules.V3MoleculePredictWorker" ;;
+  *) echo "usage: $0 {sdf|model|molecule} [worker args...]" >&2; exit 2 ;;
 esac
 
 if [ -f .env ]; then
@@ -31,6 +33,10 @@ fi
 export MOLCLASS_JDBC_URL="${MOLCLASS_JDBC_URL:-jdbc:mariadb://127.0.0.1:3306/molclass_v3}"
 export MOLCLASS_V3_SCHEMA="${MOLCLASS_V3_SCHEMA:-molclass_v3}"
 export MOLCLASS_UPLOAD_ROOT="${MOLCLASS_UPLOAD_ROOT:-$ROOT/uploads/v3}"
+# Only the molecule worker calls out to the predictor (to run the actual
+# prediction once descriptors are computed); the local systemd unit binds it
+# to 8182, matching molclass-predictor.service's MOLCLASS_PREDICTOR_PORT.
+export MOLCLASS_PREDICTOR_URL="${MOLCLASS_PREDICTOR_URL:-http://127.0.0.1:8182}"
 
 app_jar="$(ls -1 build/libs/MolClass-*.jar 2>/dev/null | sort -V | tail -1 || true)"
 [ -n "$app_jar" ] || { echo "No build/libs/MolClass-*.jar. Run: ./gradlew jar" >&2; exit 1; }
