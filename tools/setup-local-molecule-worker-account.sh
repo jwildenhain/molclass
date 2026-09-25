@@ -23,7 +23,11 @@ fi
 
 invoking_user="$(printenv SUDO_USER || true)"
 if [[ -z "$invoking_user" || "$invoking_user" == "root" ]]; then
-    invoking_user="jw"
+    invoking_user="${MOLCLASS_CREDENTIAL_OWNER:-}"
+fi
+if [[ -z "$invoking_user" || "$invoking_user" == "root" ]]; then
+    printf '%s\n' "Run through sudo as the target user or set MOLCLASS_CREDENTIAL_OWNER." >&2
+    exit 1
 fi
 invoking_home="$(getent passwd "$invoking_user" | cut -d: -f6)"
 invoking_group="$(id -gn "$invoking_user")"
@@ -89,7 +93,7 @@ chmod 600 "$temporary_file"
 {
     printf '%s\n' '# Local MolClass ad-hoc molecule prediction worker database credentials.'
     printf '%s\n' '# Source before running tools/run_v3_worker.sh molecule. Never commit this file.'
-    printf 'MOLCLASS_JDBC_URL=%s\n' "jdbc:mysql://127.0.0.1:3306/$schema"
+    printf 'MOLCLASS_JDBC_URL=%s\n' "jdbc:mariadb://127.0.0.1:3306/$schema"
     printf 'MOLCLASS_DB_USER=%s\n' "$account"
     printf 'MOLCLASS_DB_PASSWORD=%s\n' "$db_password"
 } > "$temporary_file"

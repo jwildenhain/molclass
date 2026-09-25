@@ -22,11 +22,11 @@ fails the job with a clear error rather than silently producing junk.
 
 Without an API key, `model_definition_id` is required (single model per request) and the caller is
 limited to 100 `POST /api/v1/molecules/predict` submissions per UTC day, counted by client IP
-(`X-Forwarded-For`'s first hop, since this deployment sits behind Apache → Next.js → FastAPI — see
-`_client_ip` in `app/v3_molecules.py`). Over the limit: `429 {"detail": {"code":
+(`X-Forwarded-For`'s rightmost valid address from a trusted local proxy hop, so a caller cannot
+prepend a forged address — see `_client_ip` in `app/v3_molecules.py`). Over the limit: `429 {"detail": {"code":
 "DAILY_QUOTA_EXCEEDED", "limit": 100}}`. The count lives in the `molecule_submission` table
-(one row per request, regardless of outcome) — reset is implicit, since the quota query only counts
-rows from the current UTC day.
+(one audit row per accepted request) and the atomic `molecule_submission_quota` daily counter.
+Reset is implicit because each UTC date has a separate counter row.
 
 ### API-key callers: no quota, and predict every missing model in one call
 
@@ -35,8 +35,8 @@ SHA-256 hash — the plaintext is never stored) does two things:
 
 1. Exempts the request from the 100/day IP quota entirely.
 2. Lets you **omit** `model_definition_id`. The job then predicts this molecule against every
-   currently-published model it doesn't already have a result for — computed fresh against the
-   predictor's own records each time (`GET /api/v3/models`, `GET /api/v3/molecules/{id}/predictions`),
+   currently-published model build it doesn't already have a result for — computed fresh against
+   the database's publication pointer and persisted prediction-build identities each time,
    never a hardcoded list — so a newly published model is picked up automatically without any
    change on the caller's side. Result shape differs from the single-model form:
 
@@ -105,12 +105,13 @@ persists on the predictor service's own credentials.
 
 ```bash
 mysql -u "$MOLCLASS_DB_USER" -p molclass_v3 < sql/v3/V11__api_keys_and_molecule_submission_quota.sql
+mysql -u "$MOLCLASS_DB_USER" -p molclass_v3 < sql/v3/V12__atomic_molecule_submission_quota.sql
 ```
 
-Adds `api_key` (hashed keys, see above) and `molecule_submission` (one row per
+V11 adds `api_key` (hashed keys, see above) and `molecule_submission` (one row per
 `POST /api/v1/molecules/predict` request — `job_id`, `api_key_id` if any, `client_ip`, whether it
-was a single-model or predict-all-missing request — the source of truth for both the daily quota
-count and per-caller audit).
+was a single-model or predict-all-missing request — the per-caller audit). V12 adds the atomic
+daily quota counter used to prevent concurrent anonymous requests from overrunning the limit.
 
 ## For a same-host caller like chemgrid
 

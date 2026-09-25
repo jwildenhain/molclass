@@ -233,10 +233,14 @@ Apply each version exactly once and in this order:
 | V6 | `V6__molecule_search_indexes.sql` | Global identifier and molecule search indexes |
 | V7 | `V7__job_type_claim_index.sql` | Earlier job-type claim index |
 | V8 | `V8__worker_claim_and_model_review_indexes.sql` | Final claim-order index and model-review index |
+| V9 | `V09__unfiltered_model_review_index.sql` | Unfiltered model-review paging index |
+| V10 | `V10__model_build_supersession.sql` | Audited technical model-build supersession |
+| V11 | `V11__api_keys_and_molecule_submission_quota.sql` | API keys and ad-hoc submission audit |
+| V12 | `V12__atomic_molecule_submission_quota.sql` | Race-safe anonymous daily quota counter |
 
 V8 intentionally replaces the V7 `ix_job_claim` column order. The current V1 clean
 baseline already contains the final index definitions for a newly created schema,
-but the complete version chain must still finish at V8 so migration history and an
+but the complete version chain must still finish at V12 so migration history and an
 upgraded schema converge on the same final shape.
 
 The SQL filenames are Flyway-compatible. The repository does not currently define
@@ -287,9 +291,9 @@ flyway validate
 flyway info
 ```
 
-The only new migration should be V8. Stop if validation reports an edited checksum,
-a failed migration, an out-of-order version, or a version other than the expected
-state. Never run `repair` merely to make validation green; investigate and record
+Pending migrations must exactly match the repository chain through V12. Stop if validation
+reports an edited checksum, a failed migration, an out-of-order version, or an unexpected
+version. Never run `repair` merely to make validation green; investigate and record
 the cause first.
 
 ### 6.5 Existing V1-V7 schema without Flyway history
@@ -334,7 +338,7 @@ and resolve the exact state first.
 ### 6.7 Empty Compose volume
 
 On the first startup of a truly empty database volume, MariaDB executes the mounted
-`sql/v3` scripts in filename order. The current chain is V1 through V8. Docker
+`sql/v3` scripts in filename order. The current chain is V01 through V12. Docker
 entrypoint initialization never migrates an existing volume. An established volume
 therefore requires Flyway or the explicit client procedure above before application
 containers are replaced.
@@ -409,7 +413,7 @@ Take a backup before:
 1. Validate the untracked environment file and secret permissions.
 2. Start MariaDB only.
 3. Wait for the MariaDB health check.
-4. Apply and verify all migrations through V8.
+4. Apply and verify all migrations through V12.
 5. Start FastAPI and Spring.
 6. Run API and predictor readiness checks.
 7. Start the frontend and verify browser routes.
@@ -664,7 +668,7 @@ Run full canonical coverage only when needed:
 
 ### 11.1 Preconditions
 
-- All schema migrations through V8 are applied.
+- All schema migrations through V12 are applied.
 - The model definition points to a ready feature profile.
 - Dataset partial-state acknowledgement, when required, is present.
 - The release revision is immutable and supplied as `MOLCLASS_CODE_REVISION`.
@@ -1015,7 +1019,7 @@ searches. Record the exercise before removing the restore environment.
 
 ### After migration/startup
 
-- Flyway validation or manual migration record is successful through V8.
+- Flyway validation or manual migration record is successful through V12.
 - V8 index order is verified.
 - MariaDB statistics are refreshed.
 - FastAPI readiness passes.

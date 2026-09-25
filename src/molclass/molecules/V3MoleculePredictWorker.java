@@ -2,7 +2,6 @@ package molclass.molecules;
 
 import molclass.features.V3FeatureGenerator;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.net.InetAddress;
@@ -18,8 +17,10 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -294,12 +295,9 @@ public final class V3MoleculePredictWorker {
      * others; each failure is collected and reported alongside whatever did succeed.
      */
     private void completeAllMissing(Claim claim, long moleculeId) throws Exception {
-        Set<Long> published = publishedModelIds();
-        Set<Long> alreadyPredicted = predictedModelIds(moleculeId);
-        List<Long> missing = new ArrayList<>();
-        for (Long modelId : published) {
-            if (!alreadyPredicted.contains(modelId)) missing.add(modelId);
-        }
+        Map<Long, Long> published = publishedModels();
+        Set<Long> predictedBuilds = predictedBuildIds(moleculeId);
+        List<Long> missing = missingModelDefinitionIds(published, predictedBuilds);
 
         List<String> predictions = new ArrayList<>();
         List<String> errors = new ArrayList<>();
@@ -314,7 +312,7 @@ public final class V3MoleculePredictWorker {
         JSONObject result = new JSONObject();
         result.put("moleculeId", moleculeId);
         result.put("modelsPublished", published.size());
-        result.put("modelsAlreadyPredicted", alreadyPredicted.size());
+        result.put("modelsAlreadyPredicted", published.size() - missing.size());
         result.put("predictions", predictions.stream().map(JSONObject::new).toList());
         result.put("errors", errors);
 
@@ -323,38 +321,45 @@ public final class V3MoleculePredictWorker {
                 result.toString());
     }
 
-    /** Every currently-published model's definition ID, per the predictor's own registry. */
-    private Set<Long> publishedModelIds() throws Exception {
-        JSONArray models = httpGetJsonArray("/api/v3/models?limit=1000&query=");
-        Set<Long> ids = new LinkedHashSet<>();
-        for (int index = 0; index < models.length(); index++) {
-            ids.add(models.getJSONObject(index).getLong("modelDefinitionId"));
+    /** Current published build by model definition, without the predictor API's 200-row cap. */
+    private Map<Long, Long> publishedModels() throws SQLException {
+        Map<Long, Long> models = new LinkedHashMap<>();
+        String sql = "SELECT md.model_definition_id,md.published_model_build_id FROM "
+                + t("model_definition") + " md JOIN " + t("model_build")
+                + " mb ON mb.model_build_id=md.published_model_build_id"
+                + " WHERE md.status='ACTIVE' AND mb.status='PUBLISHED'"
+                + " ORDER BY md.model_definition_id";
+        try (Connection connection = connection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet rows = statement.executeQuery()) {
+            while (rows.next()) models.put(rows.getLong(1), rows.getLong(2));
+        }
+        return models;
+    }
+
+    /** Published-build identities already persisted for this molecule. */
+    private Set<Long> predictedBuildIds(long moleculeId) throws SQLException {
+        Set<Long> ids = new HashSet<>();
+        String sql = "SELECT DISTINCT pj.model_build_id FROM " + t("prediction_result")
+                + " pr JOIN " + t("prediction_job")
+                + " pj ON pj.prediction_job_id=pr.prediction_job_id WHERE pr.molecule_id=?";
+        try (Connection connection = connection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, moleculeId);
+            try (ResultSet rows = statement.executeQuery()) {
+                while (rows.next()) ids.add(rows.getLong(1));
+            }
         }
         return ids;
     }
 
-    /** Every model this molecule already has at least one persisted prediction against. */
-    private Set<Long> predictedModelIds(long moleculeId) throws Exception {
-        JSONArray predictions = httpGetJsonArray("/api/v3/molecules/" + moleculeId + "/predictions");
-        Set<Long> ids = new LinkedHashSet<>();
-        for (int index = 0; index < predictions.length(); index++) {
-            ids.add(predictions.getJSONObject(index).getLong("modelDefinitionId"));
+    static List<Long> missingModelDefinitionIds(
+            Map<Long, Long> publishedModels, Set<Long> predictedBuildIds) {
+        List<Long> missing = new ArrayList<>();
+        for (Map.Entry<Long, Long> model : publishedModels.entrySet()) {
+            if (!predictedBuildIds.contains(model.getValue())) missing.add(model.getKey());
         }
-        return ids;
-    }
-
-    private JSONArray httpGetJsonArray(String path) throws Exception {
-        URI uri = URI.create(config.predictorUrl + path);
-        HttpRequest request = HttpRequest.newBuilder(uri)
-                .timeout(Duration.ofSeconds(30))
-                .GET()
-                .build();
-        HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() / 100 != 2) {
-            throw new PredictionFailedException(
-                    "predictor returned " + response.statusCode() + ": " + truncate(response.body(), 1024));
-        }
-        return new JSONArray(response.body());
+        return missing;
     }
 
     private void transition(long jobId, String runstep) throws SQLException {

@@ -1,4 +1,5 @@
 import hashlib
+import ipaddress
 import json
 from typing import Any, Optional
 
@@ -22,16 +23,38 @@ class MoleculePredictRequest(BaseModel):
     model_definition_id: Optional[int] = Field(default=None, gt=0)
 
 
-def _client_ip(request: Request) -> str:
-    # Trusted here because this deployment is only reachable through Apache -> Next.js's
-    # proxy, and Next.js only *sets* X-Forwarded-For when the incoming request lacks one --
-    # it never overwrites Apache's value. The leftmost entry is the original client.
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        candidate = forwarded.split(",")[0].strip()
-        if candidate:
-            return candidate
-    return request.client.host if request.client else "unknown"
+def _parse_ip(value: Optional[str]):
+    if not value:
+        return None
+    try:
+        parsed = ipaddress.ip_address(value.strip())
+    except ValueError:
+        return None
+    if isinstance(parsed, ipaddress.IPv6Address) and parsed.ipv4_mapped:
+        return parsed.ipv4_mapped
+    return parsed
+
+
+def _client_ip(request: Request) -> bytes:
+    """Return a normalized packed address suitable for VARBINARY(16).
+
+    Apache appends the actual client to X-Forwarded-For before the request reaches
+    the private Next.js/FastAPI hop. Reading from the right prevents a caller from
+    evading the quota by prepending a forged address. Forwarded headers are ignored
+    for a direct request from a public peer.
+    """
+    peer = _parse_ip(request.client.host if request.client else None)
+    peer_is_trusted_proxy = peer is None or peer.is_private or peer.is_loopback or peer.is_link_local
+    if peer_is_trusted_proxy:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            for candidate in reversed(forwarded.split(",")):
+                parsed = _parse_ip(candidate)
+                if parsed is not None:
+                    return parsed.packed
+    if peer is not None:
+        return peer.packed
+    return ipaddress.ip_address("0.0.0.0").packed
 
 
 def _resolve_api_key(db: Session, request: Request) -> Optional[int]:
@@ -81,14 +104,28 @@ def queue_molecule_predict(
         client_ip = _client_ip(http_request)
 
         if api_key_id is None:
+            # The upsert locks one (UTC date, IP) row, so simultaneous requests
+            # cannot all observe the same pre-limit COUNT and overrun the quota.
+            db.execute(
+                text(
+                    "INSERT INTO molecule_submission_quota"
+                    " (quota_date,client_ip,submission_count,updated_at)"
+                    " VALUES (UTC_DATE(),:client_ip,1,UTC_TIMESTAMP(6))"
+                    " ON DUPLICATE KEY UPDATE"
+                    " submission_count=submission_count+1,updated_at=UTC_TIMESTAMP(6)"
+                ),
+                {"client_ip": client_ip},
+            )
             submitted_today = db.execute(
                 text(
-                    "SELECT COUNT(*) FROM molecule_submission"
-                    " WHERE client_ip=INET6_ATON(:ip) AND created_at>=UTC_DATE()"
+                    "SELECT submission_count FROM molecule_submission_quota"
+                    " WHERE quota_date=UTC_DATE() AND client_ip=:client_ip"
                 ),
-                {"ip": client_ip},
+                {"client_ip": client_ip},
             ).scalar()
-            if submitted_today is not None and int(submitted_today) >= DAILY_SUBMISSION_LIMIT:
+            if submitted_today is None:
+                raise RuntimeError("anonymous submission quota row was not persisted")
+            if int(submitted_today) > DAILY_SUBMISSION_LIMIT:
                 raise HTTPException(
                     status_code=429,
                     detail={"code": "DAILY_QUOTA_EXCEEDED", "limit": DAILY_SUBMISSION_LIMIT},
@@ -134,13 +171,13 @@ def queue_molecule_predict(
                 """
                 INSERT INTO molecule_submission
                     (job_id,api_key_id,client_ip,requested_model_definition_id,predict_all_missing)
-                VALUES (:job_id,:api_key_id,INET6_ATON(:ip),:model_id,:predict_all_missing)
+                VALUES (:job_id,:api_key_id,:client_ip,:model_id,:predict_all_missing)
                 """
             ),
             {
                 "job_id": job_id,
                 "api_key_id": api_key_id,
-                "ip": client_ip,
+                "client_ip": client_ip,
                 "model_id": request.model_definition_id,
                 "predict_all_missing": predict_all_missing,
             },

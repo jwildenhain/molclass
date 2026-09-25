@@ -42,13 +42,15 @@ test("clicking the linked molecule searches for it", async ({ page }) => {
 
 test("a new structure with no exact match can be registered and predicted", async ({ page }) => {
   await stubEndpoint(page, routes.moleculeSearch, []);
-  await page.route(routes.adhocMoleculePredict, (route) =>
+  let submitted: Record<string, unknown> | null = null;
+  await page.route(routes.adhocMoleculePredict, (route) => {
+    submitted = route.request().postDataJSON() as Record<string, unknown>;
     route.fulfill({
       status: 202,
       contentType: "application/json",
       body: JSON.stringify({ jobId: 555, status: "QUEUED" }),
-    }),
-  );
+    });
+  });
   await page.route(routes.adhocJob, (route) =>
     route.fulfill({
       status: 200,
@@ -72,4 +74,5 @@ test("a new structure with no exact match can be registered and predicted", asyn
   await page.getByRole("button", { name: "Register this structure and predict" }).click();
 
   await expect(page).toHaveURL(/\/search\?tab=models&molecules=999$/);
+  expect(submitted).toMatchObject({ smiles: "CCOc1ccccc1", model_definition_id: expect.any(Number) });
 });

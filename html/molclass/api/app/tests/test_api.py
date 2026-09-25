@@ -216,6 +216,7 @@ class _FakeMoleculePredictSession:
     def __init__(self, api_key_row=None, submissions_today=0):
         self.api_key_row = api_key_row
         self.submissions_today = submissions_today
+        self.client_ips = []
 
     def begin(self):
         return self
@@ -226,12 +227,14 @@ class _FakeMoleculePredictSession:
     def __exit__(self, *exc_info):
         return False
 
-    def execute(self, sql, *_args, **_kwargs):
+    def execute(self, sql, params=None, *_args, **_kwargs):
         sql_text = str(sql).strip().lower()
+        if isinstance(params, dict) and isinstance(params.get("client_ip"), bytes):
+            self.client_ips.append(params["client_ip"])
         if sql_text.startswith("select api_key_id"):
             return self._Result(first_value=self.api_key_row)
-        if sql_text.startswith("select count(*) from molecule_submission"):
-            return self._Result(scalar_value=self.submissions_today)
+        if sql_text.startswith("select submission_count from molecule_submission_quota"):
+            return self._Result(scalar_value=self.submissions_today + 1)
         return self._Result(lastrowid=4242)
 
 
@@ -289,6 +292,23 @@ def test_predict_anonymous_quota_exceeded(client: TestClient):
 
     assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
     assert response.json() == {"detail": {"code": "DAILY_QUOTA_EXCEEDED", "limit": 100}}
+
+
+def test_predict_quota_uses_proxy_appended_client_ip(client: TestClient):
+    session = _FakeMoleculePredictSession()
+    key = _override_molecule_predict_db(session)
+    try:
+        response = client.post(
+            "/api/v1/molecules/predict",
+            json={"smiles": "CCO", "model_definition_id": 1},
+            headers={"X-Forwarded-For": "1.1.1.1, 8.8.8.8"},
+        )
+    finally:
+        app.dependency_overrides.pop(key, None)
+
+    assert response.status_code == status.HTTP_202_ACCEPTED
+    assert session.client_ips
+    assert all(value == b"\x08\x08\x08\x08" for value in session.client_ips)
 
 
 def test_predict_with_api_key_bypasses_quota_and_allows_missing_model_id(client: TestClient):
@@ -379,13 +399,9 @@ def test_get_single_model(client: TestClient):
     data = resp.json()
     assert "model_id" in data
 
-def test_create_model_success(client: TestClient):
+def test_legacy_model_creation_route_is_retired(client: TestClient):
     resp = client.post("/model/create", json=MODEL_CREATE_PAYLOAD)
-    assert resp.status_code == status.HTTP_200_OK
-    data = resp.json()
-    assert "model_id" in data
-    assert data["model_id"] == 12345
-    assert "message" in data
+    assert resp.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 def test_delete_dataset_success(client: TestClient):
     resp = client.delete("/dataset/1")
@@ -414,18 +430,3 @@ def test_get_prediction_results(client: TestClient):
     resp = client.get("/prediction/1/results")
     assert resp.status_code == status.HTTP_200_OK
     assert isinstance(resp.json(), list)
-
-def test_background_task_registration_on_create_model(client: TestClient):
-    resp = client.post("/model/create", json=MODEL_CREATE_PAYLOAD)
-    assert resp.status_code == status.HTTP_200_OK
-    fake_session = LAST_FAKE_SESSION
-    assert fake_session is not None
-    assert "insert into class_models" in (fake_session.last_sql or "")
-
-def test_create_model_invalid_email(client: TestClient):
-    bad_payload = MODEL_CREATE_PAYLOAD.copy()
-    bad_payload["email"] = "not-an-email"
-    resp = client.post("/model/create", json=bad_payload)
-    assert resp.status_code == status.HTTP_400_BAD_REQUEST
-    assert "Invalid email format" in resp.text
-

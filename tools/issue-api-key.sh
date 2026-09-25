@@ -28,7 +28,11 @@ fi
 
 invoking_user="$(printenv SUDO_USER || true)"
 if [[ -z "$invoking_user" || "$invoking_user" == "root" ]]; then
-    invoking_user="jw"
+    invoking_user="${MOLCLASS_CREDENTIAL_OWNER:-}"
+fi
+if [[ -z "$invoking_user" || "$invoking_user" == "root" ]]; then
+    printf '%s\n' "Run through sudo as the target user or set MOLCLASS_CREDENTIAL_OWNER." >&2
+    exit 1
 fi
 invoking_home="$(getent passwd "$invoking_user" | cut -d: -f6)"
 invoking_group="$(id -gn "$invoking_user")"

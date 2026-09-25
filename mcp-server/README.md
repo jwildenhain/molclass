@@ -7,9 +7,9 @@ compounds and run predictions as part of a conversation or agent workflow.
 Two ways to predict: `predict` works only on molecules already indexed on the
 target deployment (find the id first with `search_molecule` or
 `search_molecule_by_structure`); `submit_and_predict` registers a brand-new
-structure from a raw SMILES string first. Registration itself (not prediction)
-is the only part gated by the deployment's data intake setting -- a read-only
-deployment rejects it with a clear `DATA_INTAKE_DISABLED` error rather than hang.
+structure from a raw SMILES string first. This quota-protected path remains
+available when training-data intake is disabled because it only invokes
+already-published models.
 
 With `MOLCLASS_API_KEY` set, `submit_and_predict` defaults to predicting against
 every currently-published model the molecule is missing (instead of one named
@@ -53,7 +53,7 @@ export MOLCLASS_BASE_URL=https://your-domain.example
 export MOLCLASS_API_URL=https://your-domain.example
 
 # optional: unlocks submit_and_predict's predict-all-missing mode and exempts it
-# from the deployment's per-IP daily quota (see sql/v3/V11__api_keys_and_molecule_submission_quota.sql).
+# from the deployment's per-IP daily quota (see sql/v3/V11 and V12 migrations).
 # Issue one with sudo tools/issue-api-key.sh mcp-server; never commit the value.
 export MOLCLASS_API_KEY=...
 ```

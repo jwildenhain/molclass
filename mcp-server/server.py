@@ -3,11 +3,10 @@
 
 Talks to a running MolClass deployment's v3 prediction API (see
 spring_boot_predictor/src/main/java/molclass/predictor/V3PredictionController.java)
-for search/predict on already-indexed molecules, and its ad-hoc registration API
-(see html/molclass/api/app/v3_molecules.py) for genuinely new structures. The
-latter is disabled on any deployment with MOLCLASS_DATA_INTAKE_ENABLED=false
-(the FAQ page in molclass-frontend explains why) -- submit_and_predict will
-return a clear DATA_INTAKE_DISABLED error on those, not a crash.
+for search/predict on already-indexed molecules, and its quota-protected ad-hoc
+registration API (see html/molclass/api/app/v3_molecules.py) for genuinely new
+structures. Ad-hoc prediction remains available when training-data intake is
+disabled because it only uses already-published models.
 """
 import json
 import os
@@ -148,10 +147,8 @@ def submit_and_predict(
 
     Unlike predict(), the molecule does not need to already be indexed -- this registers
     it, computes its descriptors, and predicts, then waits (polling) for the whole
-    pipeline to finish. Disabled on deployments configured as read-only (search/predict
-    only, no new data) -- returns a DATA_INTAKE_DISABLED error on those rather than
-    hanging. Counts as one molecule of this server's daily quota, spent only if the
-    pipeline actually completes successfully.
+    pipeline to finish. Counts as one molecule of this server's daily quota, spent
+    only if the pipeline actually completes successfully.
 
     Pass model_definition_id to predict against exactly that one model -- result is
     {moleculeId, modelDefinitionId, prediction}. Omit it (this server's default, since
