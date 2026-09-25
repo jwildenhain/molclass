@@ -2,10 +2,17 @@
 
 import { FormEvent, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Activity, Beaker, Info, PencilRuler, Search } from "lucide-react";
 import type { SketcherHandle } from "./MoleculeSketcher";
+
 import { MoleculeStructure } from "@/components/MoleculeStructure";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+
+const LinkedStructurePreview = dynamic(() => import("./LinkedStructurePreview").then(module => module.LinkedStructurePreview), {
+  ssr: false,
+  loading: () => <p className="my-6">Loading linked structures…</p>,
+});
 
 const MoleculeSketcher = dynamic(() => import("./MoleculeSketcher"), {
   ssr: false,
@@ -74,7 +81,10 @@ async function errorDetail(response: Response, fallback: string) {
 
 export function StructureSearchPanel() {
   const router = useRouter();
-  const [query, setQuery] = useState("");
+  const params = useSearchParams();
+  const linkedSmiles = (params.get("smiles") || "").slice(0, 10000);
+  const linkedScaffold = (params.get("scaffold") || "").slice(0, 10000);
+  const [query, setQuery] = useState(linkedSmiles);
   const [matchMode, setMatchMode] = useState<MatchMode>("exact");
   const [results, setResults] = useState<Molecule[]>([]);
   const [meta, setMeta] = useState<SearchMeta | null>(null);
@@ -84,7 +94,79 @@ export function StructureSearchPanel() {
   const [showSketcher, setShowSketcher] = useState(false);
   const [sketcherError, setSketcherError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [adhocStatus, setAdhocStatus] = useState<"idle" | "submitting" | "error">("idle");
+  const [adhocError, setAdhocError] = useState<string | null>(null);
   const sketcherRef = useRef<SketcherHandle>(null);
+
+  function clearLinkedStructure() {
+    setQuery("");
+    setResults([]);
+    setMeta(null);
+    setSearched(false);
+    setError(null);
+    setAdhocStatus("idle");
+    setAdhocError(null);
+    router.replace("/search");
+  }
+
+  async function predictNewStructure() {
+    const smiles = query.trim();
+    if (!smiles) return;
+    setAdhocStatus("submitting");
+    setAdhocError(null);
+
+    try {
+      const modelsResponse = await fetchWithTimeout("/api/v3/models?limit=1&query=");
+      if (!modelsResponse.ok) {
+        throw new Error(await errorDetail(modelsResponse, "Could not load published models."));
+      }
+      const models = (await modelsResponse.json()) as { modelDefinitionId: number }[];
+      const seedModelId = models[0]?.modelDefinitionId;
+      if (!seedModelId) {
+        throw new Error("No published models are available to predict against.");
+      }
+
+      const submitResponse = await fetchWithTimeout("/api/v1/molecules/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ smiles, model_definition_id: seedModelId }),
+      });
+      if (!submitResponse.ok) {
+        throw new Error(await errorDetail(submitResponse, `Could not submit this structure (${submitResponse.status}).`));
+      }
+      const { jobId } = (await submitResponse.json()) as { jobId: number };
+
+      const deadline = Date.now() + 30000;
+      let moleculeId: number | null = null;
+      while (Date.now() < deadline) {
+        const jobResponse = await fetchWithTimeout(`/api/v1/jobs/${jobId}`, { cache: "no-store" });
+        if (!jobResponse.ok) {
+          throw new Error(await errorDetail(jobResponse, "Could not check prediction status."));
+        }
+        const job = (await jobResponse.json()) as {
+          status: string;
+          error_message: string | null;
+          result: { moleculeId: number } | null;
+        };
+        if (job.status === "SUCCEEDED") {
+          moleculeId = job.result?.moleculeId ?? null;
+          break;
+        }
+        if (job.status === "FAILED") {
+          throw new Error(job.error_message || "MolClass could not process this structure.");
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+
+      if (moleculeId == null) {
+        throw new Error("Registering this structure is taking longer than expected. Try again shortly.");
+      }
+      router.push(`/search?tab=models&molecules=${moleculeId}`);
+    } catch (submitError) {
+      setAdhocStatus("error");
+      setAdhocError(submitError instanceof Error ? submitError.message : "Could not predict this structure.");
+    }
+  }
 
   function toggleSelected(moleculeId: number) {
     setSelectedIds((current) => {
@@ -183,25 +265,45 @@ export function StructureSearchPanel() {
         </div>
       </header>
 
-      <div className="mb-4 inline-flex rounded-xl border border-border bg-card/60 p-1 shadow-sm">
-        <button
-          type="button"
-          onClick={() => setMatchMode("exact")}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-            matchMode === "exact" ? "bg-blue-600 text-white" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Exact match
-        </button>
-        <button
-          type="button"
-          onClick={() => setMatchMode("substructure")}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-            matchMode === "substructure" ? "bg-blue-600 text-white" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Substructure
-        </button>
+      {linkedSmiles && <LinkedStructurePreview
+        smiles={linkedSmiles}
+        scaffold={linkedScaffold}
+        onSearch={(value, isScaffold) => {
+          const mode = isScaffold ? "substructure" : "exact";
+          setQuery(value); setMatchMode(mode); void runSearch(value, mode);
+        }}
+      />}
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex rounded-xl border border-border bg-card/60 p-1 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setMatchMode("exact")}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+              matchMode === "exact" ? "bg-blue-600 text-white" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Exact match
+          </button>
+          <button
+            type="button"
+            onClick={() => setMatchMode("substructure")}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+              matchMode === "substructure" ? "bg-blue-600 text-white" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Substructure
+          </button>
+        </div>
+        {linkedSmiles && (
+          <button
+            type="button"
+            onClick={clearLinkedStructure}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
+          >
+            Clear, back to search
+          </button>
+        )}
       </div>
 
       <form onSubmit={search} className="grid gap-3 rounded-2xl border border-border bg-card/60 p-5 shadow-lg backdrop-blur-md sm:grid-cols-[1fr_auto_auto] sm:p-6">
@@ -324,8 +426,24 @@ export function StructureSearchPanel() {
               ? meta && meta.totalMolecules > 0
                 ? `No match among the ${meta.indexedMolecules.toLocaleString()} molecules currently indexed for substructure search. The remaining ${(meta.totalMolecules - meta.indexedMolecules).toLocaleString()} are not searchable this way yet, so this does not rule the fragment out.`
                 : "No indexed molecule contains this fragment. Indexing is incomplete, so this does not rule the fragment out."
-              : "Try a shorter identifier fragment, a wildcard (* or ?), or browse without a query."}
+              : "Try a shorter identifier fragment, a wildcard (* or ?), or browse without a query. If this is a new structure, you can register and predict it directly below."}
           </p>
+          {matchMode === "exact" && query.trim() && (
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={() => void predictNewStructure()}
+                disabled={adhocStatus === "submitting"}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-60"
+              >
+                <Activity className="h-4 w-4" />
+                {adhocStatus === "submitting" ? "Registering and predicting..." : "Register this structure and predict"}
+              </button>
+              {adhocStatus === "error" && adhocError && (
+                <p role="alert" className="mx-auto mt-3 max-w-md text-sm text-red-600 dark:text-red-300">{adhocError}</p>
+              )}
+            </div>
+          )}
         </section>
       )}
 

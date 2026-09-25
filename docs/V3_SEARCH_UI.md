@@ -30,6 +30,24 @@ selection. Molecules can be removed individually from the prediction panel but n
 adding more means going back to structure search. This keeps molecule lookup in one place instead
 of duplicating it across both tabs.
 
+## Linked structures from ChemGrid
+
+`/search?smiles=<smiles>&scaffold=<smiles>` (what a chemgrid.org compound page links to) renders
+`LinkedStructurePreview` above the structure-search form — loaded client-side only
+(`next/dynamic`, `ssr:false`) since it draws both structures with the `smiles-drawer` vendor
+script (`public/vendor/smiles-drawer-2.3.0.min.js`). "Find this molecule" / "Find compounds with
+this scaffold" run an exact/substructure search on that value; "Clear, back to search" (next to
+the Exact match/Substructure toggle, not in the panel itself) resets all search state and
+navigates to a bare `/search`.
+
+If the exact search finds nothing, a "Register this structure and predict" button appears instead
+of the usual empty-state text — it submits the linked SMILES to
+`POST /api/v1/molecules/predict` (no API key, so single-model mode against the first published
+model — see [V3_ADHOC_PREDICTION.md](V3_ADHOC_PREDICTION.md)), polls the job, and on success
+navigates to `/search?tab=models&molecules=<newMoleculeId>` with the new molecule pre-selected.
+This is the only place in the frontend that calls the ad-hoc endpoint; everywhere else predicts
+against molecules already in the registry.
+
 ## Model + molecule prediction
 
 - The classification-models table adds **AUC** and **F1** columns (`holdoutAuc`/`holdoutF1` from

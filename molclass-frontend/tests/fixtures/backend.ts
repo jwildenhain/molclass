@@ -327,6 +327,8 @@ export const routes = {
   modelReviews: /\/api\/v1\/model-reviews\?/,
   modelReviewDetail: /\/api\/v1\/model-definitions\/\d+\/review$/,
   renameModelDefinition: /\/api\/v1\/model-definitions\/\d+$/,
+  adhocMoleculePredict: /\/api\/v1\/molecules\/predict$/,
+  adhocJob: /\/api\/v1\/jobs\/\d+$/,
 };
 
 /** Serve every backend call this UI makes with a healthy, predictable payload. */
