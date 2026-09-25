@@ -16,10 +16,13 @@ Async, not synchronous: the structure needs registering (CDK-normalized, dedupli
 against everything already known), its descriptors computed, then predicted against the model.
 Poll `GET /api/v1/jobs/{jobId}` until `status` is `SUCCEEDED` or `FAILED`; on success `result`
 holds `{moleculeId, modelDefinitionId, prediction}`. A structure CDK can't parse or normalize
-fails the job with a clear error rather than silently producing junk. Disabled entirely
-(`403 DATA_INTAKE_DISABLED`) on any deployment with `MOLCLASS_DATA_INTAKE_ENABLED=false` — a
-read-only deployment shouldn't register new molecules just because a caller asked for a
-prediction.
+fails the job with a clear error rather than silently producing junk.
+
+**Not gated by `MOLCLASS_DATA_INTAKE_ENABLED` or `MOLCLASS_CONFIGURATION_ENABLED`**: those flags
+block growing the training corpus (uploads, import triggers, new/edited model definitions) on a
+read-only deployment. Ad-hoc prediction runs against an already-approved model rather than
+building or reconfiguring one, so it stays reachable on a read-only deployment — including on
+tyerschem2 production, where both flags are currently `false`.
 
 This is the same endpoint the MCP server's `submit_and_predict` tool wraps (see
 [mcp-server/README.md](../mcp-server/README.md)) — that wrapper is a reasonable reference for the

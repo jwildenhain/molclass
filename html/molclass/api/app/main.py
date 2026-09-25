@@ -39,13 +39,16 @@ app.include_router(v3_dataset_router)
 app.include_router(v3_molecules_router)
 
 def _is_data_intake_route(method: str, path: str) -> bool:
+    # Blocks growing the training corpus (uploads, import triggers, new model
+    # definitions) on a read-only deployment. Ad-hoc prediction from a raw
+    # structure (/api/v1/molecules/predict) is deliberately NOT gated here: it
+    # predicts against an already-approved model rather than building one, so
+    # it stays available even when data intake is disabled.
     if method != "POST":
         return False
     if path == "/api/v1/uploads":
         return True
     if path.startswith("/api/v1/uploads/") and path.endswith("/imports"):
-        return True
-    if path == "/api/v1/molecules/predict":
         return True
     return path == "/api/v1/model-definitions"
 

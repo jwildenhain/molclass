@@ -185,6 +185,53 @@ def test_configuration_disabled_blocks_model_creation(client: TestClient, monkey
     assert response.status_code == status.HTTP_403_FORBIDDEN
     assert response.json() == {"detail": {"code": "SERVER_CONFIGURATION_DISABLED"}}
 
+def test_data_intake_disabled_still_blocks_uploads(client: TestClient, monkeypatch):
+    monkeypatch.setattr(settings, "data_intake_enabled", False)
+    response = client.post("/api/v1/uploads", json={})
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.json() == {"detail": {"code": "DATA_INTAKE_DISABLED"}}
+
+
+def test_data_intake_disabled_does_not_block_prediction(client: TestClient, monkeypatch):
+    # Ad-hoc prediction runs against an already-approved model rather than
+    # building one, so it must stay reachable even on a read-only deployment
+    # that has data_intake_enabled=False to block uploads/imports/model builds.
+    monkeypatch.setattr(settings, "data_intake_enabled", False)
+
+    class _FakeJobResult:
+        lastrowid = 4242
+
+    class _FakeV3Session:
+        def begin(self):
+            return self
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc_info):
+            return False
+
+        def execute(self, *_args, **_kwargs):
+            return _FakeJobResult()
+
+    def _override_v3_db():
+        yield _FakeV3Session()
+
+    from app.database import get_v3_db
+
+    app.dependency_overrides[get_v3_db] = _override_v3_db
+    try:
+        response = client.post(
+            "/api/v1/molecules/predict",
+            json={"smiles": "CCO", "model_definition_id": 1},
+        )
+    finally:
+        app.dependency_overrides.pop(get_v3_db, None)
+
+    assert response.status_code == status.HTTP_202_ACCEPTED
+    assert response.json() == {"jobId": 4242, "status": "QUEUED"}
+
+
 def test_get_datasets(client: TestClient):
     resp = client.get("/dataset")
     assert resp.status_code == status.HTTP_200_OK
