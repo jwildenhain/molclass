@@ -192,41 +192,119 @@ def test_data_intake_disabled_still_blocks_uploads(client: TestClient, monkeypat
     assert response.json() == {"detail": {"code": "DATA_INTAKE_DISABLED"}}
 
 
+class _FakeMoleculePredictSession:
+    """Stubs just enough of the v3 Session API for POST /api/v1/molecules/predict:
+    an api_key lookup (mappings().first()), a quota count (scalar()), and the job/
+    job_event/molecule_submission inserts inside `with db.begin()` (execute().lastrowid).
+    """
+
+    class _Result:
+        def __init__(self, lastrowid=None, scalar_value=None, first_value=None):
+            self.lastrowid = lastrowid
+            self._scalar = scalar_value
+            self._first = first_value
+
+        def scalar(self):
+            return self._scalar
+
+        def mappings(self):
+            return self
+
+        def first(self):
+            return self._first
+
+    def __init__(self, api_key_row=None, submissions_today=0):
+        self.api_key_row = api_key_row
+        self.submissions_today = submissions_today
+
+    def begin(self):
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+    def execute(self, sql, *_args, **_kwargs):
+        sql_text = str(sql).strip().lower()
+        if sql_text.startswith("select api_key_id"):
+            return self._Result(first_value=self.api_key_row)
+        if sql_text.startswith("select count(*) from molecule_submission"):
+            return self._Result(scalar_value=self.submissions_today)
+        return self._Result(lastrowid=4242)
+
+
+def _override_molecule_predict_db(session: "_FakeMoleculePredictSession"):
+    from app.database import get_v3_db
+
+    def _override():
+        yield session
+
+    app.dependency_overrides[get_v3_db] = _override
+    return get_v3_db
+
+
 def test_data_intake_disabled_does_not_block_prediction(client: TestClient, monkeypatch):
     # Ad-hoc prediction runs against an already-approved model rather than
     # building one, so it must stay reachable even on a read-only deployment
     # that has data_intake_enabled=False to block uploads/imports/model builds.
     monkeypatch.setattr(settings, "data_intake_enabled", False)
 
-    class _FakeJobResult:
-        lastrowid = 4242
-
-    class _FakeV3Session:
-        def begin(self):
-            return self
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *exc_info):
-            return False
-
-        def execute(self, *_args, **_kwargs):
-            return _FakeJobResult()
-
-    def _override_v3_db():
-        yield _FakeV3Session()
-
-    from app.database import get_v3_db
-
-    app.dependency_overrides[get_v3_db] = _override_v3_db
+    key = _override_molecule_predict_db(_FakeMoleculePredictSession())
     try:
         response = client.post(
             "/api/v1/molecules/predict",
             json={"smiles": "CCO", "model_definition_id": 1},
         )
     finally:
-        app.dependency_overrides.pop(get_v3_db, None)
+        app.dependency_overrides.pop(key, None)
+
+    assert response.status_code == status.HTTP_202_ACCEPTED
+    assert response.json() == {"jobId": 4242, "status": "QUEUED"}
+
+
+def test_predict_without_model_id_requires_api_key(client: TestClient):
+    key = _override_molecule_predict_db(_FakeMoleculePredictSession())
+    try:
+        response = client.post("/api/v1/molecules/predict", json={"smiles": "CCO"})
+    finally:
+        app.dependency_overrides.pop(key, None)
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.json() == {"detail": {"code": "MODEL_DEFINITION_ID_REQUIRED"}}
+
+
+def test_predict_anonymous_quota_exceeded(client: TestClient):
+    key = _override_molecule_predict_db(
+        _FakeMoleculePredictSession(submissions_today=100)
+    )
+    try:
+        response = client.post(
+            "/api/v1/molecules/predict",
+            json={"smiles": "CCO", "model_definition_id": 1},
+        )
+    finally:
+        app.dependency_overrides.pop(key, None)
+
+    assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+    assert response.json() == {"detail": {"code": "DAILY_QUOTA_EXCEEDED", "limit": 100}}
+
+
+def test_predict_with_api_key_bypasses_quota_and_allows_missing_model_id(client: TestClient):
+    key = _override_molecule_predict_db(
+        _FakeMoleculePredictSession(
+            api_key_row={"api_key_id": 7}, submissions_today=100
+        )
+    )
+    try:
+        response = client.post(
+            "/api/v1/molecules/predict",
+            json={"smiles": "CCO"},
+            headers={"X-MolClass-Api-Key": "test-key"},
+        )
+    finally:
+        app.dependency_overrides.pop(key, None)
 
     assert response.status_code == status.HTTP_202_ACCEPTED
     assert response.json() == {"jobId": 4242, "status": "QUEUED"}

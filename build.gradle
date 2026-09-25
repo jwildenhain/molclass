@@ -42,6 +42,11 @@ dependencies {
     implementation fileTree(dir: 'lib', include: ['*.jar'], exclude: ['cdk-2.12.jar', 'weka-stable-3.8.6.jar', 'weka-src.jar'])
     implementation 'org.openscience.cdk:cdk-bundle:2.12'
     implementation 'nz.ac.waikato.cms.weka:weka-stable:3.8.7'
+    // Minimal JSON parsing for V3MoleculePredictWorker's predict-all-missing-models mode,
+    // which has to read arrays (published models, existing predictions) from the predictor
+    // service -- everywhere else in this codebase gets away with hand-built JSON strings
+    // and MySQL's JSON_EXTRACT because it only ever reads single flat objects.
+    implementation 'org.json:json:20250107'
 
     components {
         withModule('com.github.fommil.netlib:all') {

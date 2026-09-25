@@ -18,6 +18,46 @@ Poll `GET /api/v1/jobs/{jobId}` until `status` is `SUCCEEDED` or `FAILED`; on su
 holds `{moleculeId, modelDefinitionId, prediction}`. A structure CDK can't parse or normalize
 fails the job with a clear error rather than silently producing junk.
 
+### Anonymous callers: 100 submissions/day per IP
+
+Without an API key, `model_definition_id` is required (single model per request) and the caller is
+limited to 100 `POST /api/v1/molecules/predict` submissions per UTC day, counted by client IP
+(`X-Forwarded-For`'s first hop, since this deployment sits behind Apache → Next.js → FastAPI — see
+`_client_ip` in `app/v3_molecules.py`). Over the limit: `429 {"detail": {"code":
+"DAILY_QUOTA_EXCEEDED", "limit": 100}}`. The count lives in the `molecule_submission` table
+(one row per request, regardless of outcome) — reset is implicit, since the quota query only counts
+rows from the current UTC day.
+
+### API-key callers: no quota, and predict every missing model in one call
+
+Send `X-MolClass-Api-Key: <key>`. A valid, unrevoked key (checked against `api_key.key_hash`, a
+SHA-256 hash — the plaintext is never stored) does two things:
+
+1. Exempts the request from the 100/day IP quota entirely.
+2. Lets you **omit** `model_definition_id`. The job then predicts this molecule against every
+   currently-published model it doesn't already have a result for — computed fresh against the
+   predictor's own records each time (`GET /api/v3/models`, `GET /api/v3/molecules/{id}/predictions`),
+   never a hardcoded list — so a newly published model is picked up automatically without any
+   change on the caller's side. Result shape differs from the single-model form:
+
+   ```json
+   {"jobId": 4121, "status": "QUEUED"}
+   ```
+   ```json
+   // GET /api/v1/jobs/4121 once SUCCEEDED:
+   {"moleculeId": 150561, "modelsPublished": 15, "modelsAlreadyPredicted": 2,
+    "predictions": [{"modelDefinitionId": 1, "predictedClass": "...", "...": "..."}, ...],
+    "errors": ["Model 9: predictor returned 500: ..."]}
+   ```
+
+   One model failing to predict doesn't fail the job or block the others — it's collected into
+   `errors` alongside whatever did succeed.
+
+Issue a key with `sudo tools/issue-api-key.sh <label>` (e.g. `chemgrid`) — see
+[Database account](#database-account) below for the migration it depends on. The plaintext key
+exists only in the credential file the script writes; there's no way to recover a lost one, only
+revoke (`UPDATE api_key SET revoked_at=UTC_TIMESTAMP(6) WHERE label=...`) and reissue.
+
 **Not gated by `MOLCLASS_DATA_INTAKE_ENABLED` or `MOLCLASS_CONFIGURATION_ENABLED`**: those flags
 block growing the training corpus (uploads, import triggers, new/edited model definitions) on a
 read-only deployment. Ad-hoc prediction runs against an already-approved model rather than
@@ -60,6 +100,17 @@ Writes `~/.config/molclass/molecule-worker.env` (mode 0600). Grants: everything
 the one thing feature-worker deliberately doesn't have, since it only ever computes descriptors
 for molecules that already exist. The prediction step itself writes nothing under this account; it
 persists on the predictor service's own credentials.
+
+## Migration: API keys and the submission quota
+
+```bash
+mysql -u "$MOLCLASS_DB_USER" -p molclass_v3 < sql/v3/V11__api_keys_and_molecule_submission_quota.sql
+```
+
+Adds `api_key` (hashed keys, see above) and `molecule_submission` (one row per
+`POST /api/v1/molecules/predict` request — `job_id`, `api_key_id` if any, `client_ip`, whether it
+was a single-model or predict-all-missing request — the source of truth for both the daily quota
+count and per-caller audit).
 
 ## For a same-host caller like chemgrid
 

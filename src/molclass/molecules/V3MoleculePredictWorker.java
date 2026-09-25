@@ -2,6 +2,9 @@ package molclass.molecules;
 
 import molclass.features.V3FeatureGenerator;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -14,6 +17,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -137,7 +144,8 @@ public final class V3MoleculePredictWorker {
             connection.setAutoCommit(false);
             String sql = "SELECT job_id,"
                     + "JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.smiles')),"
-                    + "CAST(JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.modelDefinitionId')) AS UNSIGNED)"
+                    + "CAST(JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.modelDefinitionId')) AS UNSIGNED),"
+                    + "JSON_UNQUOTE(JSON_EXTRACT(payload_json,'$.predictAllMissing'))"
                     + " FROM " + t("job")
                     + " WHERE job_type=? AND status='QUEUED' AND available_at<=UTC_TIMESTAMP(6)"
                     + " ORDER BY priority DESC,job_id LIMIT 1 FOR UPDATE SKIP LOCKED";
@@ -146,7 +154,8 @@ public final class V3MoleculePredictWorker {
                 select.setString(1, JOB_TYPE);
                 try (ResultSet row = select.executeQuery()) {
                     if (row.next()) {
-                        claim = new Claim(row.getLong(1), row.getString(2), row.getLong(3));
+                        claim = new Claim(row.getLong(1), row.getString(2), row.getLong(3),
+                                "true".equals(row.getString(4)));
                     }
                 }
             }
@@ -154,9 +163,13 @@ public final class V3MoleculePredictWorker {
                 connection.rollback();
                 return null;
             }
-            if (claim.smiles == null || claim.smiles.isBlank() || claim.modelDefinitionId <= 0) {
+            boolean payloadValid = claim.smiles != null && !claim.smiles.isBlank()
+                    && (claim.predictAllMissing || claim.modelDefinitionId > 0);
+            if (!payloadValid) {
                 connection.rollback();
-                failPermanently(claim.jobId, "MOLECULE_PREDICT_REQUEST payload is missing smiles or modelDefinitionId");
+                failPermanently(claim.jobId,
+                        "MOLECULE_PREDICT_REQUEST payload is missing smiles, or modelDefinitionId "
+                                + "when predictAllMissing is not set");
                 return null;
             }
             try (PreparedStatement update = connection.prepareStatement(
@@ -234,10 +247,16 @@ public final class V3MoleculePredictWorker {
             }
             if (leaseLost.get()) throw new IllegalStateException("worker lease was lost");
             transition(claim.jobId, "PREDICT");
-            String predictionJson = predict(claim.modelDefinitionId, moleculeId);
-            complete(claim, moleculeId, predictionJson);
-            System.out.println("Molecule predict job " + claim.jobId + " completed for molecule "
-                    + moleculeId + " against model " + claim.modelDefinitionId);
+            if (claim.predictAllMissing) {
+                completeAllMissing(claim, moleculeId);
+                System.out.println("Molecule predict job " + claim.jobId
+                        + " completed for molecule " + moleculeId + " against every missing model");
+            } else {
+                String predictionJson = predict(claim.modelDefinitionId, moleculeId);
+                complete(claim, moleculeId, predictionJson);
+                System.out.println("Molecule predict job " + claim.jobId + " completed for molecule "
+                        + moleculeId + " against model " + claim.modelDefinitionId);
+            }
         } catch (Exception exception) {
             try {
                 fail(claim, exception);
@@ -264,6 +283,78 @@ public final class V3MoleculePredictWorker {
                     "predictor returned " + response.statusCode() + ": " + truncate(response.body(), 1024));
         }
         return response.body();
+    }
+
+    /**
+     * Predicts this molecule against every currently-published model it doesn't already have a
+     * result for, and completes the job with all of them at once. "Missing" is computed fresh on
+     * every call against the predictor's own records (GET .../models, GET .../predictions) --
+     * never a caller-supplied list -- so a newly published model is picked up automatically and a
+     * caller never has to track model IDs itself. One model failing to predict doesn't fail the
+     * others; each failure is collected and reported alongside whatever did succeed.
+     */
+    private void completeAllMissing(Claim claim, long moleculeId) throws Exception {
+        Set<Long> published = publishedModelIds();
+        Set<Long> alreadyPredicted = predictedModelIds(moleculeId);
+        List<Long> missing = new ArrayList<>();
+        for (Long modelId : published) {
+            if (!alreadyPredicted.contains(modelId)) missing.add(modelId);
+        }
+
+        List<String> predictions = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+        for (Long modelId : missing) {
+            try {
+                predictions.add(predict(modelId, moleculeId));
+            } catch (Exception exception) {
+                errors.add("Model " + modelId + ": " + safeMessage(exception));
+            }
+        }
+
+        JSONObject result = new JSONObject();
+        result.put("moleculeId", moleculeId);
+        result.put("modelsPublished", published.size());
+        result.put("modelsAlreadyPredicted", alreadyPredicted.size());
+        result.put("predictions", predictions.stream().map(JSONObject::new).toList());
+        result.put("errors", errors);
+
+        completeWithResult(claim, "molecule " + moleculeId + " predicted against "
+                + predictions.size() + " missing model(s), " + errors.size() + " error(s)",
+                result.toString());
+    }
+
+    /** Every currently-published model's definition ID, per the predictor's own registry. */
+    private Set<Long> publishedModelIds() throws Exception {
+        JSONArray models = httpGetJsonArray("/api/v3/models?limit=1000&query=");
+        Set<Long> ids = new LinkedHashSet<>();
+        for (int index = 0; index < models.length(); index++) {
+            ids.add(models.getJSONObject(index).getLong("modelDefinitionId"));
+        }
+        return ids;
+    }
+
+    /** Every model this molecule already has at least one persisted prediction against. */
+    private Set<Long> predictedModelIds(long moleculeId) throws Exception {
+        JSONArray predictions = httpGetJsonArray("/api/v3/molecules/" + moleculeId + "/predictions");
+        Set<Long> ids = new LinkedHashSet<>();
+        for (int index = 0; index < predictions.length(); index++) {
+            ids.add(predictions.getJSONObject(index).getLong("modelDefinitionId"));
+        }
+        return ids;
+    }
+
+    private JSONArray httpGetJsonArray(String path) throws Exception {
+        URI uri = URI.create(config.predictorUrl + path);
+        HttpRequest request = HttpRequest.newBuilder(uri)
+                .timeout(Duration.ofSeconds(30))
+                .GET()
+                .build();
+        HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() / 100 != 2) {
+            throw new PredictionFailedException(
+                    "predictor returned " + response.statusCode() + ": " + truncate(response.body(), 1024));
+        }
+        return new JSONArray(response.body());
     }
 
     private void transition(long jobId, String runstep) throws SQLException {
@@ -296,6 +387,11 @@ public final class V3MoleculePredictWorker {
     private void complete(Claim claim, long moleculeId, String predictionJson) throws Exception {
         String resultJson = "{\"moleculeId\":" + moleculeId + ",\"modelDefinitionId\":"
                 + claim.modelDefinitionId + ",\"prediction\":" + predictionJson + "}";
+        completeWithResult(claim, "molecule " + moleculeId + " predicted against model "
+                + claim.modelDefinitionId, resultJson);
+    }
+
+    private void completeWithResult(Claim claim, String message, String resultJson) throws Exception {
         try (Connection connection = connection()) {
             connection.setAutoCommit(false);
             try (PreparedStatement update = connection.prepareStatement(
@@ -307,9 +403,7 @@ public final class V3MoleculePredictWorker {
                 update.setString(2, workerId);
                 if (update.executeUpdate() != 1) throw new SQLException("worker lease was lost");
             }
-            event(connection, claim.jobId, "JOB_SUCCEEDED", "COMPLETE",
-                    "molecule " + moleculeId + " predicted against model " + claim.modelDefinitionId,
-                    resultJson);
+            event(connection, claim.jobId, "JOB_SUCCEEDED", "COMPLETE", message, resultJson);
             connection.commit();
         }
     }
@@ -408,7 +502,7 @@ public final class V3MoleculePredictWorker {
         }
     }
 
-    private record Claim(long jobId, String smiles, long modelDefinitionId) {
+    private record Claim(long jobId, String smiles, long modelDefinitionId, boolean predictAllMissing) {
     }
 
     private static final class Config {

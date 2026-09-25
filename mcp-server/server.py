@@ -21,6 +21,7 @@ from mcp.server.fastmcp import FastMCP
 
 BASE_URL = os.environ.get("MOLCLASS_BASE_URL", "http://127.0.0.1:8082").rstrip("/")
 API_URL = os.environ.get("MOLCLASS_API_URL", "http://127.0.0.1:8000").rstrip("/")
+API_KEY = os.environ.get("MOLCLASS_API_KEY", "")
 DAILY_LIMIT = int(os.environ.get("MOLCLASS_MCP_DAILY_LIMIT", "100"))
 STATE_PATH = Path(
     os.environ.get("MOLCLASS_MCP_STATE_FILE", str(Path.home() / ".molclass-mcp" / "usage.json"))
@@ -61,8 +62,12 @@ def _post(path: str) -> Any:
     return response.json()
 
 
+def _api_headers() -> dict[str, str]:
+    return {"X-MolClass-Api-Key": API_KEY} if API_KEY else {}
+
+
 def _api_post(path: str, json_body: dict[str, Any]) -> tuple[int, Any]:
-    response = httpx.post(f"{API_URL}{path}", json=json_body, timeout=30.0)
+    response = httpx.post(f"{API_URL}{path}", json=json_body, headers=_api_headers(), timeout=30.0)
     try:
         body = response.json()
     except ValueError:
@@ -71,7 +76,7 @@ def _api_post(path: str, json_body: dict[str, Any]) -> tuple[int, Any]:
 
 
 def _api_get(path: str) -> Any:
-    response = httpx.get(f"{API_URL}{path}", timeout=30.0)
+    response = httpx.get(f"{API_URL}{path}", headers=_api_headers(), timeout=30.0)
     response.raise_for_status()
     return response.json()
 
@@ -137,9 +142,9 @@ def predict(model_definition_id: int, molecule_id: int) -> dict[str, Any]:
 
 @mcp.tool()
 def submit_and_predict(
-    smiles: str, model_definition_id: int, timeout_seconds: int = 120
+    smiles: str, model_definition_id: int | None = None, timeout_seconds: int = 120
 ) -> dict[str, Any]:
-    """Register a brand-new molecule from a raw SMILES string and predict against one model.
+    """Register a brand-new molecule from a raw SMILES string and predict on it.
 
     Unlike predict(), the molecule does not need to already be indexed -- this registers
     it, computes its descriptors, and predicts, then waits (polling) for the whole
@@ -147,6 +152,16 @@ def submit_and_predict(
     only, no new data) -- returns a DATA_INTAKE_DISABLED error on those rather than
     hanging. Counts as one molecule of this server's daily quota, spent only if the
     pipeline actually completes successfully.
+
+    Pass model_definition_id to predict against exactly that one model -- result is
+    {moleculeId, modelDefinitionId, prediction}. Omit it (this server's default, since
+    it has its own API key) to predict against every currently-published model this
+    molecule doesn't already have a result for in one call, computed fresh against the
+    deployment's own records each time -- result is {moleculeId, modelsPublished,
+    modelsAlreadyPredicted, predictions: [...], errors: [...]}; one model failing
+    doesn't fail the others. Omitting it without an API key configured
+    (MOLCLASS_API_KEY) returns a clear MODEL_DEFINITION_ID_REQUIRED error rather than
+    a confusing one from the deployment.
     """
     usage = _load_usage()
     if usage["count"] >= DAILY_LIMIT:
@@ -157,10 +172,10 @@ def submit_and_predict(
                 "that limit has been reached for today (UTC). Try again after 00:00 UTC."
             ),
         }
-    status_code, body = _api_post(
-        "/api/v1/molecules/predict",
-        {"smiles": smiles, "model_definition_id": model_definition_id},
-    )
+    body_payload: dict[str, Any] = {"smiles": smiles}
+    if model_definition_id is not None:
+        body_payload["model_definition_id"] = model_definition_id
+    status_code, body = _api_post("/api/v1/molecules/predict", body_payload)
     if status_code != 202:
         return {"error": "SUBMIT_FAILED", "httpStatus": status_code, "detail": body}
 

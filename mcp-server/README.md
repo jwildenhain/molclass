@@ -7,9 +7,16 @@ compounds and run predictions as part of a conversation or agent workflow.
 Two ways to predict: `predict` works only on molecules already indexed on the
 target deployment (find the id first with `search_molecule` or
 `search_molecule_by_structure`); `submit_and_predict` registers a brand-new
-structure from a raw SMILES string first. The latter needs the deployment's data
-intake enabled -- production deployments configured as read-only (search/predict
-only) will reject it with a clear `DATA_INTAKE_DISABLED` error rather than hang.
+structure from a raw SMILES string first. Registration itself (not prediction)
+is the only part gated by the deployment's data intake setting -- a read-only
+deployment rejects it with a clear `DATA_INTAKE_DISABLED` error rather than hang.
+
+With `MOLCLASS_API_KEY` set, `submit_and_predict` defaults to predicting against
+every currently-published model the molecule is missing (instead of one named
+model) and is exempt from the deployment's own per-IP daily submission quota --
+see [docs/V3_ADHOC_PREDICTION.md](../docs/V3_ADHOC_PREDICTION.md) for what the key
+unlocks server-side. Without a key, you must pass `model_definition_id` explicitly
+and are subject to that quota like any other anonymous caller.
 
 ## Tools
 
@@ -19,7 +26,7 @@ only) will reject it with a clear `DATA_INTAKE_DISABLED` error rather than hang.
 - `get_molecule(molecule_id)` -- detail for one molecule
 - `get_predictions(molecule_id, limit)` -- predictions already computed (no quota cost)
 - `predict(model_definition_id, molecule_id)` -- predict on an already-indexed molecule (uses quota)
-- `submit_and_predict(smiles, model_definition_id, timeout_seconds)` -- register a new molecule and predict on it (uses quota, only on success)
+- `submit_and_predict(smiles, model_definition_id=None, timeout_seconds)` -- register a new molecule and predict on it (uses quota, only on success). Omit `model_definition_id` to predict every missing model at once -- requires `MOLCLASS_API_KEY`.
 - `usage_status()` -- remaining daily quota
 
 ## Setup
@@ -44,6 +51,11 @@ export MOLCLASS_API_URL=http://127.0.0.1:8000   # FastAPI: submit_and_predict's 
 # or, behind a reverse proxy:
 export MOLCLASS_BASE_URL=https://your-domain.example
 export MOLCLASS_API_URL=https://your-domain.example
+
+# optional: unlocks submit_and_predict's predict-all-missing mode and exempts it
+# from the deployment's per-IP daily quota (see sql/v3/V11__api_keys_and_molecule_submission_quota.sql).
+# Issue one with sudo tools/issue-api-key.sh mcp-server; never commit the value.
+export MOLCLASS_API_KEY=...
 ```
 
 Add it to your MCP client's config, e.g. Claude Desktop's `claude_desktop_config.json`:
@@ -54,7 +66,7 @@ Add it to your MCP client's config, e.g. Claude Desktop's `claude_desktop_config
     "molclass": {
       "command": "/absolute/path/to/molclass/mcp-server/.venv/bin/python3",
       "args": ["/absolute/path/to/molclass/mcp-server/server.py"],
-      "env": { "MOLCLASS_BASE_URL": "http://127.0.0.1:8082", "MOLCLASS_API_URL": "http://127.0.0.1:8000" }
+      "env": { "MOLCLASS_BASE_URL": "http://127.0.0.1:8082", "MOLCLASS_API_URL": "http://127.0.0.1:8000", "MOLCLASS_API_KEY": "..." }
     }
   }
 }
