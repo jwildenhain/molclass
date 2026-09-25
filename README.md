@@ -45,7 +45,7 @@ bundled MCP server.
 
 ## Architecture
 
-A modern, containerized stack — six Docker Compose services:
+A modern, containerized stack — seven Docker Compose services:
 
 | Service | What it does |
 |---|---|
