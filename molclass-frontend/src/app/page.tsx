@@ -98,13 +98,14 @@ export default function Home() {
 
         {/* Details Card */}
         <Link href="/details" className="group relative p-1 rounded-2xl bg-gradient-to-br from-amber-500/30 to-orange-500/30 hover:from-amber-500/50 hover:to-orange-500/50 transition-all duration-300 shadow-xl shadow-amber-900/20">
-          <div className="absolute inset-0 bg-card/80 backdrop-blur-sm rounded-2xl"></div>
-          <div className="relative p-6 flex flex-col items-center text-center space-y-4 rounded-xl h-full justify-center">
-            <div className="p-4 bg-amber-500/20 rounded-full group-hover:scale-110 transition-transform duration-300">
-              <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <div className="bg-card/80 backdrop-blur-sm p-8 rounded-xl h-full border border-border/50 flex flex-col justify-between group-hover:bg-card/60 transition-colors">
+            <div>
+              <div className="w-12 h-12 rounded-lg bg-amber-500/20 flex items-center justify-center mb-6 border border-amber-500/30">
+                <svg className="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <h2 className="text-2xl font-bold text-foreground mb-3">Details & Citations</h2>
+              <p className="text-muted-foreground">About MolClass, contact information, and academic citations.</p>
             </div>
-            <h2 className="text-xl font-bold text-foreground">Details & Citations</h2>
-            <p className="text-sm text-muted-foreground">About MolClass, contact information, and academic citations.</p>
           </div>
         </Link>
 

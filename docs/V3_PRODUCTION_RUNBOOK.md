@@ -1062,3 +1062,48 @@ searches. Record the exercise before removing the restore environment.
 - `docs/V3_LEGACY_MIGRATION.md`
 - `docs/adr/0006-model-rebuild-restart-semantics.md`
 - `docs/adr/0008-utc-runtime-timestamps.md`
+
+
+## 18. Frontend-only releases and header update (2026-10-11)
+
+For a frontend-only presentation release, compare the affected source files with
+production before applying the patch. Preserve newer production edits, the analytics
+script, the Apache analytics alias and the frontend layout's script inclusion.
+Database migrations and worker shutdown are not part of this release type.
+
+Build the frontend while the current container remains running. Test the candidate
+on a loopback-only port on the existing Compose network, then replace only the
+frontend with `docker compose up -d --no-deps --no-build frontend`. Check the public
+routes and a read-only API request, compare protected-file checksums, and remove
+the temporary candidate container. Retain the prior image and changed source files
+for rollback.
+
+The 2026-10-11 header release updated News, Help, Model Creation, Upload and the
+home-page Details & Citations card. Production build/type checking and candidate
+and public route checks passed; `/api/v1/model-datasets` returned HTTP 200.
+Analytics JavaScript, the MolClass Apache virtual host and `src/app/layout.tsx`
+matched their pre-release SHA-256 checksums. Backend containers were not replaced.
+
+Release records on the production host:
+
+- Source backup: `/var/backups/molclass-headers-20261011/frontend-before.tgz`
+- Protected checksums: `/var/backups/molclass-headers-20261011/protected.sha256`
+- Previous image: `molclass-frontend:before-headers-20261011`
+- Released image ID: `sha256:b8b84a4c882c258bc1ef7eab5a59888c5d6c864e32c052184d8f662834a0bdc5`
+
+Rollback from `/home/tyerschem2/molclass`: restore the source archive there, tag
+`molclass-frontend:before-headers-20261011` as `molclass-frontend:latest`, and run
+`docker compose up -d --no-deps --no-build frontend`. Verify public routes again.
+
+### CI and Docker context
+
+GitHub Actions runs Playwright checks, an isolated Docker deployment smoke test
+(including upload/import), and MCP import checks. The workflow named Deployment
+Smoke Test validates a disposable stack; it does not deploy to production.
+
+The frontend is a separate Docker build context. Its own `.dockerignore` excludes
+host `node_modules`, `.next`, test output and local environment files. The root
+`.dockerignore` does not apply to that context. This prevents local dependencies
+and secrets entering `COPY . .` and avoids the 1.08 GB context observed during the
+header release. Docker still installs dependencies from the lockfile and builds
+all production assets inside its build stages.

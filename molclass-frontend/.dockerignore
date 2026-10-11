@@ -1,0 +1,16 @@
+# Dependencies and build output are created inside the Docker build stages.
+node_modules
+.next
+out
+coverage
+playwright-report
+test-results
+*.tsbuildinfo
+*.log
+
+# Keep machine-specific secrets and local tooling out of the build context.
+.env
+.env.*
+!.env.example
+.git
+.DS_Store

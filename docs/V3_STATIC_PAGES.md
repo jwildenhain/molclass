@@ -5,7 +5,7 @@ These are content pages with no backend of their own — everything below is fro
 
 ## Navigation
 
-Top bar order is now: Upload, Model Creation, Search, Model Review, **Help**, **News**, Details.
+Top bar order is now: Upload, Model Creation, Search, Model Review, **Help**, **News**, Details, FAQ.
 
 `Prediction List` was removed from the nav (both desktop and, previously, absent from mobile). The
 route itself — `/prediction-list`, its redirects, and its Playwright coverage — is untouched and
@@ -41,3 +41,25 @@ an `<img>`.
 - Contact block links out to LinkedIn rather than a mailto link.
 - Header uses the same left-aligned kicker/h1/subtitle pattern as every other page (fixed from an
   earlier centered layout that had drifted from the rest of the site).
+
+
+## Header and home-card consistency (2026-10-11)
+
+Model Review, Details and FAQ define the reference header treatment: an unboxed,
+left-aligned header with a plain blue uppercase monospace introductory label,
+`mt-3` title spacing and `mt-4` supporting text. Page-specific widths and content
+panels remain independent.
+
+- News and Help use text-only introductory labels, without pill outlines,
+  backgrounds or icons.
+- Model Creation uses the same plain label and an open header, without its former
+  outer border, background, shadow or decorative glow. Its statistics remain.
+- Upload places the header above the bordered workflow panel; the panel contains
+  the import steps and upload controls.
+- The home-page Details & Citations card uses the same top-left 48px rounded-square
+  icon container, 24px icon and card padding as its neighbours.
+
+These are presentation changes; upload, model creation, navigation and analytics
+behaviour are unchanged. Verification included application type checking, linting,
+local browser review and production checks of all affected routes and the read-only
+model-dataset API.

@@ -5,7 +5,6 @@ import {
   ArrowRight,
   Beaker,
   CheckCircle2,
-  HelpCircle,
   Search as SearchIcon,
   UploadCloud,
   UserCheck,
@@ -45,11 +44,8 @@ export default function HelpPage() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:py-14">
       <header className="mb-10">
-        <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.28em] text-blue-600 dark:text-blue-300">
-          <HelpCircle className="h-3.5 w-3.5" />
-          Getting started
-        </div>
-        <h1 className="mt-4 text-3xl font-bold tracking-tight text-foreground sm:text-5xl">Help</h1>
+        <p className="font-mono text-xs uppercase tracking-[0.28em] text-blue-500">Getting started</p>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-5xl">Help</h1>
         <p className="mt-4 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
           The full MolClass workflow, from a raw SDF file to a published prediction model you can query.
           Every screen below is redrawn from the real page&rsquo;s layout to walk through what you&rsquo;ll

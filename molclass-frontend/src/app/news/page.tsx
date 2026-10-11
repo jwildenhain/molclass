@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Newspaper, Trophy } from "lucide-react";
+import { Trophy } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "News | MolClass V2",
@@ -38,11 +38,8 @@ export default function NewsPage() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:py-14">
       <header className="mb-10">
-        <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.28em] text-blue-600 dark:text-blue-300">
-          <Newspaper className="h-3.5 w-3.5" />
-          MolClass news
-        </div>
-        <h1 className="mt-4 text-3xl font-bold tracking-tight text-foreground sm:text-5xl">News</h1>
+        <p className="font-mono text-xs uppercase tracking-[0.28em] text-blue-500">MolClass news</p>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-5xl">News</h1>
         <p className="mt-4 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
           Updates on what MolClass can do, and how it holds up against published benchmarks.
         </p>

@@ -259,16 +259,11 @@ export default function ModelCreationPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:py-14">
-      <section className="relative mb-8 overflow-hidden rounded-3xl border border-border bg-card/60 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-amber-400/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 -left-12 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl" />
+      <header className="mb-8">
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.28em] text-amber-500">
-              <Beaker className="h-3.5 w-3.5" />
-              Model intake
-            </div>
-            <h1 className="mt-4 max-w-3xl text-3xl font-bold tracking-tight text-foreground sm:text-5xl">
+            <p className="font-mono text-xs uppercase tracking-[0.28em] text-blue-500">Model intake</p>
+            <h1 className="mt-3 max-w-3xl text-3xl font-bold tracking-tight text-foreground sm:text-5xl">
               Choose a dataset with a verified target to build a model.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
@@ -296,7 +291,7 @@ export default function ModelCreationPage() {
             </div>
           </div>
         </div>
-      </section>
+      </header>
 
       <section className="overflow-hidden rounded-3xl border border-border bg-card/60 shadow-2xl backdrop-blur-xl">
         <div className="flex flex-col gap-4 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">

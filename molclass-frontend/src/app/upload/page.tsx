@@ -350,23 +350,23 @@ export default function UploadPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:py-14">
-      <section className="relative overflow-hidden rounded-3xl border border-border bg-card/70 shadow-2xl backdrop-blur-xl">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(14,165,233,0.15),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(245,158,11,0.10),transparent_30%)]" />
-        <div className="relative border-b border-border px-6 py-8 sm:px-10">
-          <p className="mb-3 font-mono text-xs uppercase tracking-[0.28em] text-sky-400">Durable dataset intake</p>
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h1 className="max-w-3xl text-3xl font-bold tracking-tight text-foreground sm:text-5xl">Inspect the chemistry before it enters the model pipeline.</h1>
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                MolClass analyzes every SDF record first, proposes a complete unique identifier, and imports all properties unless you explicitly remove them.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 px-5 py-4 text-sm text-sky-900 dark:text-sky-100">
-              Per-record transactions<br />Failed molecules do not stop the dataset
-            </div>
+      <header className="mb-8">
+        <p className="font-mono text-xs uppercase tracking-[0.28em] text-blue-500">Durable dataset intake</p>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h1 className="mt-3 max-w-3xl text-3xl font-bold tracking-tight text-foreground sm:text-5xl">Inspect the chemistry before it enters the model pipeline.</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+              MolClass analyzes every SDF record first, proposes a complete unique identifier, and imports all properties unless you explicitly remove them.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 px-5 py-4 text-sm text-sky-900 dark:text-sky-100">
+            Per-record transactions<br />Failed molecules do not stop the dataset
           </div>
         </div>
+      </header>
 
+      <section className="relative overflow-hidden rounded-3xl border border-border bg-card/70 shadow-2xl backdrop-blur-xl">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(14,165,233,0.15),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(245,158,11,0.10),transparent_30%)]" />
         <div className="relative grid gap-10 px-6 py-8 sm:px-10 lg:grid-cols-[220px_minmax(0,1fr)] lg:py-10">
           <nav aria-label="Import progress" className="space-y-2">
             {phases.map((item, index) => {
