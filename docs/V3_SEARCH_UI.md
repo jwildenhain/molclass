@@ -32,13 +32,30 @@ of duplicating it across both tabs.
 
 ## Linked structures from ChemGrid
 
-`/search?smiles=<smiles>&scaffold=<smiles>` (what a chemgrid.org compound page links to) renders
-`LinkedStructurePreview` above the structure-search form — loaded client-side only
+`/search?smiles=<smiles>` accepts a standalone, URL-encoded SMILES deep link. The optional
+`&scaffold=<smiles>` parameter adds a nearest-training-scaffold comparison when the caller has
+one. Either form initializes the molecule-search text box from `smiles`; a supplied molecule is
+therefore ready for an exact registry lookup without retyping or pasting it.
+
+The deep link renders `LinkedStructurePreview` above the structure-search form — loaded client-side only
 (`next/dynamic`, `ssr:false`) since it draws both structures with the `smiles-drawer` vendor
 script (`public/vendor/smiles-drawer-2.3.0.min.js`). "Find this molecule" / "Find compounds with
 this scaffold" run an exact/substructure search on that value; "Clear, back to search" (next to
 the Exact match/Substructure toggle, not in the panel itself) resets all search state and
 navigates to a bare `/search`.
+
+### Molecule of the month
+
+The first landing-page card is the "MolClass molecule of the month" entry point. The whole card,
+including "Explore activity", links to `/search?smiles=<canonical-smiles>` using a Next.js URL
+object so the SMILES is encoded safely. The current molecule is BMS-820132. Its card briefly
+identifies it as an investigational oral partial glucokinase activator developed for type 2
+diabetes and loads its canonical SMILES into both the structure preview and search text box.
+
+Opening the card does not claim that the molecule already exists in the local registry and does
+not start a prediction job automatically. The user first runs the exact lookup; if no match is
+found, the existing ad-hoc registration path described below makes it available to approved
+MolClass models.
 
 If the exact search finds nothing, a "Register this structure and predict" button appears instead
 of the usual empty-state text — it submits the linked SMILES to

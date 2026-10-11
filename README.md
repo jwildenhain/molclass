@@ -38,6 +38,13 @@ bundled MCP server.
   used for a prediction.
 - **Structure search that's actually structure-aware**: exact match and
   substructure search by SMILES, not just text matching on names.
+- **A featured-molecule handoff, not a dead-end showcase.** The landing page's
+  "MolClass molecule of the month" card opens structure search with the
+  molecule's canonical SMILES already loaded and drawn. From there it can be
+  found in the registry or registered and explored against approved MolClass
+  models. The current feature is BMS-820132, an investigational oral partial
+  glucokinase activator developed for type 2 diabetes ([IUPHAR/BPS Guide to
+  PHARMACOLOGY](https://www.guidetopharmacology.org/GRAC/LigandDisplayForward?ligandId=11932&tab=refs)).
 - **Talk to it from an AI assistant.** [`mcp-server/`](mcp-server/) exposes
   search and prediction as MCP tools, including registering a brand-new
   molecule from a raw SMILES string and predicting on it in one call — useful
@@ -76,6 +83,10 @@ docker compose up -d
 ```
 
 Then open `http://127.0.0.1:3000`.
+
+Local database dumps, dataset snapshots, and deployment safety copies belong
+under `backups/`. That directory is intentionally ignored and must not be added
+to Git history.
 
 ## Citation
 
