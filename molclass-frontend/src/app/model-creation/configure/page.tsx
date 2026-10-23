@@ -46,6 +46,10 @@ type ModelOptions = {
   algorithms: Option[];
   featureSelections: Option[];
   featureProfiles: Profile[];
+  buildPolicy?: {
+    crossValidation: { defaultFolds: number | null; minimumFolds: number; maximumFolds: number };
+    timeout: { defaultSeconds: number; minimumSeconds: number; maximumSeconds: number };
+  };
 };
 type CreationResult = {
   modelDefinitionId: number;
@@ -54,6 +58,7 @@ type CreationResult = {
   targetProperty: string;
   declaredClassLabels: string[];
   positiveClassLabel: string;
+  buildPolicy: { crossValidationFolds: number | null; timeoutSeconds: number };
 };
 
 function payloadMessage(payload: unknown, fallback: string) {
@@ -73,11 +78,14 @@ async function apiJson<T>(response: Response, fallback: string): Promise<T> {
   return payload as T;
 }
 
-function minorityLabel(labels: ClassLabel[]) {
-  return labels.reduce<ClassLabel | null>(
-    (smallest, item) => !smallest || item.supportCount < smallest.supportCount ? item : smallest,
-    null,
-  )?.label ?? "";
+function generatedModelName(
+  datasetName: string,
+  targetName: string,
+  algorithmCode: string,
+  profileCode: string,
+  featureSelectionCode: string,
+) {
+  return `${datasetName} - ${targetName} - ${algorithmCode} - ${profileCode} - ${featureSelectionCode}`.slice(0, 255);
 }
 
 function ConfigureModelForm() {
@@ -90,8 +98,11 @@ function ConfigureModelForm() {
   const [featureProfileId, setFeatureProfileId] = useState("");
   const [algorithmCode, setAlgorithmCode] = useState("RandomForest");
   const [featureSelectionCode, setFeatureSelectionCode] = useState("CfsSubsetEval");
+  const [crossValidationFolds, setCrossValidationFolds] = useState("auto");
+  const [buildTimeoutSeconds, setBuildTimeoutSeconds] = useState("7200");
   const [positiveClass, setPositiveClass] = useState("");
   const [modelName, setModelName] = useState("");
+  const [modelNameEdited, setModelNameEdited] = useState(false);
   const [createdBy, setCreatedBy] = useState("web-operator");
   const [partialAcknowledged, setPartialAcknowledged] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -123,13 +134,21 @@ function ConfigureModelForm() {
         const nextOptions = await apiJson<ModelOptions>(optionsResponse, "Model options are unavailable.");
         if (cancelled) return;
         const target = nextDataset.targets[0];
-        const profile = nextOptions.featureProfiles.find((item) => item.code === "ALL") ?? nextOptions.featureProfiles[0];
+        const profile = nextOptions.featureProfiles.find((item) => item.code === "ALL" && item.status.startsWith("READY"))
+          ?? nextOptions.featureProfiles.find((item) => item.code === "CDK" && item.status === "READY")
+          ?? nextOptions.featureProfiles.find((item) => item.status === "READY")
+          ?? nextOptions.featureProfiles.find((item) => item.code === "CDK")
+          ?? nextOptions.featureProfiles[0];
         setDataset(nextDataset);
         setOptions(nextOptions);
         setTargetPropertyId(String(target.propertyId));
-        setPositiveClass(minorityLabel(target.classLabels));
+        setPositiveClass("");
         setFeatureProfileId(profile ? String(profile.featureProfileId) : "");
-        setModelName(`${nextDataset.name} - ${target.name}`.slice(0, 255));
+        setCrossValidationFolds(nextOptions.buildPolicy?.crossValidation.defaultFolds == null
+          ? "auto" : String(nextOptions.buildPolicy.crossValidation.defaultFolds));
+        setBuildTimeoutSeconds(String(nextOptions.buildPolicy?.timeout.defaultSeconds ?? 7200));
+        setModelName(generatedModelName(nextDataset.name, target.name, "RandomForest", profile?.code ?? "features", "CfsSubsetEval"));
+        setModelNameEdited(false);
       } catch (loadError) {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Model configuration could not be loaded.");
       } finally {
@@ -157,10 +176,20 @@ function ConfigureModelForm() {
     [options, featureSelectionCode],
   );
 
+  useEffect(() => {
+    if (!dataset || !selectedTarget || !selectedProfile || modelNameEdited) return;
+    setModelName(generatedModelName(
+      dataset.name,
+      selectedTarget.name,
+      algorithmCode,
+      selectedProfile.code,
+      featureSelectionCode,
+    ));
+  }, [algorithmCode, dataset, featureSelectionCode, modelNameEdited, selectedProfile, selectedTarget]);
+
   const changeTarget = (value: string) => {
     setTargetPropertyId(value);
-    const target = dataset?.targets.find((item) => item.propertyId === Number(value));
-    if (target) setPositiveClass(minorityLabel(target.classLabels));
+    setPositiveClass("");
   };
 
   const submit = async (event: FormEvent) => {
@@ -179,6 +208,8 @@ function ConfigureModelForm() {
           model_name: modelName.trim(),
           algorithm_code: algorithmCode,
           feature_selection_code: featureSelectionCode,
+          cross_validation_folds: crossValidationFolds === "auto" ? null : Number(crossValidationFolds),
+          build_timeout_seconds: Number(buildTimeoutSeconds),
           positive_class_label: positiveClass,
           partial_dataset_acknowledged: partialAcknowledged,
           created_by: createdBy.trim(),
@@ -211,6 +242,8 @@ function ConfigureModelForm() {
             <span className="rounded-lg bg-black/5 px-3 py-2 dark:bg-black/20">status {result.status}</span>
             <span className="rounded-lg bg-black/5 px-3 py-2 dark:bg-black/20">target {result.targetProperty}</span>
             <span className="rounded-lg bg-black/5 px-3 py-2 dark:bg-black/20">positive {result.positiveClassLabel}</span>
+            <span className="rounded-lg bg-black/5 px-3 py-2 dark:bg-black/20">CV {result.buildPolicy.crossValidationFolds ?? "automatic"}</span>
+            <span className="rounded-lg bg-black/5 px-3 py-2 dark:bg-black/20">timeout {result.buildPolicy.timeoutSeconds / 3600}h</span>
           </div>
         </div>
         <Link href="/model-creation" className="inline-flex rounded-xl border border-border px-5 py-3 font-semibold text-foreground transition hover:border-amber-400/50 hover:bg-amber-400/5">
@@ -241,16 +274,28 @@ function ConfigureModelForm() {
         <SelectField label="Feature selection" value={featureSelectionCode} onChange={setFeatureSelectionCode}>
           {options.featureSelections.map((selection) => <option key={selection.code} value={selection.code}>{selection.name}</option>)}
         </SelectField>
+        <SelectField label="Cross-validation" value={crossValidationFolds} onChange={setCrossValidationFolds}>
+          <option value="auto">Automatic for sparse evaluation splits</option>
+          {Array.from({ length: 9 }, (_, index) => index + 2).map((folds) => <option key={folds} value={folds}>{folds}-fold forced CV</option>)}
+        </SelectField>
+        <SelectField label="Build timeout" value={buildTimeoutSeconds} onChange={setBuildTimeoutSeconds}>
+          <option value="3600">1 hour</option>
+          <option value="7200">2 hours (recommended)</option>
+          <option value="14400">4 hours</option>
+          <option value="28800">8 hours</option>
+          <option value="86400">24 hours</option>
+        </SelectField>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         <InfoCard label="Profile" value={`${selectedProfile?.code ?? ""} / ${selectedProfile?.status ?? ""}`} detail={selectedProfile?.description ?? "Versioned CDK feature contract."} />
         <InfoCard label="Training path" value={selectedAlgorithm?.name ?? algorithmCode} detail={`${selectedAlgorithm?.description ?? ""} ${selectedFeatureSelection?.description ?? ""}`} />
+        <InfoCard label="Evaluation policy" value={crossValidationFolds === "auto" ? "Automatic CV" : `${crossValidationFolds}-fold CV`} detail={`Hard timeout after ${Number(buildTimeoutSeconds) / 3600} hour${buildTimeoutSeconds === "3600" ? "" : "s"}.`} />
       </div>
 
       <fieldset>
         <legend className="text-sm font-semibold text-foreground">Positive class</legend>
-        <p className="mt-1 text-sm text-muted-foreground">Choose the class whose probability and recall should be treated as positive during evaluation.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Required: explicitly choose the class whose probability and recall should be treated as positive. MolClass does not infer scientific meaning from class frequency.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {selectedTarget.classLabels.map((item) => (
             <label key={item.label} className={`cursor-pointer rounded-xl border p-4 transition ${positiveClass === item.label ? "border-amber-400 bg-amber-400/10" : "border-border bg-muted/10"}`}>
@@ -267,7 +312,7 @@ function ConfigureModelForm() {
       </fieldset>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <TextField label="Model name" value={modelName} onChange={setModelName} maxLength={255} />
+        <TextField label="Model name" value={modelName} onChange={(value) => { setModelName(value); setModelNameEdited(true); }} maxLength={255} />
         <TextField label="Created by" value={createdBy} onChange={setCreatedBy} maxLength={255} />
       </div>
 
@@ -347,7 +392,7 @@ export default function ConfigureModelPage() {
       <div className="mb-8">
         <p className="font-mono text-xs uppercase tracking-[0.28em] text-amber-500">Controlled training</p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-5xl">Define the model before the worker builds it.</h1>
-        <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground">Every definition records its dataset, target, class order, CDK profile, Weka algorithm, and operator.</p>
+        <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground">Every definition records its dataset, target, class order, CDK profile, Weka algorithm, evaluation policy, timeout, and operator.</p>
       </div>
       <section className="rounded-3xl border border-border bg-card/60 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
         <Suspense fallback={<div className="p-12 text-center text-muted-foreground">Loading model configuration...</div>}>

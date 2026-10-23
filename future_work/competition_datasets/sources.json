@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-10-22",
+  "sources": [
+    {
+      "id": "fda-dilirank-2",
+      "authority": "US FDA",
+      "status": "materialized",
+      "landingPage": "https://www.fda.gov/science-research/liver-toxicity-knowledge-base-ltkb/drug-induced-liver-injury-rank-dilirank-20-dataset",
+      "artifacts": ["fda_dilirank2_multiclass.sdf", "fda_dilirank2_binary.sdf"]
+    },
+    {
+      "id": "fda-dilist",
+      "authority": "US FDA",
+      "status": "materialized",
+      "landingPage": "https://www.fda.gov/science-research/liver-toxicity-knowledge-base-ltkb/drug-induced-liver-injury-severity-and-toxicity-dilist-dataset",
+      "artifacts": ["fda_dilist.sdf"]
+    },
+    {
+      "id": "fda-dictrank",
+      "authority": "US FDA",
+      "status": "materialized",
+      "landingPage": "https://www.fda.gov/science-research/bioinformatics-tools/drug-induced-cardiotoxicity-rank-dictrank-dataset",
+      "artifacts": ["fda_dictrank_multiclass.sdf", "fda_dictrank_binary.sdf"]
+    },
+    {
+      "id": "fda-diril",
+      "authority": "US FDA",
+      "status": "materialized",
+      "landingPage": "https://www.fda.gov/science-research/bioinformatics-tools/drug-induced-renal-injury-list-diril-dataset",
+      "artifacts": ["fda_diril.sdf"]
+    },
+    {
+      "id": "openfoodtox-3",
+      "authority": "EFSA",
+      "status": "local-use-only",
+      "landingPage": "https://www.efsa.europa.eu/en/data-report/chemical-hazards-database-openfoodtox",
+      "release": "3.0",
+      "license": "CC BY-ND 4.0",
+      "reason": "A transformed SDF is an adapted artifact and is not committed without EFSA permission."
+    },
+    {
+      "id": "epa-ecotox",
+      "authority": "US EPA",
+      "status": "endpoint-protocol-required",
+      "landingPage": "https://www.epa.gov/comptox-tools/ecotoxicology-ecotox-knowledgebase-resource-hub",
+      "reason": "LC50, EC50, LD50 and NOEC records require endpoint-, species-, duration-, medium-, and unit-specific curation before model assembly."
+    },
+    {
+      "id": "epa-toxcast-invitrodb-4.3",
+      "authority": "US EPA",
+      "status": "not-materialized",
+      "landingPage": "https://www.epa.gov/comptox-tools/exploring-toxcast-data",
+      "reason": "The release is an assay panel, not one target; endpoint selection belongs in a separate benchmark pass."
+    },
+    {
+      "id": "chembl-crop-protection",
+      "authority": "EMBL-EBI ChEMBL",
+      "status": "assay-protocol-required",
+      "landingPage": "https://www.ebi.ac.uk/about/news/updates-from-data-resources/ChEMBL-19-released/",
+      "reason": "Crop-protection activities span incompatible organisms, units, exposure protocols, and endpoint definitions; keyword membership is not an activity label."
+    },
+    {
+      "id": "irac-moa",
+      "authority": "IRAC",
+      "status": "permission-required",
+      "landingPage": "https://irac-online.org/mode-of-action/",
+      "adapter": "build_rac_from_licensed_source.py"
+    },
+    {
+      "id": "frac-code-list",
+      "authority": "FRAC",
+      "status": "permission-required",
+      "landingPage": "https://www.frac.info/publications/all-downloads/",
+      "adapter": "build_rac_from_licensed_source.py"
+    },
+    {
+      "id": "hrac-global-classification",
+      "authority": "HRAC",
+      "status": "permission-required",
+      "landingPage": "https://hracglobal.com/tools/2026-hrac-global-herbicide-moa-classification",
+      "adapter": "build_rac_from_licensed_source.py"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardList, Gauge, Layers, RefreshCw } from "lucide-react";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
@@ -105,6 +105,7 @@ type ModelReview = {
     };
     algorithm: { code: string; options: unknown };
     featureSelection: { code: string; options: unknown };
+    buildPolicy?: { crossValidationFolds: number | null; timeoutSeconds: number };
     positiveClassLabel: string | null;
     declaredClassLabels: string[];
     publishedModelBuildId: number | null;
@@ -189,6 +190,7 @@ const SET_LABELS: Record<string, string> = {
   TRAIN: "Train",
 };
 const SET_ORDER = ["CROSS_VALIDATION", "HOLDOUT", "VALIDATION", "TRAIN"];
+const PAGE_SIZE = 25;
 
 function formatMetric(code: string, value: number | null) {
   if (value === null || !Number.isFinite(value)) return "n/a";
@@ -254,7 +256,9 @@ export default function ModelReviewPage() {
   const [items, setItems] = useState<ReviewListItem[]>([]);
   const [statusFilter, setStatusFilter] = useState("AWAITING_APPROVAL");
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [pendingDeepLinkId, setPendingDeepLinkId] = useState<number | null>(null);
   const [review, setReview] = useState<ModelReview | null>(null);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingReview, setLoadingReview] = useState(false);
@@ -272,6 +276,13 @@ export default function ModelReviewPage() {
   const [decisionPending, setDecisionPending] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
+  const detailRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get("definition_id");
+    const definitionId = Number(raw);
+    if (Number.isSafeInteger(definitionId) && definitionId > 0) setPendingDeepLinkId(definitionId);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -311,8 +322,10 @@ export default function ModelReviewPage() {
     return items.filter((item) => {
       if (statusFilter !== "ALL" && item.status !== statusFilter) return false;
       if (!normalizedQuery) return true;
+      if (/^\d+$/.test(normalizedQuery)) {
+        return item.modelDefinitionId.toString() === normalizedQuery;
+      }
       return [
-        item.modelDefinitionId.toString(),
         item.modelName || "",
         item.dataset.name,
         item.targetProperty,
@@ -322,6 +335,17 @@ export default function ModelReviewPage() {
     });
   }, [items, query, statusFilter]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const visibleItems = useMemo(
+    () => filteredItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [currentPage, filteredItems],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter]);
+
   const awaitingCount = useMemo(
     () => items.filter((item) => item.status === "AWAITING_APPROVAL").length,
     [items],
@@ -329,13 +353,18 @@ export default function ModelReviewPage() {
 
   function changeStatusFilter(nextStatusFilter: string) {
     setStatusFilter(nextStatusFilter);
+    setPage(1);
     setSelectedId(null);
     setReview(null);
     setError(null);
     setErrorSource(null);
+    setPendingDeepLinkId(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("definition_id");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
   }
 
-  async function selectReview(modelDefinitionId: number) {
+  const selectReview = useCallback(async (modelDefinitionId: number) => {
     setSelectedId(modelDefinitionId);
     setReview(null);
     setLoadingReview(true);
@@ -345,6 +374,14 @@ export default function ModelReviewPage() {
     setDecisionNotice(null);
     setDecisionNote("");
     setReviewToken("");
+    const url = new URL(window.location.href);
+    url.searchParams.set("definition_id", String(modelDefinitionId));
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
+    window.setTimeout(() => {
+      if (window.matchMedia("(max-width: 1279px)").matches) {
+        detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 0);
     try {
       const response = await fetchWithTimeout(
         `/api/v1/model-definitions/${modelDefinitionId}/review`,
@@ -360,10 +397,26 @@ export default function ModelReviewPage() {
     } finally {
       setLoadingReview(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (loadingList || pendingDeepLinkId === null) return;
+    const definitionId = pendingDeepLinkId;
+    const linkedItem = items.find((item) => item.modelDefinitionId === definitionId);
+    setPendingDeepLinkId(null);
+    setQuery(String(definitionId));
+    setPage(1);
+    if (linkedItem && linkedItem.status !== statusFilter) setStatusFilter("ALL");
+    void selectReview(definitionId);
+  }, [items, loadingList, pendingDeepLinkId, selectReview, statusFilter]);
 
   const setSummaries = useMemo(() => buildSetSummaries(review?.evaluations ?? []), [review]);
   const foldRows = useMemo(() => buildFoldRows(review?.evaluations ?? []), [review]);
+  const actualCrossValidation = foldRows.length > 0
+    ? `${foldRows.length}-fold cross-validation`
+    : setSummaries.some((summary) => summary.evaluationSet === "CROSS_VALIDATION")
+      ? "Aggregate recorded; fold count unavailable"
+      : "Not recorded";
 
   const decisionBuildId = review?.latestBuild?.modelBuildId ?? 0;
   const canDecide = Boolean(
@@ -446,7 +499,7 @@ export default function ModelReviewPage() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:py-14">
+    <main className="mx-auto max-w-7xl overflow-x-hidden px-4 py-10 sm:px-6 lg:py-14">
       <header className="mb-8">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
           <div>
@@ -484,8 +537,8 @@ export default function ModelReviewPage() {
         </div>
       )}
 
-      <section className="grid gap-6 xl:grid-cols-[380px_1fr]">
-        <aside className="flex flex-col rounded-2xl border border-border bg-card/60 shadow-2xl backdrop-blur-xl">
+      <section className="grid min-w-0 gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
+        <aside className="flex min-w-0 max-w-full flex-col rounded-2xl border border-border bg-card/60 shadow-2xl backdrop-blur-xl">
           <div className="grid gap-3 border-b border-border p-5">
             <label className="text-sm font-semibold text-foreground">
               Search definitions
@@ -512,7 +565,9 @@ export default function ModelReviewPage() {
 
           <div className="flex items-center justify-between px-5 pt-4">
             <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">Definitions</h2>
-            <span className="text-xs text-muted-foreground">{loadingList ? "loading" : filteredItems.length}</span>
+            <span className="text-xs text-muted-foreground">
+              {loadingList ? "loading" : `${filteredItems.length} · page ${currentPage}/${totalPages}`}
+            </span>
           </div>
 
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-5">
@@ -521,12 +576,12 @@ export default function ModelReviewPage() {
                 No definitions match this filter.
               </p>
             )}
-            {filteredItems.map((item) => (
+            {visibleItems.map((item) => (
               <button
                 key={item.modelDefinitionId}
                 type="button"
                 onClick={() => void selectReview(item.modelDefinitionId)}
-                className={`w-full rounded-xl border p-4 text-left transition-colors ${
+                className={`min-w-0 w-full max-w-full rounded-xl border p-4 text-left transition-colors ${
                   selectedId === item.modelDefinitionId
                     ? "border-emerald-500 bg-emerald-500/10"
                     : "border-border hover:border-blue-500/60 hover:bg-muted/30"
@@ -552,9 +607,31 @@ export default function ModelReviewPage() {
               </button>
             ))}
           </div>
+
+          {filteredItems.length > PAGE_SIZE && (
+            <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-4">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={currentPage === 1}
+                className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground transition hover:border-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <span className="text-xs text-muted-foreground">{currentPage} of {totalPages}</span>
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={currentPage === totalPages}
+                className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground transition hover:border-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </aside>
 
-        <section className="min-w-0 rounded-2xl border border-border bg-card/60 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+        <section ref={detailRef} className="min-w-0 scroll-mt-24 rounded-2xl border border-border bg-card/60 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
           {!selectedId && !loadingReview && (
             <div className="grid min-h-[560px] place-items-center rounded-xl border border-dashed border-border p-8 text-center">
               <div>
@@ -597,6 +674,9 @@ export default function ModelReviewPage() {
                 <DataPoint label="Feature profile" value={`${review.definition.featureProfile.code} ${review.definition.featureProfile.version}`} />
                 <DataPoint label="Feature selection" value={review.definition.featureSelection.code} />
                 <DataPoint label="Target" value={review.definition.targetProperty.name} />
+                <DataPoint label="Definition CV policy" value={review.definition.buildPolicy?.crossValidationFolds ? `${review.definition.buildPolicy.crossValidationFolds}-fold forced` : "Automatic when needed"} />
+                <DataPoint label="Actual build evaluation" value={actualCrossValidation} />
+                <DataPoint label="Build timeout" value={review.definition.buildPolicy ? `${review.definition.buildPolicy.timeoutSeconds / 3600} hours` : "2 hours"} />
                 <DataPoint label="Positive class" value={review.definition.positiveClassLabel || "Not declared"} />
                 <DataPoint label="Class labels" value={review.definition.declaredClassLabels.join(", ") || "Not declared"} />
                 <DataPoint label="Created by" value={review.definition.createdBy} />

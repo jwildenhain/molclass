@@ -8,8 +8,8 @@ Engine: InnoDB for every domain table
 
 Target server: MariaDB 10.11+
 
-Schema sources: `sql/v3/V1__molclass_v3_baseline.sql` through
-`sql/v3/V10__model_build_supersession.sql`
+Schema sources: `sql/v3/V01__molclass_v3_baseline.sql` through
+`sql/v3/V14__immutable_feature_contracts.sql`
 
 ## 1. Scope and design goals
 

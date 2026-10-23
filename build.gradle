@@ -79,6 +79,14 @@ tasks.named('run') {
     jvmArgs '-Dweka.core.WekaPackageManager.offline=true'
 }
 
+tasks.withType(JavaExec).configureEach {
+    // Weka treats every regular classpath file as a ZIP. Gradle may resolve the
+    // netlib `all` aggregate as a POM, so keep non-JAR artifacts off JVM classpaths.
+    doFirst {
+        classpath = classpath.filter { it.isDirectory() || it.name.endsWith('.jar') }
+    }
+}
+
 tasks.named('installDist') {
     // bounce-0.18.jar is both vendored in lib/ and pulled transitively via the
     // cdk-bundle Maven dependency, so the two copies collide when installDist
@@ -112,6 +120,8 @@ tasks.register('runtimeClasspathFile') {
     doLast {
         def file = target.get().asFile
         file.parentFile.mkdirs()
-        file.text = sourceSets.main.runtimeClasspath.asPath
+        file.text = sourceSets.main.runtimeClasspath
+                .filter { it.isDirectory() || it.name.endsWith('.jar') }
+                .asPath
     }
 }

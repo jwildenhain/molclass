@@ -8,3 +8,14 @@ tasks.register('auditV3Production', JavaExec) {
         args project.property('auditArgs').toString().trim().split(/\s+/).findAll { !it.isEmpty() }
     }
 }
+
+tasks.register('auditV3FeatureCoverage', JavaExec) {
+    group = 'verification'
+    description = 'Writes a read-only Markdown audit of immutable feature contracts and coverage.'
+    dependsOn classes
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'molclass.audit.V3FeatureCoverageAudit'
+    if (project.hasProperty('auditArgs')) {
+        args project.property('auditArgs').toString().trim().split(/\s+/).findAll { !it.isEmpty() }
+    }
+}

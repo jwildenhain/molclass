@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -220,7 +221,8 @@ public final class V3FeatureGenerator {
                                    String fallbackClass) {
     }
 
-    private record FingerprintDefinition(FingerprintSpec spec, long id, int size) {
+    private record FingerprintDefinition(FingerprintSpec spec, long id, int size,
+                                         String generationVersion, byte[] configurationHash) {
     }
 
     private record DescriptorCatalog(List<String> classNames, List<String> names,
@@ -264,6 +266,7 @@ public final class V3FeatureGenerator {
         private long descriptorGenerationId;
         private DescriptorCatalog catalog;
         private List<FingerprintDefinition> definitions;
+        private final List<Long> linkedProfileIds = new ArrayList<>();
         private long scaffoldFailures;
 
         Generator(Config config, Connection read, Connection write,
@@ -349,6 +352,19 @@ public final class V3FeatureGenerator {
                     }
                 }
             }
+            String contractSql = "SELECT COUNT(*) FROM information_schema.COLUMNS"
+                    + " WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'feature_profile'"
+                    + " AND COLUMN_NAME IN ('contract_manifest_json','contract_sha256')";
+            try (PreparedStatement statement = write.prepareStatement(contractSql)) {
+                statement.setString(1, config.targetSchema());
+                try (ResultSet result = statement.executeQuery()) {
+                    result.next();
+                    if (result.getInt(1) != 2) {
+                        throw new IllegalStateException(
+                                "V14__immutable_feature_contracts.sql has not been applied");
+                    }
+                }
+            }
         }
 
         private long createJob() throws SQLException {
@@ -377,36 +393,53 @@ public final class V3FeatureGenerator {
             Map<String, Object> configuration = new LinkedHashMap<>();
             configuration.put("descriptorClassCount", catalog.classNames().size());
             configuration.put("descriptorValueCount", catalog.names().size());
+            configuration.put("descriptorManifestSha256", hex(catalog.manifestHash()));
             configuration.put("implementationVersion", IMPLEMENTATION_VERSION);
             configuration.put("missingValuePolicy", "bit-mask-and-NaN");
             configuration.put("ordering", "descriptor-class-name-then-result-index");
             String json = jsonObject(configuration);
+            String findSql = "SELECT dg.descriptor_generation_id FROM "
+                    + table(config.targetSchema(), "descriptor_generation") + " dg JOIN "
+                    + table(config.targetSchema(), "descriptor_schema") + " ds"
+                    + " ON ds.descriptor_generation_id=dg.descriptor_generation_id"
+                    + " WHERE dg.cdk_version=? AND dg.normalization_version=?"
+                    + " AND dg.implementation_version=? AND dg.vector_format=?"
+                    + " AND ds.descriptor_count=? AND ds.manifest_sha256=?"
+                    + " ORDER BY dg.descriptor_generation_id DESC LIMIT 1";
+            try (PreparedStatement statement = write.prepareStatement(findSql)) {
+                statement.setString(1, CDK_VERSION);
+                statement.setString(2, NORMALIZATION_VERSION);
+                statement.setString(3, IMPLEMENTATION_VERSION);
+                statement.setString(4, VECTOR_FORMAT);
+                statement.setInt(5, catalog.names().size());
+                statement.setBytes(6, catalog.manifestHash());
+                try (ResultSet result = statement.executeQuery()) {
+                    if (result.next()) return result.getLong(1);
+                }
+            }
+            byte[] configurationHash = sha256(json);
+            String generationName = DESCRIPTOR_NAME + "-" + shortHash(configurationHash);
             String sql = "INSERT INTO " + table(config.targetSchema(), "descriptor_generation")
                     + " (generation_name, cdk_version, java_version, normalization_version,"
                     + " implementation_version, configuration_json, configuration_sha256,"
-                    + " vector_format, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'GENERATING')"
-                    + " ON DUPLICATE KEY UPDATE descriptor_generation_id ="
-                    + " LAST_INSERT_ID(descriptor_generation_id), status = 'GENERATING'";
+                    + " vector_format, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'GENERATING')";
             long id;
             try (PreparedStatement statement = write.prepareStatement(
                     sql, Statement.RETURN_GENERATED_KEYS)) {
-                statement.setString(1, DESCRIPTOR_NAME);
+                statement.setString(1, generationName);
                 statement.setString(2, CDK_VERSION);
                 statement.setString(3, System.getProperty("java.version"));
                 statement.setString(4, NORMALIZATION_VERSION);
                 statement.setString(5, IMPLEMENTATION_VERSION);
                 statement.setString(6, json);
-                statement.setBytes(7, sha256(json));
+                statement.setBytes(7, configurationHash);
                 statement.setString(8, VECTOR_FORMAT);
                 statement.executeUpdate();
-                id = generatedKeyOrLastInsertId(statement);
+                id = generatedKey(statement);
             }
             String schemaSql = "INSERT INTO " + table(config.targetSchema(), "descriptor_schema")
                     + " (descriptor_generation_id, descriptor_count, descriptor_manifest_json,"
-                    + " manifest_sha256) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE"
-                    + " descriptor_count = VALUES(descriptor_count),"
-                    + " descriptor_manifest_json = VALUES(descriptor_manifest_json),"
-                    + " manifest_sha256 = VALUES(manifest_sha256)";
+                    + " manifest_sha256) VALUES (?, ?, ?, ?)";
             try (PreparedStatement statement = write.prepareStatement(schemaSql)) {
                 statement.setLong(1, id);
                 statement.setInt(2, catalog.names().size());
@@ -428,26 +461,46 @@ public final class V3FeatureGenerator {
                 configuration.put("implementationClass", spec.implementationClass());
                 configuration.put("implementationVersion", IMPLEMENTATION_VERSION);
                 String json = jsonObject(configuration);
+                byte[] configurationHash = sha256(json);
+                String findSql = "SELECT fingerprint_definition_id,generation_version FROM "
+                        + table(config.targetSchema(), "fingerprint_definition")
+                        + " WHERE fingerprint_code=? AND implementation_class=?"
+                        + " AND cdk_version=? AND normalization_version=? AND bit_length=?"
+                        + " AND configuration_sha256=?"
+                        + " ORDER BY fingerprint_definition_id DESC LIMIT 1";
+                try (PreparedStatement statement = write.prepareStatement(findSql)) {
+                    statement.setString(1, spec.code());
+                    statement.setString(2, spec.implementationClass());
+                    statement.setString(3, CDK_VERSION);
+                    statement.setString(4, NORMALIZATION_VERSION);
+                    statement.setInt(5, size);
+                    statement.setBytes(6, configurationHash);
+                    try (ResultSet rows = statement.executeQuery()) {
+                        if (rows.next()) {
+                            result.add(new FingerprintDefinition(spec, rows.getLong(1), size,
+                                    rows.getString(2), configurationHash));
+                            continue;
+                        }
+                    }
+                }
+                String generationVersion = GENERATION_VERSION + "-" + shortHash(configurationHash);
                 String sql = "INSERT INTO " + table(config.targetSchema(), "fingerprint_definition")
                         + " (fingerprint_code, generation_version, implementation_class,"
                         + " cdk_version, normalization_version, bit_length, configuration_json,"
-                        + " configuration_sha256, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'GENERATING')"
-                        + " ON DUPLICATE KEY UPDATE fingerprint_definition_id ="
-                        + " LAST_INSERT_ID(fingerprint_definition_id), bit_length = VALUES(bit_length),"
-                        + " status = 'GENERATING'";
+                        + " configuration_sha256, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'GENERATING')";
                 try (PreparedStatement statement = write.prepareStatement(
                         sql, Statement.RETURN_GENERATED_KEYS)) {
                     statement.setString(1, spec.code());
-                    statement.setString(2, GENERATION_VERSION);
+                    statement.setString(2, generationVersion);
                     statement.setString(3, spec.implementationClass());
                     statement.setString(4, CDK_VERSION);
                     statement.setString(5, NORMALIZATION_VERSION);
                     statement.setInt(6, size);
                     statement.setString(7, json);
-                    statement.setBytes(8, sha256(json));
+                    statement.setBytes(8, configurationHash);
                     statement.executeUpdate();
                     result.add(new FingerprintDefinition(spec,
-                            generatedKeyOrLastInsertId(statement), size));
+                            generatedKey(statement), size, generationVersion, configurationHash));
                 }
             }
             return List.copyOf(result);
@@ -469,54 +522,142 @@ public final class V3FeatureGenerator {
                 byCode.put(definition.spec().code(), definition);
             }
             String profileIdSql = "SELECT feature_profile_id FROM "
-                    + table(config.targetSchema(), "feature_profile") + " WHERE profile_code = ?";
-            String deleteSql = "DELETE FROM "
-                    + table(config.targetSchema(), "feature_profile_component")
-                    + " WHERE feature_profile_id = ?";
+                    + table(config.targetSchema(), "feature_profile")
+                    + " WHERE profile_code=? AND contract_sha256=?"
+                    + " ORDER BY feature_profile_id DESC LIMIT 1";
+            String profileInsertSql = "INSERT INTO "
+                    + table(config.targetSchema(), "feature_profile")
+                    + " (profile_code,profile_version,description,configuration_json,"
+                    + " configuration_sha256,status) VALUES (?,?,?,?,?,'GENERATING')";
             String insertSql = "INSERT INTO "
                     + table(config.targetSchema(), "feature_profile_component")
                     + " (feature_profile_id, component_order, descriptor_generation_id,"
                     + " fingerprint_definition_id, transformation_json) VALUES (?, ?, ?, ?, ?)";
-            String statusSql = "UPDATE " + table(config.targetSchema(), "feature_profile")
-                    + " SET status = 'GENERATING' WHERE feature_profile_id = ?";
+            String sealSql = "UPDATE " + table(config.targetSchema(), "feature_profile")
+                    + " SET contract_manifest_json=?,contract_sha256=?,raw_feature_count=?"
+                    + " WHERE feature_profile_id=? AND contract_sha256 IS NULL";
+            String descriptionSql = "UPDATE " + table(config.targetSchema(), "feature_profile")
+                    + " SET description=? WHERE feature_profile_id=?";
             try (PreparedStatement find = write.prepareStatement(profileIdSql);
-                 PreparedStatement delete = write.prepareStatement(deleteSql);
+                 PreparedStatement create = write.prepareStatement(
+                         profileInsertSql, Statement.RETURN_GENERATED_KEYS);
                  PreparedStatement insert = write.prepareStatement(insertSql);
-                 PreparedStatement status = write.prepareStatement(statusSql)) {
+                 PreparedStatement seal = write.prepareStatement(sealSql);
+                 PreparedStatement describe = write.prepareStatement(descriptionSql)) {
                 for (Map.Entry<String, List<String>> profile : profiles.entrySet()) {
+                    String manifest = profileManifest(profile.getKey(), profile.getValue(), byCode);
+                    byte[] contractHash = sha256(manifest);
+                    int rawFeatureCount = rawFeatureCount(profile.getValue(), byCode);
+                    String description = profileDescription(profile.getKey(), rawFeatureCount);
                     find.setString(1, profile.getKey());
+                    find.setBytes(2, contractHash);
                     long profileId;
                     try (ResultSet result = find.executeQuery()) {
-                        if (!result.next()) {
-                            throw new IllegalStateException("migrated feature profile is missing: "
-                                    + profile.getKey());
-                        }
-                        profileId = result.getLong(1);
-                    }
-                    delete.setLong(1, profileId);
-                    delete.executeUpdate();
-                    int order = 0;
-                    for (String component : profile.getValue()) {
-                        insert.setLong(1, profileId);
-                        insert.setInt(2, order++);
-                        if ("CDK".equals(component)) {
-                            insert.setLong(3, descriptorGenerationId);
-                            insert.setNull(4, Types.BIGINT);
-                            insert.setString(5,
-                                    "{\"kind\":\"descriptor-vector\",\"missing\":\"weka-missing\"}");
+                        if (result.next()) {
+                            profileId = result.getLong(1);
                         } else {
-                            FingerprintDefinition definition = byCode.get(component);
-                            insert.setNull(3, Types.BIGINT);
-                            insert.setLong(4, definition.id());
-                            insert.setString(5, "{\"kind\":\"bit-vector\",\"prefix\":\""
-                                    + component + "_\",\"bitOrder\":\"lsb0\"}");
+                            create.setString(1, profile.getKey());
+                            create.setString(2, GENERATION_VERSION + "-" + shortHash(contractHash));
+                            create.setString(3, description);
+                            create.setString(4, manifest);
+                            create.setBytes(5, contractHash);
+                            create.executeUpdate();
+                            profileId = generatedKey(create);
+
+                            int order = 0;
+                            for (String component : profile.getValue()) {
+                                insert.setLong(1, profileId);
+                                insert.setInt(2, order++);
+                                if ("CDK".equals(component)) {
+                                    insert.setLong(3, descriptorGenerationId);
+                                    insert.setNull(4, Types.BIGINT);
+                                    insert.setString(5,
+                                            "{\"kind\":\"descriptor-vector\",\"missing\":\"weka-missing\"}");
+                                } else {
+                                    FingerprintDefinition definition = byCode.get(component);
+                                    insert.setNull(3, Types.BIGINT);
+                                    insert.setLong(4, definition.id());
+                                    insert.setString(5, "{\"kind\":\"bit-vector\",\"prefix\":\""
+                                            + component + "_\",\"bitOrder\":\"lsb0\"}");
+                                }
+                                insert.executeUpdate();
+                            }
+                            seal.setString(1, manifest);
+                            seal.setBytes(2, contractHash);
+                            seal.setInt(3, rawFeatureCount);
+                            seal.setLong(4, profileId);
+                            if (seal.executeUpdate() != 1) {
+                                throw new SQLException("could not seal feature profile " + profileId);
+                            }
                         }
-                        insert.executeUpdate();
                     }
-                    status.setLong(1, profileId);
-                    status.executeUpdate();
+                    describe.setString(1, description);
+                    describe.setLong(2, profileId);
+                    describe.executeUpdate();
+                    linkedProfileIds.add(profileId);
                 }
             }
+        }
+
+        private String profileManifest(String profileCode, List<String> components,
+                                       Map<String, FingerprintDefinition> byCode) {
+            StringBuilder json = new StringBuilder("{\"contractFormat\":\"MOLCLASS_FEATURE_PROFILE_V1\","
+                    + "\"profileCode\":").append(jsonString(profileCode)).append(",\"components\":[");
+            for (int index = 0; index < components.size(); index++) {
+                if (index > 0) json.append(',');
+                String component = components.get(index);
+                json.append("{\"order\":").append(index);
+                if ("CDK".equals(component)) {
+                    json.append(",\"sourceType\":\"DESCRIPTOR\",\"sourceCode\":\"CDK\"")
+                            .append(",\"sourceVersion\":").append(jsonString(IMPLEMENTATION_VERSION))
+                            .append(",\"schemaSha256\":").append(jsonString(hex(catalog.manifestHash())))
+                            .append(",\"width\":").append(catalog.names().size())
+                            .append(",\"transformation\":{\"kind\":\"descriptor-vector\","
+                                    + "\"missing\":\"weka-missing\"}}");
+                } else {
+                    FingerprintDefinition definition = byCode.get(component);
+                    json.append(",\"sourceType\":\"FINGERPRINT\",\"sourceCode\":")
+                            .append(jsonString(component))
+                            .append(",\"sourceVersion\":")
+                            .append(jsonString(definition.generationVersion()))
+                            .append(",\"configurationSha256\":")
+                            .append(jsonString(hex(definition.configurationHash())))
+                            .append(",\"width\":").append(definition.size())
+                            .append(",\"transformation\":{\"kind\":\"bit-vector\",\"prefix\":")
+                            .append(jsonString(component + "_"))
+                            .append(",\"bitOrder\":\"lsb0\"}}");
+                }
+                json.append('}');
+            }
+            return json.append("],\"rawFeatureCount\":")
+                    .append(rawFeatureCount(components, byCode)).append('}').toString();
+        }
+
+        private int rawFeatureCount(List<String> components,
+                                    Map<String, FingerprintDefinition> byCode) {
+            int count = 0;
+            for (String component : components) {
+                count += "CDK".equals(component)
+                        ? catalog.names().size() : byCode.get(component).size();
+            }
+            return count;
+        }
+
+        private String profileDescription(String code, int rawFeatureCount) {
+            String composition = switch (code) {
+                case "CDK" -> "CDK molecular descriptors";
+                case "MACCS" -> "MACCS structural keys";
+                case "PubChem" -> "PubChem structural fingerprint";
+                case "EXT" -> "CDK extended fingerprint";
+                case "KR" -> "Klekota-Roth structural keys";
+                case "EXTGO" -> "Extended and graph-only fingerprints";
+                case "ALL" -> "Descriptors plus MACCS, PubChem, extended, substructure and ECFP4 fingerprints";
+                case "MCAT" -> "Descriptors plus MACCS, PubChem, substructure and Klekota-Roth fingerprints";
+                case "JUMBO" -> "Descriptors plus MACCS, PubChem, extended, substructure, Klekota-Roth and ECFP4 fingerprints";
+                default -> code + " feature contract";
+            };
+            return composition + "; " + rawFeatureCount
+                    + " raw features before model-specific feature selection.";
         }
 
         private long calculateIncompleteMolecules() throws Exception {
@@ -688,12 +829,87 @@ public final class V3FeatureGenerator {
                 }
                 statement.executeBatch();
             }
-            String profileSql = "UPDATE " + table(config.targetSchema(), "feature_profile")
-                    + " SET status = ? WHERE status = 'GENERATING'";
-            try (PreparedStatement statement = write.prepareStatement(profileSql)) {
-                statement.setString(1, status);
-                statement.executeUpdate();
+            for (long profileId : linkedProfileIds) {
+                ProfileCoverage coverage = profileCoverage(profileId);
+                String profileStatus;
+                if (coverage.failed() == 0 && coverage.missing() == 0) {
+                    profileStatus = config.scope() == Scope.ALL ? "READY" : "READY_MODEL_SCOPE";
+                } else if (coverage.missing() == 0 && coverage.failed() > 0
+                        && "READY_WITH_EXCLUSIONS".equals(status)) {
+                    profileStatus = "READY_WITH_EXCLUSIONS";
+                } else {
+                    profileStatus = coverage.failed() > 0
+                            ? "COMPLETED_WITH_ERRORS" : "INCOMPLETE";
+                }
+                String profileSql = "UPDATE " + table(config.targetSchema(), "feature_profile")
+                        + " SET status=?,required_molecule_count=?,ready_molecule_count=?,"
+                        + " failed_molecule_count=?,missing_molecule_count=?,"
+                        + " readiness_checked_at=NOW(6) WHERE feature_profile_id=?";
+                try (PreparedStatement statement = write.prepareStatement(profileSql)) {
+                    statement.setString(1, profileStatus);
+                    statement.setLong(2, coverage.required());
+                    statement.setLong(3, coverage.ready());
+                    statement.setLong(4, coverage.failed());
+                    statement.setLong(5, coverage.missing());
+                    statement.setLong(6, profileId);
+                    statement.executeUpdate();
+                }
+                if (profileStatus.startsWith("READY")) {
+                    String supersedeSql = "UPDATE " + table(config.targetSchema(), "feature_profile")
+                            + " prior JOIN " + table(config.targetSchema(), "feature_profile")
+                            + " current ON current.feature_profile_id=?"
+                            + " SET prior.superseded_by_feature_profile_id=current.feature_profile_id"
+                            + " WHERE prior.profile_code=current.profile_code"
+                            + " AND prior.feature_profile_id<>current.feature_profile_id"
+                            + " AND prior.superseded_by_feature_profile_id IS NULL";
+                    try (PreparedStatement statement = write.prepareStatement(supersedeSql)) {
+                        statement.setLong(1, profileId);
+                        statement.executeUpdate();
+                    }
+                }
             }
+        }
+
+        private ProfileCoverage profileCoverage(long profileId) throws SQLException {
+            String eligible = config.scope() == Scope.ALL
+                    ? "SELECT molecule_id FROM " + table(config.targetSchema(), "molecule")
+                    : "SELECT DISTINCT dm.molecule_id FROM "
+                            + table(config.targetSchema(), "dataset_molecule") + " dm JOIN "
+                            + table(config.targetSchema(), "model_definition")
+                            + " md ON md.dataset_id=dm.dataset_id";
+            String sql = "SELECT COUNT(*),"
+                    + " COALESCE(SUM(has_incomplete=0),0),"
+                    + " COALESCE(SUM(has_failed=1),0),"
+                    + " COALESCE(SUM(has_incomplete=1 AND has_failed=0),0) FROM ("
+                    + " SELECT eligible.molecule_id,"
+                    + " MAX(CASE WHEN (fpc.descriptor_generation_id IS NOT NULL"
+                    + " AND mdv.status='FAILED') OR (fpc.fingerprint_definition_id IS NOT NULL"
+                    + " AND mf.status='FAILED') THEN 1 ELSE 0 END) has_failed,"
+                    + " MAX(CASE WHEN (fpc.descriptor_generation_id IS NOT NULL"
+                    + " AND COALESCE(mdv.status,'MISSING')<>'SUCCESS')"
+                    + " OR (fpc.fingerprint_definition_id IS NOT NULL"
+                    + " AND COALESCE(mf.status,'MISSING')<>'SUCCESS') THEN 1 ELSE 0 END) has_incomplete"
+                    + " FROM (" + eligible + ") eligible JOIN "
+                    + table(config.targetSchema(), "feature_profile_component")
+                    + " fpc ON fpc.feature_profile_id=? LEFT JOIN "
+                    + table(config.targetSchema(), "molecule_descriptor_vector")
+                    + " mdv ON mdv.molecule_id=eligible.molecule_id"
+                    + " AND mdv.descriptor_generation_id=fpc.descriptor_generation_id LEFT JOIN "
+                    + table(config.targetSchema(), "molecule_fingerprint")
+                    + " mf ON mf.molecule_id=eligible.molecule_id"
+                    + " AND mf.fingerprint_definition_id=fpc.fingerprint_definition_id"
+                    + " GROUP BY eligible.molecule_id) coverage";
+            try (PreparedStatement statement = write.prepareStatement(sql)) {
+                statement.setLong(1, profileId);
+                try (ResultSet rows = statement.executeQuery()) {
+                    rows.next();
+                    return new ProfileCoverage(rows.getLong(1), rows.getLong(2),
+                            rows.getLong(3), rows.getLong(4));
+                }
+            }
+        }
+
+        private record ProfileCoverage(long required, long ready, long failed, long missing) {
         }
 
         private void updateJob(String status, String runstep, String code,
@@ -780,11 +996,26 @@ public final class V3FeatureGenerator {
             Connection connection, String schema) throws Exception {
         List<FingerprintDefinition> result = new ArrayList<>();
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT fingerprint_definition_id FROM " + table(schema, "fingerprint_definition")
-                        + " WHERE fingerprint_code = ? AND generation_version = ?")) {
+                "SELECT fingerprint_definition_id,generation_version,configuration_sha256 FROM "
+                        + table(schema, "fingerprint_definition")
+                        + " WHERE fingerprint_code=? AND implementation_class=?"
+                        + " AND cdk_version=? AND normalization_version=? AND bit_length=?"
+                        + " AND configuration_sha256=?"
+                        + " ORDER BY fingerprint_definition_id DESC LIMIT 1")) {
             for (FingerprintSpec spec : FINGERPRINTS) {
+                int size = createFingerprinter(spec.code()).getSize();
+                Map<String, Object> configuration = new LinkedHashMap<>();
+                configuration.put("bitEncoding", "fixed-width-lsb0");
+                configuration.put("fallbackClass", spec.fallbackClass());
+                configuration.put("implementationClass", spec.implementationClass());
+                configuration.put("implementationVersion", IMPLEMENTATION_VERSION);
+                byte[] configurationHash = sha256(jsonObject(configuration));
                 statement.setString(1, spec.code());
-                statement.setString(2, GENERATION_VERSION);
+                statement.setString(2, spec.implementationClass());
+                statement.setString(3, CDK_VERSION);
+                statement.setString(4, NORMALIZATION_VERSION);
+                statement.setInt(5, size);
+                statement.setBytes(6, configurationHash);
                 try (ResultSet row = statement.executeQuery()) {
                     if (!row.next()) {
                         throw new IllegalStateException(
@@ -792,7 +1023,7 @@ public final class V3FeatureGenerator {
                                         + "run generateV3Features at least once before ad-hoc registration");
                     }
                     result.add(new FingerprintDefinition(
-                            spec, row.getLong(1), createFingerprinter(spec.code()).getSize()));
+                            spec, row.getLong(1), size, row.getString(2), row.getBytes(3)));
                 }
             }
         }
@@ -1310,6 +1541,14 @@ public final class V3FeatureGenerator {
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException(exception);
         }
+    }
+
+    private static String hex(byte[] value) {
+        return HexFormat.of().withUpperCase().formatHex(value);
+    }
+
+    private static String shortHash(byte[] value) {
+        return hex(value).substring(0, 12).toLowerCase(Locale.ROOT);
     }
 
     private static String jsonObject(Map<String, ?> values) {

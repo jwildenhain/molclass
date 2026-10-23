@@ -295,6 +295,8 @@ def get_model_review(
                    md.algorithm_options_json,
                    md.feature_selection_code,
                    md.feature_selection_options_json,
+                   md.cross_validation_folds,
+                   md.build_timeout_seconds,
                    md.positive_class_label,
                    md.declared_class_labels_json,
                    md.published_model_build_id,
@@ -476,6 +478,10 @@ def get_model_review(
             "featureSelection": {
                 "code": value["feature_selection_code"],
                 "options": _json_value(value["feature_selection_options_json"], {}),
+            },
+            "buildPolicy": {
+                "crossValidationFolds": value["cross_validation_folds"],
+                "timeoutSeconds": value["build_timeout_seconds"],
             },
             "positiveClassLabel": value["positive_class_label"],
             "declaredClassLabels": _json_value(value["declared_class_labels_json"], []),

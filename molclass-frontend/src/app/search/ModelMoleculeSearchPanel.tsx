@@ -151,8 +151,20 @@ type PredictionOutcome =
   | { status: "success"; model: PublishedModel; molecule: Molecule; prediction: Prediction }
   | { status: "error"; model: PublishedModel; molecule: Molecule; message: string };
 
+function extractMolecules(payload: unknown): Molecule[] {
+  if (Array.isArray(payload)) return payload as Molecule[];
+  if (!payload || typeof payload !== "object") return [];
+  const record = payload as Record<string, unknown>;
+  for (const key of ["items", "results", "molecules"]) {
+    if (Array.isArray(record[key])) return record[key] as Molecule[];
+  }
+  return [];
+}
+
 export function ModelMoleculeSearchPanel() {
   const searchParams = useSearchParams();
+  const linkedMoleculeIds = searchParams.get("molecules") || "";
+  const linkedSmiles = (searchParams.get("smiles") || "").trim().slice(0, 10000);
   const [models, setModels] = useState<PublishedModel[]>([]);
   const [modelQuery, setModelQuery] = useState("");
   const [selectedModelIds, setSelectedModelIds] = useState<Set<number>>(new Set());
@@ -162,6 +174,7 @@ export function ModelMoleculeSearchPanel() {
   const [loadingModels, setLoadingModels] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [linkedMoleculeStatus, setLinkedMoleculeStatus] = useState<"idle" | "loading" | "ready" | "not-found" | "error">("idle");
 
   function cacheMolecules(found: Molecule[]) {
     setMoleculeCache((current) => {
@@ -172,7 +185,7 @@ export function ModelMoleculeSearchPanel() {
   }
 
   useEffect(() => {
-    const raw = searchParams.get("molecules");
+    const raw = linkedMoleculeIds;
     if (!raw) return;
     const ids = Array.from(new Set(raw.split(",").map((id) => Number(id.trim())).filter((id) => Number.isFinite(id) && id > 0)));
     if (ids.length === 0) return;
@@ -195,7 +208,39 @@ export function ModelMoleculeSearchPanel() {
       cacheMolecules(found.filter((m): m is Molecule => m !== null));
     })();
     return () => { cancelled = true; };
-  }, [searchParams]);
+  }, [linkedMoleculeIds]);
+
+  useEffect(() => {
+    if (!linkedSmiles || linkedMoleculeIds) {
+      setLinkedMoleculeStatus("idle");
+      return;
+    }
+
+    let cancelled = false;
+    setLinkedMoleculeStatus("loading");
+    void (async () => {
+      try {
+        const response = await fetchWithTimeout(
+          `/api/v3/molecules?${new URLSearchParams({ query: linkedSmiles, limit: "25" })}`,
+          { cache: "no-store", headers: { Accept: "application/json" } },
+        );
+        if (!response.ok) throw new Error(`Molecule lookup failed (${response.status}).`);
+        const found = extractMolecules(await response.json());
+        if (cancelled) return;
+        const molecule = found.find((item) => item.canonicalSmiles === linkedSmiles) ?? found[0];
+        if (!molecule) {
+          setLinkedMoleculeStatus("not-found");
+          return;
+        }
+        cacheMolecules([molecule]);
+        setSelectedMoleculeIds((current) => new Set([...current, molecule.moleculeId]));
+        setLinkedMoleculeStatus("ready");
+      } catch {
+        if (!cancelled) setLinkedMoleculeStatus("error");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [linkedMoleculeIds, linkedSmiles]);
 
   const loadModels = async (query = "") => {
     setLoadingModels(true);
@@ -477,10 +522,32 @@ export function ModelMoleculeSearchPanel() {
             <h2 className="text-xl font-bold text-foreground">Prediction</h2>
           </div>
 
-          {selectedMolecules.length === 0 && (
+          {linkedMoleculeStatus === "loading" && (
+            <p role="status" className="mt-4 rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-sm text-blue-700 dark:text-blue-200">
+              Loading the highlighted molecule into this prediction workspace...
+            </p>
+          )}
+
+          {(linkedMoleculeStatus === "not-found" || linkedMoleculeStatus === "error") && (
+            <p role="alert" className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+              This structure is not indexed yet. Return to{" "}
+              <Link
+                href={`/search?${new URLSearchParams({ smiles: linkedSmiles })}`}
+                className="font-semibold underline underline-offset-2"
+              >
+                Structure search
+              </Link>{" "}
+              and choose &ldquo;Find this molecule&rdquo; first.
+            </p>
+          )}
+
+          {selectedMolecules.length === 0 && linkedMoleculeStatus !== "loading" && linkedMoleculeStatus !== "not-found" && linkedMoleculeStatus !== "error" && (
             <p className="mt-4 text-sm leading-6 text-muted-foreground">
               Pick molecules from{" "}
-              <Link href="/search" className="font-semibold text-blue-500 hover:underline">
+              <Link
+                href={linkedSmiles ? `/search?${new URLSearchParams({ smiles: linkedSmiles })}` : "/search"}
+                className="font-semibold text-blue-500 hover:underline"
+              >
                 Structure search
               </Link>
               {" "}and use &ldquo;Predict selected&rdquo; to bring them here.

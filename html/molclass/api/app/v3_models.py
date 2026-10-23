@@ -22,7 +22,7 @@ ALGORITHMS = (
     {"code": "LibSVM", "name": "LibSVM", "description": "Kernel SVM for nonlinear class boundaries."},
     {"code": "LMT", "name": "Logistic model tree", "description": "Logistic regression models arranged in a decision tree."},
     {"code": "LogitBoost", "name": "LogitBoost", "description": "Boosted additive logistic regression."},
-    {"code": "Ensemble", "name": "Stacked ensemble", "description": "Legacy-compatible J48 and KNN stacking."},
+    {"code": "Ensemble", "name": "Stacked ensemble", "description": "Random Forest, tuned K-nearest neighbours, and Naive Bayes with a linear-regression meta-classifier."},
     {"code": "Bagging", "name": "Bagged J48", "description": "Bootstrap-aggregated J48 trees; variance reduction on a standard tree base."},
     {"code": "AdaBoostM1", "name": "AdaBoost.M1 (J48)", "description": "Boosted J48 trees using the classic AdaBoost.M1 algorithm."},
 )
@@ -47,6 +47,8 @@ class ModelDefinitionRequest(BaseModel):
     model_name: str = Field(min_length=1, max_length=255)
     algorithm_code: str = Field(min_length=1, max_length=64)
     feature_selection_code: str = Field(min_length=1, max_length=64)
+    cross_validation_folds: Optional[int] = Field(default=None, ge=2, le=10)
+    build_timeout_seconds: int = Field(default=7200, ge=60, le=86400)
     positive_class_label: str = Field(min_length=1, max_length=255)
     partial_dataset_acknowledged: bool = False
     created_by: str = Field(default="web-operator", min_length=1, max_length=255)
@@ -144,9 +146,14 @@ def model_options(db: Session = Depends(get_v3_db)):
     profiles = db.execute(
         text(
             """
-            SELECT feature_profile_id,profile_code,profile_version,description,status
+            SELECT feature_profile_id,profile_code,profile_version,description,status,
+                   HEX(contract_sha256) AS contract_sha256,raw_feature_count,
+                   required_molecule_count,ready_molecule_count,
+                   failed_molecule_count,missing_molecule_count,readiness_checked_at
               FROM feature_profile
              WHERE status LIKE 'READY%'
+               AND contract_sha256 IS NOT NULL
+               AND superseded_by_feature_profile_id IS NULL
              ORDER BY profile_code,feature_profile_id
             """
         )
@@ -154,6 +161,18 @@ def model_options(db: Session = Depends(get_v3_db)):
     return {
         "algorithms": list(ALGORITHMS),
         "featureSelections": list(FEATURE_SELECTIONS),
+        "buildPolicy": {
+            "crossValidation": {
+                "defaultFolds": None,
+                "minimumFolds": 2,
+                "maximumFolds": 10,
+            },
+            "timeout": {
+                "defaultSeconds": 7200,
+                "minimumSeconds": 60,
+                "maximumSeconds": 86400,
+            },
+        },
         "featureProfiles": [
             {
                 "featureProfileId": row["feature_profile_id"],
@@ -161,6 +180,15 @@ def model_options(db: Session = Depends(get_v3_db)):
                 "version": row["profile_version"],
                 "description": row["description"],
                 "status": row["status"],
+                "contractSha256": row["contract_sha256"],
+                "rawFeatureCount": row["raw_feature_count"],
+                "coverage": {
+                    "required": row["required_molecule_count"],
+                    "ready": row["ready_molecule_count"],
+                    "failed": row["failed_molecule_count"],
+                    "missing": row["missing_molecule_count"],
+                    "checkedAt": row["readiness_checked_at"],
+                },
             }
             for row in profiles
         ],
@@ -277,6 +305,10 @@ def create_model_definition(
         "targetProperty": target["original_name"],
         "featureProfile": target["profile_code"],
         "featureProfileVersion": target["profile_version"],
+        "buildPolicy": {
+            "crossValidationFolds": request.cross_validation_folds,
+            "timeoutSeconds": request.build_timeout_seconds,
+        },
         "classSupport": labels,
     }
     try:
@@ -287,12 +319,14 @@ def create_model_definition(
                     (legacy_model_id,dataset_id,target_property_id,feature_profile_id,
                      model_name,algorithm_code,algorithm_options_json,
                      feature_selection_code,feature_selection_options_json,
+                     cross_validation_folds,build_timeout_seconds,
                      positive_class_label,declared_class_labels_json,status,
                      published_model_build_id,created_by,definition_metadata_json,
                      created_at,updated_at)
                 VALUES
                     (NULL,:dataset_id,:target_property_id,:feature_profile_id,
                      :model_name,:algorithm_code,'{}',:feature_selection_code,'{}',
+                     :cross_validation_folds,:build_timeout_seconds,
                      :positive_class_label,:declared_labels,'PENDING_REBUILD',
                      NULL,:created_by,:metadata,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))
                 """
@@ -304,6 +338,8 @@ def create_model_definition(
                 "model_name": request.model_name.strip(),
                 "algorithm_code": request.algorithm_code,
                 "feature_selection_code": request.feature_selection_code,
+                "cross_validation_folds": request.cross_validation_folds,
+                "build_timeout_seconds": request.build_timeout_seconds,
                 "positive_class_label": request.positive_class_label,
                 "declared_labels": json.dumps(declared_labels, separators=(",", ":")),
                 "created_by": request.created_by.strip(),
@@ -331,6 +367,8 @@ def create_model_definition(
                         "featureProfileId": request.feature_profile_id,
                         "algorithm": request.algorithm_code,
                         "featureSelection": request.feature_selection_code,
+                        "crossValidationFolds": request.cross_validation_folds,
+                        "buildTimeoutSeconds": request.build_timeout_seconds,
                     },
                     separators=(",", ":"),
                 ),
@@ -348,6 +386,10 @@ def create_model_definition(
         "targetProperty": target["original_name"],
         "declaredClassLabels": declared_labels,
         "positiveClassLabel": request.positive_class_label,
+        "buildPolicy": {
+            "crossValidationFolds": request.cross_validation_folds,
+            "timeoutSeconds": request.build_timeout_seconds,
+        },
     }
 
 

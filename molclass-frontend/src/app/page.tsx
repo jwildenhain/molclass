@@ -22,8 +22,7 @@ export default function Home() {
         <Link
           href={{
             pathname: "/search",
-            query: {
-              smiles: "CCOP(=O)(Cn1ccc(n1)NC(=O)c1cc(cc(c1)OC(C)C)Oc1cnc(cn1)C(=O)N1CCC1)OCC",
+            query: { tab: "models", smiles: "CCOP(=O)(Cn1ccc(n1)NC(=O)c1cc(cc(c1)OC(C)C)Oc1cnc(cn1)C(=O)N1CCC1)OCC",
             },
           }}
           className="group relative p-1 rounded-2xl bg-gradient-to-br from-blue-500/30 to-indigo-500/30 hover:from-blue-500/50 hover:to-indigo-500/50 transition-all duration-300 shadow-xl shadow-blue-900/20"

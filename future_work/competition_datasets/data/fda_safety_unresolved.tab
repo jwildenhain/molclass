@@ -1,0 +1,473 @@
+SourceDataset	SourceRecordID	MoleculeName	Reason	Details
+DICTrank	DICT-1292		missing_name_or_label	
+DICTrank	DICT-1293		missing_name_or_label	
+DICTrank	DICT-1294		missing_name_or_label	
+DICTrank	DICT-1295		missing_name_or_label	
+DICTrank	DICT-1296		missing_name_or_label	
+DICTrank	DICT-1297		missing_name_or_label	
+DICTrank	DICT-1298		missing_name_or_label	
+DICTrank	DICT-1299		missing_name_or_label	
+DICTrank	DICT-1300		missing_name_or_label	
+DICTrank	DICT-1301		missing_name_or_label	
+DICTrank	DICT-1302		missing_name_or_label	
+DICTrank	DICT-1303		missing_name_or_label	
+DICTrank	DICT-1304		missing_name_or_label	
+DICTrank	DICT-1305		missing_name_or_label	
+DICTrank	DICT-1306		missing_name_or_label	
+DICTrank	DICT-1307		missing_name_or_label	
+DICTrank	DICT-1308		missing_name_or_label	
+DICTrank	DICT-1309		missing_name_or_label	
+DICTrank	DICT-1310		missing_name_or_label	
+DICTrank	DICT-1311		missing_name_or_label	
+DICTrank	DICT-1312		missing_name_or_label	
+DICTrank	DICT-1313		missing_name_or_label	
+DICTrank	DICT-1314		missing_name_or_label	
+DICTrank	DICT-1315		missing_name_or_label	
+DICTrank	DICT-1316		missing_name_or_label	
+DICTrank	DICT-1317		missing_name_or_label	
+DICTrank	DICT-1318		missing_name_or_label	
+DILIrank2	LT03618	Abaloparatide	structure_unresolved	structure exceeds 250 heavy atoms
+DILIrank2	LT01402	Abatacept	structure_unresolved	not_found
+DILIrank2	LT01330	Abciximab	structure_unresolved	not_found
+DILIrank2	LT01387	Adalimumab	structure_unresolved	not_found
+DILIrank2	LT02385	Agalsidase beta	structure_unresolved	not_found
+DILIrank2	LT01319	Aldesleukin	structure_unresolved	not_found
+DILIrank2	LT01364	Alemtuzumab	structure_unresolved	not_found
+DILIrank2	LT01404	Alglucosidase alfa	structure_unresolved	not_found
+DILIrank2	LT01315	Alteplase	structure_unresolved	not_found
+DILIrank2	LT02067	Ammonium chloride	structure_unresolved	structure has no carbon atom
+DILIrank2	LT01373	Anakinra	structure_unresolved	not_found
+DILIrank2	LT01442	Antithymocyte globulin	structure_unresolved	not_found
+DILIrank2	LT00962	Aprotinin	structure_unresolved	structure exceeds 250 heavy atoms
+DILIrank2	LT01093	Arsenic trioxide	structure_unresolved	structure has no carbon atom
+DILIrank2	LT01303	Asparaginase	structure_unresolved	not_found
+DILIrank2	LT01346	Basiliximab	structure_unresolved	not_found
+DILIrank2	LT01123	Benztropine mesylate	ambiguous_pubchem_structure	GIJXKZJWITVLHI-RTBURBONSA-N;GIJXKZJWITVLHI-UHFFFAOYSA-N;GIJXKZJWITVLHI-YOFSQIOKSA-N
+DILIrank2	LT01276	Benzylpenicilloyl polylysine	structure_unresolved	not_found
+DILIrank2	LT01390	Bevacizumab	structure_unresolved	not_found
+DILIrank2	LT01305	Botulinum toxin type a	structure_unresolved	not_found
+DILIrank2	LT01356	Botulinum toxin type b	structure_unresolved	not_found
+DILIrank2	LT02432	Canakinumab	structure_unresolved	not_found
+DILIrank2	LT03648	Casimersen	structure_unresolved	not_found
+DILIrank2	LT01412	Certolizumab pegol	structure_unresolved	not_found
+DILIrank2	LT01389	Cetuximab	structure_unresolved	not_found
+DILIrank2	LT00328	Cholestyramine	structure_unresolved	not_found
+DILIrank2	LT01082	Choriogonadotropin alfa	structure_unresolved	not_found
+DILIrank2	LT00071	Cisplatin	structure_unresolved	structure has no carbon atom
+DILIrank2	LT01080	Colesevelam hydrochloride	structure_unresolved	not_found
+DILIrank2	LT00438	Corticorelin ovine triflutate	structure_unresolved	structure exceeds 250 heavy atoms
+DILIrank2	LT00077	Corticotropin	structure_unresolved	structure exceeds 250 heavy atoms
+DILIrank2	LT02430	Crofelemer	structure_unresolved	not_found
+DILIrank2	LT00361	Cupric chloride	structure_unresolved	structure has no carbon atom
+DILIrank2	LT03562	Dalbavancin hydrochloride	structure_unresolved	not_found
+DILIrank2	LT00961	Dalteparin sodium	structure_unresolved	not_found
+DILIrank2	LT01374	Darbepoetin alfa	structure_unresolved	not_found
+DILIrank2	LT03655	Dasiglucagon hydrochloride	structure_unresolved	not_found
+DILIrank2	LT01774	Defibrotide sodium	structure_unresolved	not_found
+DILIrank2	LT01347	Denileukin diftitox	structure_unresolved	not_found
+DILIrank2	LT00695	Dermatan	structure_unresolved	not_found
+DILIrank2	LT00986	Dolasetron mesylate	ambiguous_pubchem_structure	UKTAZPQNNNJVKR-AKJUYKBHSA-N;UKTAZPQNNNJVKR-DBBXXEFVSA-N;UKTAZPQNNNJVKR-UDXKHGJESA-N;UKTAZPQNNNJVKR-UHFFFAOYSA-N
+DILIrank2	LT00683	Ecallantide	structure_unresolved	structure exceeds 250 heavy atoms
+DILIrank2	LT01414	Eculizumab	structure_unresolved	not_found
+DILIrank2	LT01169	Enfuvirtide	structure_unresolved	structure exceeds 250 heavy atoms
+DILIrank2	LT00954	Enoxaparin sodium	structure_unresolved	not_found
+DILIrank2	LT01353	Etanercept	structure_unresolved	not_found
+DILIrank2	LT03675	Eteplirsen	structure_unresolved	not_found
+DILIrank2	LT00537	Exenatide synthetic	structure_unresolved	structure exceeds 250 heavy atoms
+DILIrank2	LT00967	Ferumoxides	structure_unresolved	not_found
+DILIrank2	LT00966	Ferumoxsil	structure_unresolved	not_found
+DILIrank2	LT00650	Ferumoxytol	structure_unresolved	structure has no carbon atom
+DILIrank2	LT01320	Filgrastim	structure_unresolved	not_found
+DILIrank2	LT01953	Follitropin alfa/beta	structure_unresolved	not_found
+DILIrank2	LT02064	Gallium nitrate	structure_unresolved	structure has no carbon atom
+DILIrank2	LT01401	Galsulfase	structure_unresolved	not_found
+DILIrank2	LT00477	Gemtuzumab ozogamicin	structure_unresolved	not_found
+DILIrank2	LT03686	Givosiran sodium	structure_unresolved	not_found
+DILIrank2	LT00985	Glatiramer acetate	structure_unresolved	not_found
+DILIrank2	LT01419	Golimumab	structure_unresolved	not_found
+DILIrank2	LT03688	Golodirsen	structure_unresolved	not_found
+DILIrank2	LT00557	Granisetron hydrochloride	ambiguous_pubchem_structure	MFWNKCLOYSRHCJ-AGUYFDCRSA-N;MFWNKCLOYSRHCJ-KBPBESRZSA-N;MFWNKCLOYSRHCJ-UHFFFAOYSA-N
+DILIrank2	LT02382	Hetastarch	structure_unresolved	not_found
+DILIrank2	LT00725	Hyaluronidase	structure_unresolved	not_found
+DILIrank2	LT02913	Hyaluronidase recombinant human	structure_unresolved	not_found
+DILIrank2	LT01378	Ibritumomab tiuxetan	structure_unresolved	not_found
+DILIrank2	LT01409	Idursulfase	structure_unresolved	not_found
+DILIrank2	LT02384	Imiglucerase	structure_unresolved	not_found
+DILIrank2	LT03691	Inclisiran sodium	structure_unresolved	not_found
+DILIrank2	LT01350	Infliximab	structure_unresolved	not_found
+DILIrank2	LT03693	Inotersen sodium	structure_unresolved	not_found
+DILIrank2	LT01311	Interferon alfa-2a, recombinant	structure_unresolved	not_found
+DILIrank2	LT01336	Interferon alfacon-1	structure_unresolved	not_found
+DILIrank2	LT01332	Interferon beta-1a	structure_unresolved	not_found
+DILIrank2	LT01328	Interferon beta-1b	structure_unresolved	not_found
+DILIrank2	LT01354	Interferon gamma-1b	structure_unresolved	not_found
+DILIrank2	LT00568	Ivermectin	structure_unresolved	not_found
+DILIrank2	LT02907	Laronidase	structure_unresolved	not_found
+DILIrank2	LT01013	Lepirudin	structure_unresolved	structure exceeds 250 heavy atoms
+DILIrank2	LT01268	Liraglutide	structure_unresolved	structure exceeds 250 heavy atoms
+DILIrank2	LT03705	Lumasiran sodium	structure_unresolved	not_found
+DILIrank2	LT01227	Mecasermin recombinant	structure_unresolved	not_found
+DILIrank2	LT01326	Muromonab-cd3	structure_unresolved	not_found
+DILIrank2	LT01393	Natalizumab	structure_unresolved	not_found
+DILIrank2	LT03720	Nusinersen sodium	structure_unresolved	not_found
+DILIrank2	LT00602	Nystatin	ambiguous_pubchem_structure	VQOXZBDYSJBXMA-APKAJEQISA-N;VQOXZBDYSJBXMA-CXNMXRRLSA-N;VQOXZBDYSJBXMA-DIJMFWDCSA-N;VQOXZBDYSJBXMA-DZCKSEKHSA-N;VQOXZBDYSJBXMA-GLBPGAGLSA-N;VQOXZBDYSJBXMA-IARQTZDHSA-N;VQOXZBDYSJBXMA-ISCGSDQNSA-N;VQOXZBDYSJBXMA-ITVVHGMISA-N;VQOXZBDYSJBXMA-JKMCSYCMSA-N;VQOXZBDYSJBXMA-KZHBHFBCSA-N;VQOXZBDYSJBXMA-LAOSQEDYSA-N;VQOXZBDYSJBXMA-LJEOKBHJSA-N;VQOXZBDYSJBXMA-NQTDYLQESA-N;VQOXZBDYSJBXMA-OELABKPSSA-N;VQOXZBDYSJBXMA-PMVWXSCVSA-N;VQOXZBDYSJBXMA-QEKUPDCNSA-N;VQOXZBDYSJBXMA-RKEBNKJGSA-N;VQOXZBDYSJBXMA-RYVWDIBKSA-N;VQOXZBDYSJBXMA-UHFFFAOYSA-N;VQOXZBDYSJBXMA-VHFLTRTASA-N;VQOXZBDYSJBXMA-VNGPISPUSA-N;VQOXZBDYSJBXMA-VSBJOVSVSA-N;VQOXZBDYSJBXMA-WRDWGCENSA-N;VQOXZBDYSJBXMA-XPYSQSRWSA-N;VQOXZBDYSJBXMA-YRYSSRCWSA-N
+DILIrank2	LT01421	Ofatumumab	structure_unresolved	not_found
+DILIrank2	LT01377	Omalizumab	structure_unresolved	not_found
+DILIrank2	LT01339	Oprelvekin	structure_unresolved	not_found
+DILIrank2	LT00702	Pafuraidine	structure_unresolved	not_found
+DILIrank2	LT01392	Palifermin	structure_unresolved	not_found
+DILIrank2	LT01349	Palivizumab	structure_unresolved	not_found
+DILIrank2	LT00674	Pancrelipase	structure_unresolved	not_found
+DILIrank2	LT01408	Panitumumab	structure_unresolved	not_found
+DILIrank2	LT03730	Patiromer sorbitex calcium	structure_unresolved	not_found
+DILIrank2	LT03731	Patisiran sodium	structure_unresolved	not_found
+DILIrank2	LT00941	Pegademase bovine	structure_unresolved	not_found
+DILIrank2	LT01322	Pegaspargase	structure_unresolved	not_found
+DILIrank2	LT03732	Pegcetacoplan	structure_unresolved	not_found
+DILIrank2	LT01380	Pegfilgrastim	structure_unresolved	not_found
+DILIrank2	LT01376	Peginterferon alfa-2a	structure_unresolved	not_found
+DILIrank2	LT01367	Peginterferon alfa-2b	structure_unresolved	not_found
+DILIrank2	LT01069	Pegvisomant	structure_unresolved	not_found
+DILIrank2	LT00956	Pentosan polysulfate sodium	structure_unresolved	not_found
+DILIrank2	LT00805	Phentermine resin complex	structure_unresolved	not_found
+DILIrank2	LT00995	Polyethylene glycol 3350	structure_unresolved	not_found
+DILIrank2	LT01291	Polymyxin b sulfate	structure_unresolved	not_found
+DILIrank2	LT01688	Polythiazide	structure_unresolved	not_found
+DILIrank2	LT00972	Porfimer sodium	structure_unresolved	not_found
+DILIrank2	LT00492	Pramlintide acetate	structure_unresolved	structure exceeds 250 heavy atoms
+DILIrank2	LT00728	Protamine sulfate	structure_unresolved	not_found
+DILIrank2	LT03913	Radium ra-223 dichloride	structure_unresolved	not_found
+DILIrank2	LT01363	Rasburicase	structure_unresolved	not_found
+DILIrank2	LT01351	Reteplase	structure_unresolved	not_found
+DILIrank2	LT01415	Rilonacept	structure_unresolved	not_found
+DILIrank2	LT01417	Romiplostim	structure_unresolved	not_found
+DILIrank2	LT00928	Rubidium chloride rb-82	structure_unresolved	structure has no carbon atom
+DILIrank2	LT00463	Sacrosidase	structure_unresolved	not_found
+DILIrank2	LT01321	Sargramostim	structure_unresolved	not_found
+DILIrank2	LT01974	Scopolamine	ambiguous_pubchem_structure	STECJAGHUSJQJN-BAPHQMLMSA-N;STECJAGHUSJQJN-MKXJHAPZSA-N;STECJAGHUSJQJN-PMFPHFEJSA-N;STECJAGHUSJQJN-QBMZJCKTSA-N;STECJAGHUSJQJN-SFSMXDMGSA-N;STECJAGHUSJQJN-UHFFFAOYSA-N;STECJAGHUSJQJN-UQTPLXADSA-N;STECJAGHUSJQJN-USLFZFAMSA-N;STECJAGHUSJQJN-XSZHVHBUSA-N;STECJAGHUSJQJN-XUDOQVRBSA-N;STECJAGHUSJQJN-YOHVKPHQSA-N;STECJAGHUSJQJN-YOPVGWMHSA-N;STECJAGHUSJQJN-YXMSTPNBSA-N;STECJAGHUSJQJN-YXPYLGEYSA-N
+DILIrank2	LT00355	Secretin synthetic human	structure_unresolved	not_found
+DILIrank2	LT03754	Selenious acid	structure_unresolved	structure has no carbon atom
+DILIrank2	LT03759	Semaglutide	structure_unresolved	structure exceeds 250 heavy atoms
+DILIrank2	LT01039	Sevelamer hydrochloride	structure_unresolved	not_found
+DILIrank2	LT02171	Simethicone-cellulose	structure_unresolved	not_found
+DILIrank2	LT03914	Sodium fluoride f-18	structure_unresolved	structure has no carbon atom
+DILIrank2	LT00880	Sodium nitroprusside	structure_unresolved	structure has no carbon atom
+DILIrank2	LT00801	Sodium polystyrene sulfonate	structure_unresolved	not_found
+DILIrank2	LT00439	Sodium thiosulfate	structure_unresolved	structure has no carbon atom
+DILIrank2	LT03762	Sodium zirconium cyclosilicate	structure_unresolved	structure has no carbon atom
+DILIrank2	LT00888	Somatropin	structure_unresolved	not_found
+DILIrank2	LT01294	Sterile water	structure_unresolved	structure has no carbon atom
+DILIrank2	LT00358	Sucralfate	structure_unresolved	not_found
+DILIrank2	LT02329	Technetium tc-99m exametazime kit	structure_unresolved	not_found
+DILIrank2	LT01360	Tenecteplase	structure_unresolved	not_found
+DILIrank2	LT00932	Teriparatide acetate	structure_unresolved	structure exceeds 250 heavy atoms
+DILIrank2	LT00036	Tetracycline phosphate complex	structure_unresolved	not_found
+DILIrank2	LT00751	Thyrotropin alfa	structure_unresolved	not_found
+DILIrank2	LT00973	Tinzaparin sodium	structure_unresolved	not_found
+DILIrank2	LT01352	Trastuzumab	structure_unresolved	not_found
+DILIrank2	LT01229	Urokinase	structure_unresolved	not_found
+DILIrank2	LT01416	Ustekinumab	structure_unresolved	not_found
+DILIrank2	LT01075	Verteporfin	structure_unresolved	not_found
+DILIrank2	LT03789	Viltolarsen	structure_unresolved	not_found
+DILIrank2	LT03791	Vosoritide	structure_unresolved	structure exceeds 250 heavy atoms
+DILIst	29	aminohippurate	ambiguous_pubchem_structure	HSMNQINEKMPTIC-UHFFFAOYSA-M;HSMNQINEKMPTIC-UHFFFAOYSA-N
+DILIst	39	cisplatin	structure_unresolved	structure has no carbon atom
+DILIst	42	corticotropin	structure_unresolved	structure exceeds 250 heavy atoms
+DILIst	182	cholestyramine	structure_unresolved	not_found
+DILIst	190	sucralfate	structure_unresolved	not_found
+DILIst	191	cupric chloride	structure_unresolved	structure has no carbon atom
+DILIst	212	corticorelin ovine triflutate	structure_unresolved	structure exceeds 250 heavy atoms
+DILIst	213	sodium thiosulfate	structure_unresolved	structure has no carbon atom
+DILIst	227	gemtuzumab ozogamicin	structure_unresolved	not_found
+DILIst	232	pramlintide	structure_unresolved	structure exceeds 250 heavy atoms
+DILIst	248	exenatide	structure_unresolved	structure exceeds 250 heavy atoms
+DILIst	255	granisetron	ambiguous_pubchem_structure	MFWNKCLOYSRHCJ-AGUYFDCRSA-N;MFWNKCLOYSRHCJ-GHZBYRHTSA-N
+DILIst	262	ivermectin	structure_unresolved	not_found
+DILIst	283	nystatin	ambiguous_pubchem_structure	VQOXZBDYSJBXMA-APKAJEQISA-N;VQOXZBDYSJBXMA-CXNMXRRLSA-N;VQOXZBDYSJBXMA-DIJMFWDCSA-N;VQOXZBDYSJBXMA-DZCKSEKHSA-N;VQOXZBDYSJBXMA-GLBPGAGLSA-N;VQOXZBDYSJBXMA-IARQTZDHSA-N;VQOXZBDYSJBXMA-ISCGSDQNSA-N;VQOXZBDYSJBXMA-ITVVHGMISA-N;VQOXZBDYSJBXMA-JKMCSYCMSA-N;VQOXZBDYSJBXMA-KZHBHFBCSA-N;VQOXZBDYSJBXMA-LAOSQEDYSA-N;VQOXZBDYSJBXMA-LJEOKBHJSA-N;VQOXZBDYSJBXMA-NQTDYLQESA-N;VQOXZBDYSJBXMA-OELABKPSSA-N;VQOXZBDYSJBXMA-PMVWXSCVSA-N;VQOXZBDYSJBXMA-QEKUPDCNSA-N;VQOXZBDYSJBXMA-RKEBNKJGSA-N;VQOXZBDYSJBXMA-RYVWDIBKSA-N;VQOXZBDYSJBXMA-UHFFFAOYSA-N;VQOXZBDYSJBXMA-VHFLTRTASA-N;VQOXZBDYSJBXMA-VNGPISPUSA-N;VQOXZBDYSJBXMA-VSBJOVSVSA-N;VQOXZBDYSJBXMA-WRDWGCENSA-N;VQOXZBDYSJBXMA-XPYSQSRWSA-N;VQOXZBDYSJBXMA-YRYSSRCWSA-N
+DILIst	306	ferumoxytol	structure_unresolved	structure has no carbon atom
+DILIst	319	pancrelipase	structure_unresolved	not_found
+DILIst	321	ecallantide	structure_unresolved	structure exceeds 250 heavy atoms
+DILIst	330	dermatan	structure_unresolved	not_found
+DILIst	344	hyaluronidase	structure_unresolved	not_found
+DILIst	346	protamine sulfate	structure_unresolved	not_found
+DILIst	354	thyrotropin alfa	structure_unresolved	not_found
+DILIst	367	Sodium polystyrene sulfonate	structure_unresolved	not_found
+DILIst	397	nitroprusside	structure_unresolved	not_found
+DILIst	398	colestipol	structure_unresolved	not_found
+DILIst	400	somatropin recombinant	structure_unresolved	structure exceeds 250 heavy atoms
+DILIst	414	rubidium chloride rb-82	structure_unresolved	structure has no carbon atom
+DILIst	416	teriparatide	structure_unresolved	structure exceeds 250 heavy atoms
+DILIst	419	pegademase bovine	structure_unresolved	not_found
+DILIst	424	enoxaparin	structure_unresolved	not_found
+DILIst	427	dalteparin sodium	structure_unresolved	not_found
+DILIst	428	ferumoxsil	structure_unresolved	not_found
+DILIst	429	ferumoxides	structure_unresolved	not_found
+DILIst	430	porfimer	structure_unresolved	not_found
+DILIst	443	polyethylene glycol 3350	structure_unresolved	not_found
+DILIst	468	sevelamer	structure_unresolved	not_found
+DILIst	489	colesevelam	structure_unresolved	not_found
+DILIst	539	enfuvirtide	structure_unresolved	structure exceeds 250 heavy atoms
+DILIst	584	urokinase	structure_unresolved	not_found
+DILIst	608	colistimethate	structure_unresolved	not_found
+DILIst	609	benzylpenicilloyl polylysine	structure_unresolved	not_found
+DILIst	615	polymyxin b sulfate	structure_unresolved	not_found
+DILIst	617	sterile water	structure_unresolved	structure has no carbon atom
+DILIst	619	asparaginase	structure_unresolved	not_found
+DILIst	620	botulinum toxin type a	structure_unresolved	not_found
+DILIst	624	interferon alfa-2a, recombinant	structure_unresolved	not_found
+DILIst	627	alteplase	structure_unresolved	not_found
+DILIst	631	sargramostim	structure_unresolved	not_found
+DILIst	632	pegaspargase	structure_unresolved	not_found
+DILIst	634	muromonab-cd3	structure_unresolved	not_found
+DILIst	635	interferon beta-1b	structure_unresolved	not_found
+DILIst	636	abciximab	structure_unresolved	not_found
+DILIst	637	interferon beta-1a	structure_unresolved	not_found
+DILIst	640	interferon alfacon-1	structure_unresolved	not_found
+DILIst	641	oprelvekin	structure_unresolved	not_found
+DILIst	644	basiliximab	structure_unresolved	not_found
+DILIst	646	palivizumab	structure_unresolved	not_found
+DILIst	647	infliximab	structure_unresolved	not_found
+DILIst	648	reteplase	structure_unresolved	not_found
+DILIst	649	trastuzumab	structure_unresolved	not_found
+DILIst	650	etanercept	structure_unresolved	not_found
+DILIst	652	botulinum toxin type b	structure_unresolved	not_found
+DILIst	655	tenecteplase	structure_unresolved	not_found
+DILIst	656	rasburicase	structure_unresolved	not_found
+DILIst	657	alemtuzumab	structure_unresolved	not_found
+DILIst	658	peginterferon alfa-2b	structure_unresolved	not_found
+DILIst	662	anakinra	structure_unresolved	not_found
+DILIst	663	darbepoetin alfa	structure_unresolved	not_found
+DILIst	665	omalizumab	structure_unresolved	not_found
+DILIst	666	ibritumomab tiuxetan	structure_unresolved	not_found
+DILIst	667	pegfilgrastim	structure_unresolved	not_found
+DILIst	671	adalimumab	structure_unresolved	not_found
+DILIst	672	cetuximab	structure_unresolved	not_found
+DILIst	673	bevacizumab	structure_unresolved	not_found
+DILIst	674	palifermin	structure_unresolved	not_found
+DILIst	675	natalizumab	structure_unresolved	not_found
+DILIst	682	galsulfase	structure_unresolved	not_found
+DILIst	683	abatacept	structure_unresolved	not_found
+DILIst	684	alglucosidase alfa	structure_unresolved	not_found
+DILIst	686	panitumumab	structure_unresolved	not_found
+DILIst	687	idursulfase	structure_unresolved	not_found
+DILIst	688	certolizumab pegol	structure_unresolved	not_found
+DILIst	689	eculizumab	structure_unresolved	not_found
+DILIst	690	rilonacept	structure_unresolved	not_found
+DILIst	691	ustekinumab	structure_unresolved	not_found
+DILIst	692	romiplostim	structure_unresolved	not_found
+DILIst	693	ofatumumab	structure_unresolved	not_found
+DILIst	723	methylscopolamine bromide	ambiguous_pubchem_structure	LZCOQTDXKCNBEE-SSOILNFBSA-N;LZCOQTDXKCNBEE-XJMZPCNVSA-N
+DILIst	767	polythiazide	structure_unresolved	not_found
+DILIst	830	scopolamine	ambiguous_pubchem_structure	STECJAGHUSJQJN-BAPHQMLMSA-N;STECJAGHUSJQJN-MKXJHAPZSA-N;STECJAGHUSJQJN-PMFPHFEJSA-N;STECJAGHUSJQJN-QBMZJCKTSA-N;STECJAGHUSJQJN-SFSMXDMGSA-N;STECJAGHUSJQJN-UHFFFAOYSA-N;STECJAGHUSJQJN-UQTPLXADSA-N;STECJAGHUSJQJN-USLFZFAMSA-N;STECJAGHUSJQJN-XSZHVHBUSA-N;STECJAGHUSJQJN-XUDOQVRBSA-N;STECJAGHUSJQJN-YOHVKPHQSA-N;STECJAGHUSJQJN-YOPVGWMHSA-N;STECJAGHUSJQJN-YXMSTPNBSA-N;STECJAGHUSJQJN-YXPYLGEYSA-N
+DILIst	853	ammonium chloride	structure_unresolved	structure has no carbon atom
+DILIst	891	Hetastarch	structure_unresolved	not_found
+DILIst	892	imiglucerase	structure_unresolved	not_found
+DILIst	893	agalsidase beta	structure_unresolved	not_found
+DILIst	895	canakinumab	structure_unresolved	not_found
+DILIst	900	hyaluronidase recombinant human	structure_unresolved	not_found
+DILIst	901	Androgenic steroids*	structure_unresolved	not_found
+DILIst	905	Peginterferon	structure_unresolved	not_found
+DILIst	906	Sulfonamides*	structure_unresolved	not_found
+DILIst	939	Hyoscyamine	ambiguous_pubchem_structure	RKUNBYITZUJHSG-LGGPCSOHSA-N;RKUNBYITZUJHSG-PJPHBNEVSA-N;RKUNBYITZUJHSG-PRLABOORSA-N;RKUNBYITZUJHSG-QXULXFAOSA-N;RKUNBYITZUJHSG-SLTXQBBLSA-N;RKUNBYITZUJHSG-UHFFFAOYSA-N;RKUNBYITZUJHSG-VFSICIBPSA-N
+DILIst	940	Ipratropium	ambiguous_pubchem_structure	OEXHQOGQTVQTAT-BZQJJPTISA-N;OEXHQOGQTVQTAT-PPAWOBCPSA-N;OEXHQOGQTVQTAT-SSZRJXQFSA-N;OEXHQOGQTVQTAT-UHFFFAOYSA-N
+DILIst	943	Liraglutide	structure_unresolved	structure exceeds 250 heavy atoms
+DILIst	945	Pegaptanib	structure_unresolved	not_found
+DILIst	958	Antithymocyte Immunoglobulin	structure_unresolved	not_found
+DILIst	968	Clomacron	structure_unresolved	not_found
+DILIst	976	Diacetoxydiphenolisatin	structure_unresolved	not_found
+DILIst	985	Gemtuzumab	structure_unresolved	not_found
+DILIst	988	Interferon Unspecified	structure_unresolved	not_found
+DILIst	989	Interferon-Beta-1a	structure_unresolved	not_found
+DILIst	990	interferon-Beta-1b	structure_unresolved	not_found
+DILIst	991	Ioxaglate And Meglumine	structure_unresolved	not_found
+DILIst	998	Methylene Dioxymethamphetamine	structure_unresolved	not_found
+DILIst	1000	Oxyiminoalkanoic acid derivative	structure_unresolved	not_found
+DILIst	1001	Peginterferon-Alfa-2a	structure_unresolved	not_found
+DILIst	1009	STREPTOKINASE	structure_unresolved	not_found
+DILIst	1056	norgestrel	ambiguous_pubchem_structure	WWYNJERNGUHSAO-CULCCENASA-N;WWYNJERNGUHSAO-MQVXZNLGSA-N;WWYNJERNGUHSAO-NJTPJZBZSA-N;WWYNJERNGUHSAO-PHHWYCLISA-N;WWYNJERNGUHSAO-PWFLSJGKSA-N;WWYNJERNGUHSAO-RYHLCRTJSA-N;WWYNJERNGUHSAO-TXCAMPLASA-N;WWYNJERNGUHSAO-UHFFFAOYSA-N;WWYNJERNGUHSAO-VIOBCBTOSA-N;WWYNJERNGUHSAO-XUDSTZEESA-N;WWYNJERNGUHSAO-XZCODKSBSA-N;WWYNJERNGUHSAO-YHKGGNDHSA-N
+DILIst	1270	Tropatepine	ambiguous_pubchem_structure	JOQKFRLFXDPXHX-HDICACEKSA-N;JOQKFRLFXDPXHX-ROUUACIJSA-N;JOQKFRLFXDPXHX-UHFFFAOYSA-N
+DICTrank	DICT-0001	HYALURONIC ACID	structure_unresolved	not_found
+DICTrank	DICT-0030	POLYMYXIN B SULFATE	structure_unresolved	not_found
+DICTrank	DICT-0031	MAGNESIUM SULFATE HEPTAHYDRATE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0034	IRON DEXTRAN	structure_unresolved	not_found
+DICTrank	DICT-0066	colistimethate	structure_unresolved	not_found
+DICTrank	DICT-0088	WATER	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0090	CORTICOTROPIN	structure_unresolved	structure exceeds 250 heavy atoms
+DICTrank	DICT-0097	TRYPAN BLUE	ambiguous_pubchem_structure	ZBNARPCCDMHDDV-UHFFFAOYSA-J;ZBNARPCCDMHDDV-UHFFFAOYSA-M;ZBNARPCCDMHDDV-UHFFFAOYSA-N
+DICTrank	DICT-0098	TALC	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0100	ziconotide acetate	structure_unresolved	not_found
+DICTrank	DICT-0102	Nusinersen	structure_unresolved	not_found
+DICTrank	DICT-0105	COPPER	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0113	VASOPRESSIN, UNSPECIFIED	structure_unresolved	not_found
+DICTrank	DICT-0115	PORFIMER SODIUM	structure_unresolved	not_found
+DICTrank	DICT-0116	Fish oil	structure_unresolved	not_found
+DICTrank	DICT-0117	casimersen	structure_unresolved	not_found
+DICTrank	DICT-0121	patisiran sodium	structure_unresolved	not_found
+DICTrank	DICT-0124	GALLIUM NITRATE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0134	viltolarsen	structure_unresolved	not_found
+DICTrank	DICT-0137	CUPRIC CHLORIDE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0138	RADIUM RA-223 DICHLORIDE	structure_unresolved	not_found
+DICTrank	DICT-0141	MANGANESE CHLORIDE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0144	cisplatin	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0156	CALCIUM CHLORIDE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0159	Sodium Nitrite	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0163	DEFIBROTIDE SODIUM	structure_unresolved	not_found
+DICTrank	DICT-0165	CHROMIC CHLORIDE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0171	Sodium Thiosulfate	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0175	SELENIUM	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0176	IRON SUCROSE	structure_unresolved	not_found
+DICTrank	DICT-0179	RUBIDIUM CHLORIDE RB-82	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0184	SODIUM FERRIC GLUCONATE COMPLEX	structure_unresolved	not_found
+DICTrank	DICT-0187	eteplirsen	structure_unresolved	not_found
+DICTrank	DICT-0188	FERRIC DERISOMALTOSE	structure_unresolved	not_found
+DICTrank	DICT-0191	GALLIUM CHLORIDE GA-67	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0192	SECRETIN HUMAN	structure_unresolved	not_found
+DICTrank	DICT-0199	ZINC SULFATE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0200	HETASTARCH	structure_unresolved	not_found
+DICTrank	DICT-0216	FERRIC CARBOXYMALTOSE	structure_unresolved	not_found
+DICTrank	DICT-0221	TECHNETIUM TC-99M PYROPHOSPHATE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0222	INDIUM CHLORIDE IN-111	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0229	SODIUM CHLORIDE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0233	THALLOUS CHLORIDE TL-201	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0240	DALBAVANCIN HYDROCHLORIDE	structure_unresolved	not_found
+DICTrank	DICT-0246	SOYBEAN OIL	structure_unresolved	not_found
+DICTrank	DICT-0250	STANNOUS CHLORIDE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0255	VERTEPORFIN	structure_unresolved	not_found
+DICTrank	DICT-0260	ATROPINE SULFATE	ambiguous_pubchem_structure	RKUNBYITZUJHSG-ADTLFGHVSA-N;RKUNBYITZUJHSG-PJPHBNEVSA-N;RKUNBYITZUJHSG-QXULXFAOSA-N;RKUNBYITZUJHSG-UHFFFAOYSA-N;RKUNBYITZUJHSG-UHFFFAOYSA-O
+DICTrank	DICT-0261	golodirsen	structure_unresolved	not_found
+DICTrank	DICT-0278	ARSENIC TRIOXIDE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0294	DEXTRAN 40	structure_unresolved	not_found
+DICTrank	DICT-0308	Sodium Nitroprusside	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0311	FERUMOXYTOL NON-STOICHIOMETRIC MAGNETITE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0316	AMMONIA N-13	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0319	SODIUM FLUORIDE F-18	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0327	ZINC CHLORIDE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0348	STRONTIUM CHLORIDE SR-89	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0358	Granisetron Hydrochloride	ambiguous_pubchem_structure	MFWNKCLOYSRHCJ-AGUYFDCRSA-N;MFWNKCLOYSRHCJ-KBPBESRZSA-N;MFWNKCLOYSRHCJ-UHFFFAOYSA-N
+DICTrank	DICT-0367	PROTAMINE SULFATE	structure_unresolved	not_found
+DICTrank	DICT-0372	Etesevimab	structure_unresolved	not_found
+DICTrank	DICT-0374	ferumoxides	structure_unresolved	not_found
+DICTrank	DICT-0376	UROKINASE	structure_unresolved	not_found
+DICTrank	DICT-0377	Bamlanivimab	structure_unresolved	not_found
+DICTrank	DICT-0378	TECHNETIUM TC-99M SODIUM PERTECHNETATE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0383	POSACONAZOLE; posaconazole	structure_unresolved	not_found
+DICTrank	DICT-0389	TECHNETIUM TC-99M SULFUR COLLOID	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0442	DOLASETRON MESYLATE	ambiguous_pubchem_structure	UKTAZPQNNNJVKR-AKJUYKBHSA-N;UKTAZPQNNNJVKR-DBBXXEFVSA-N;UKTAZPQNNNJVKR-UDXKHGJESA-N;UKTAZPQNNNJVKR-UHFFFAOYSA-N
+DICTrank	DICT-0460	MILNACIPRAN HYDROCHLORIDE; milnacipran hydrochloride	structure_unresolved	not_found
+DICTrank	DICT-0471	CROFELEMER	structure_unresolved	not_found
+DICTrank	DICT-0559	SODIUM ZIRCONIUM CYCLOSILICATE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0594	PENTOSAN POLYSULFATE SODIUM	structure_unresolved	not_found
+DICTrank	DICT-0598	ESTROGENS, CONJUGATED SYNTHETIC B	structure_unresolved	not_found
+DICTrank	DICT-0605	FERRIC OXYHYDROXIDE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0677	propoxyphene napsylate	ambiguous_pubchem_structure	XLMALTXPSGQGBX-GCJKJVERSA-N;XLMALTXPSGQGBX-UHFFFAOYSA-N;XLMALTXPSGQGBX-XMSQKQJNSA-N
+DICTrank	DICT-0679	LEVOMILNACIPRAN HYDROCHLORIDE; levomilnacipran hydrochloride	structure_unresolved	not_found
+DICTrank	DICT-0701	BARIUM SULFATE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-0710	patiromer	structure_unresolved	not_found
+DICTrank	DICT-0747	SUCRALFATE	structure_unresolved	not_found
+DICTrank	DICT-0832	COLESEVELAM HYDROCHLORIDE	structure_unresolved	not_found
+DICTrank	DICT-0924	SEVELAMER HYDROCHLORIDE	structure_unresolved	not_found
+DICTrank	DICT-0931	POLYETHYLENE GLYCOL 3350	structure_unresolved	not_found
+DICTrank	DICT-0948	OMEGA-3-ACID ETHYL ESTERS	structure_unresolved	not_found
+DICTrank	DICT-0981	SEVELAMER CARBONATE	structure_unresolved	not_found
+DICTrank	DICT-1007	IVERMECTIN	structure_unresolved	not_found
+DICTrank	DICT-1065	POTASSIUM CHLORIDE	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-1117	Cholestyramine	structure_unresolved	not_found
+DICTrank	DICT-1144	ESTROGENS, ESTERIFIED	structure_unresolved	not_found
+DICTrank	DICT-1169	SODIUM IODIDE I-131	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-1170	SODIUM IODIDE I-123	structure_unresolved	structure has no carbon atom
+DICTrank	DICT-1197	DOXYCYCLINE HYCLATE	ambiguous_pubchem_structure	SGKRLCUYIXIAHR-AKNGSSGZSA-N;SGKRLCUYIXIAHR-AKNGSSGZSA-O
+DICTrank	DICT-1239	polythiazide	structure_unresolved	not_found
+DICTrank	DICT-1242	SODIUM POLYSTYRENE SULFONATE	structure_unresolved	not_found
+DICTrank	DICT-1245	VASOPRESSIN	structure_unresolved	not_found
+DICTrank	DICT-1251	INCLISIRAN SODIUM	structure_unresolved	not_found
+DICTrank	DICT-1252	Pegcetacoplan	structure_unresolved	not_found
+DICTrank	DICT-1255	LUMASIRAN	structure_unresolved	not_found
+DICTrank	DICT-1260	ABALOPARATIDE	structure_unresolved	structure exceeds 250 heavy atoms
+DICTrank	DICT-1262	exenatide	structure_unresolved	structure exceeds 250 heavy atoms
+DICTrank	DICT-1263	INOTERSEN SODIUM	structure_unresolved	not_found
+DICTrank	DICT-1264	LIRAGLUTIDE	structure_unresolved	structure exceeds 250 heavy atoms
+DICTrank	DICT-1266	VOSORITIDE	structure_unresolved	structure exceeds 250 heavy atoms
+DICTrank	DICT-1267	pramlintide acetate	structure_unresolved	structure exceeds 250 heavy atoms
+DICTrank	DICT-1270	givosiran sodium	structure_unresolved	not_found
+DICTrank	DICT-1271	GLATIRAMER ACETATE	structure_unresolved	not_found
+DICTrank	DICT-1272	SEMAGLUTIDE	structure_unresolved	structure exceeds 250 heavy atoms
+DICTrank	DICT-1274	Enfuvirtide	structure_unresolved	structure exceeds 250 heavy atoms
+DICTrank	DICT-1275	MIPOMERSEN SODIUM	structure_unresolved	structure exceeds 250 heavy atoms
+DICTrank	DICT-1276	DALTEPARIN SODIUM	structure_unresolved	not_found
+DICTrank	DICT-1277	Teriparatide	structure_unresolved	structure exceeds 250 heavy atoms
+DICTrank	DICT-1285	tinzaparin sodium	structure_unresolved	not_found
+DILIrank2	LT00946	Metoprolol succinate	conflicting_labels_after_structure_deduplication	fda_dilirank2_multiclass:AMBIGUOUS,LESS
+DILIrank2	LT00309	Metoprolol tartrate	conflicting_labels_after_structure_deduplication	fda_dilirank2_multiclass:AMBIGUOUS,LESS
+DILIrank2	LT01398	Fosfomycin tromethamine	conflicting_labels_after_structure_deduplication	fda_dilirank2_multiclass:AMBIGUOUS,LESS
+DILIrank2	LT00213	Tromethamine	conflicting_labels_after_structure_deduplication	fda_dilirank2_multiclass:AMBIGUOUS,LESS
+DILIrank2	LT03376	Amifampridine	conflicting_labels_after_structure_deduplication	fda_dilirank2_multiclass:AMBIGUOUS,NO
+DILIrank2	LT03895	Amifampridine phosphate	conflicting_labels_after_structure_deduplication	fda_dilirank2_multiclass:AMBIGUOUS,NO
+DILIrank2	LT03901	Gallium dotatate ga-68	conflicting_labels_after_structure_deduplication	fda_dilirank2_multiclass:AMBIGUOUS,NO
+DILIrank2	LT03912	Lutetium lu 177 dotatate	conflicting_labels_after_structure_deduplication	fda_dilirank2_multiclass:AMBIGUOUS,NO
+DILIrank2	LT02002	Cyanocobalamin	conflicting_labels_after_structure_deduplication	fda_dilirank2_multiclass:AMBIGUOUS,NO
+DILIrank2	LT01258	Hydroxocobalamin	conflicting_labels_after_structure_deduplication	fda_dilirank2_multiclass:AMBIGUOUS,NO
+DICTrank	DICT-0309	FOSAPREPITANT DIMEGLUMINE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,NO
+DICTrank	DICT-0341	FOSAPREPITANT	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,NO
+DICTrank	DICT-0961	PHENTERMINE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,LESS
+DICTrank	DICT-1216	PHENTERMINE HYDROCHLORIDE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,LESS
+DICTrank	DICT-0286	IBUPROFEN LYSINE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-0766	IBUPROFEN	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-0004	PENICILLIN G BENZATHINE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,NO
+DICTrank	DICT-0027	PENICILLIN G PROCAINE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,NO
+DICTrank	DICT-0355	CLINDAMYCIN	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,NO
+DICTrank	DICT-0801	CLINDAMYCIN HYDROCHLORIDE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,NO
+DICTrank	DICT-0127	FERRIC PYROPHOSPHATE CITRATE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,LESS,MOST,NO
+DICTrank	DICT-0226	GALLIUM CITRATE GA-67	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,LESS,MOST,NO
+DICTrank	DICT-0249	SODIUM CITRATE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,LESS,MOST,NO
+DICTrank	DICT-0637	Lithium Citrate	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,LESS,MOST,NO
+DICTrank	DICT-0944	POTASSIUM CITRATE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,LESS,MOST,NO
+DICTrank	DICT-0556	TAFENOQUINE SUCCINATE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,NO
+DICTrank	DICT-0699	TAFENOQUINE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,NO
+DICTrank	DICT-0285	TETRAKIS(2-METHOXYISOBUTYLISOCYANIDE)COPPER(I) TETRAFLUOROBORATE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-0323	TECHNETIUM TC-99M SESTAMIBI	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-0813	QUINIDINE GLUCONATE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-0900	QUINIDINE SULFATE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-0106	IOTHALAMATE MEGLUMINE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:MOST,NO
+DICTrank	DICT-0396	diatrizoate meglumine	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:MOST,NO
+DICTrank	DICT-0295	AZITHROMYCIN MONOHYDRATE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-0543	azithromycin	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-0898	AZITHROMYCIN ANHYDROUS	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-1089	AZITHROMYCIN DIHYDRATE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-0026	ZIPRASIDONE MESYLATE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-1182	ZIPRASIDONE HYDROCHLORIDE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-0213	VANCOMYCIN	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,NO
+DICTrank	DICT-1043	vancomycin hydrochloride	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,NO
+DICTrank	DICT-0289	Esomeprazole Sodium	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,NO
+DICTrank	DICT-0812	ESOMEPRAZOLE MAGNESIUM	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,NO
+DICTrank	DICT-1146	ESOMEPRAZOLE MAGNESIUM DIHYDRATE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,NO
+DICTrank	DICT-0457	Amifampridine	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,NO
+DICTrank	DICT-0599	amifampridine phosphate	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,NO
+DICTrank	DICT-0414	anhydrous tacrolimus	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-0765	TACROLIMUS	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-0150	SODIUM ACETATE ANHYDROUS	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,MOST,NO
+DICTrank	DICT-0155	POTASSIUM ACETATE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,MOST,NO
+DICTrank	DICT-0350	SODIUM ACETATE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,MOST,NO
+DICTrank	DICT-0745	CALCIUM ACETATE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,MOST,NO
+DICTrank	DICT-0362	MELPHALAN HYDROCHLORIDE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,LESS
+DICTrank	DICT-0823	MELPHALAN	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:AMBIGUOUS,LESS
+DICTrank	DICT-0009	triptorelin	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-0015	TRIPTORELIN PAMOATE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-0527	CITALOPRAM HYDROBROMIDE	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-1222	CITALOPRAM	conflicting_labels_after_structure_deduplication	fda_dictrank_multiclass:LESS,MOST
+DICTrank	DICT-0004	PENICILLIN G BENZATHINE	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1
+DICTrank	DICT-0027	PENICILLIN G PROCAINE	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1
+DICTrank	DICT-0127	FERRIC PYROPHOSPHATE CITRATE	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1
+DICTrank	DICT-0226	GALLIUM CITRATE GA-67	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1
+DICTrank	DICT-0249	SODIUM CITRATE	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1
+DICTrank	DICT-0637	Lithium Citrate	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1
+DICTrank	DICT-0106	IOTHALAMATE MEGLUMINE	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1
+DICTrank	DICT-0396	diatrizoate meglumine	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1
+DICTrank	DICT-0213	VANCOMYCIN	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1
+DICTrank	DICT-1043	vancomycin hydrochloride	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1
+DICTrank	DICT-0289	Esomeprazole Sodium	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1
+DICTrank	DICT-0812	ESOMEPRAZOLE MAGNESIUM	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1
+DICTrank	DICT-1146	ESOMEPRAZOLE MAGNESIUM DIHYDRATE	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1
+DICTrank	DICT-0457	Amifampridine	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1
+DICTrank	DICT-0599	amifampridine phosphate	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1
+DICTrank	DICT-0155	POTASSIUM ACETATE	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1
+DICTrank	DICT-0745	CALCIUM ACETATE	conflicting_labels_after_structure_deduplication	fda_dictrank_binary:0,1

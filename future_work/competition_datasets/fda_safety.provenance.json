@@ -1,0 +1,143 @@
+{
+  "benchmarks": {
+    "fda_dictrank_binary": {
+      "classBalance": {
+        "0": 281,
+        "1": 716
+      },
+      "description": "cardiotoxicity concern versus no concern",
+      "records": 997,
+      "sdf": "fda_dictrank_binary.sdf",
+      "sdfBytes": 3336448,
+      "sdfSha256": "931ba6be8a03dd9eac950ae865a7c1425a7e7b08365fd2fddb9563846f0cb97c",
+      "tab": "data/fda_dictrank_binary.tab",
+      "targetProperty": "DICTrank_Binary"
+    },
+    "fda_dictrank_multiclass": {
+      "classBalance": {
+        "AMBIGUOUS": 86,
+        "LESS": 436,
+        "MOST": 270,
+        "NO": 278
+      },
+      "description": "four-level cardiotoxicity concern",
+      "records": 1070,
+      "sdf": "fda_dictrank_multiclass.sdf",
+      "sdfBytes": 3592772,
+      "sdfSha256": "a7e9fd3fc3758da7027c3f54bc30508e44a24a6e27e9842e28a02bb46df3600e",
+      "tab": "data/fda_dictrank_multiclass.tab",
+      "targetProperty": "DICTrank_Class"
+    },
+    "fda_dilirank2_binary": {
+      "classBalance": {
+        "0": 332,
+        "1": 531
+      },
+      "description": "DILI concern versus no concern",
+      "records": 863,
+      "sdf": "fda_dilirank2_binary.sdf",
+      "sdfBytes": 2741762,
+      "sdfSha256": "07c5663958aafb1c94f6b93e7e7f70535773a66d8ad969c18e311dd5861b4a84",
+      "tab": "data/fda_dilirank2_binary.tab",
+      "targetProperty": "DILIrank_Binary"
+    },
+    "fda_dilirank2_multiclass": {
+      "classBalance": {
+        "AMBIGUOUS": 319,
+        "LESS": 324,
+        "MOST": 205,
+        "NO": 329
+      },
+      "description": "four-level DILI concern",
+      "records": 1177,
+      "sdf": "fda_dilirank2_multiclass.sdf",
+      "sdfBytes": 3791345,
+      "sdfSha256": "345e8eb53d6da28504feda768fd42d7f116a4883e2f27463d654e0b88fa88c6e",
+      "tab": "data/fda_dilirank2_multiclass.tab",
+      "targetProperty": "DILIrank_Class"
+    },
+    "fda_dilist": {
+      "classBalance": {
+        "0": 431,
+        "1": 720
+      },
+      "description": "binary human hepatotoxicity",
+      "records": 1151,
+      "sdf": "fda_dilist.sdf",
+      "sdfBytes": 3300029,
+      "sdfSha256": "6944bea1859833f1916ece7b82e52bdddec51126320d9e564aa4f2ce1cd2abed",
+      "tab": "data/fda_dilist.tab",
+      "targetProperty": "DILIst"
+    },
+    "fda_diril": {
+      "classBalance": {
+        "0": 146,
+        "1": 171
+      },
+      "description": "binary drug-induced renal injury",
+      "records": 317,
+      "sdf": "fda_diril.sdf",
+      "sdfBytes": 907794,
+      "sdfSha256": "c1b1be9bb2e9abfbaa0675f08b4cc9195cb3c16703fd8edc0e43d153daeb30e7",
+      "tab": "data/fda_diril.tab",
+      "targetProperty": "DIRI"
+    }
+  },
+  "builder": "build_fda_safety.py",
+  "generatedAt": "2026-10-22T16:10:41.773624Z",
+  "pubchem": {
+    "cache": "data/pubchem_name_resolution.json",
+    "service": "PUG REST",
+    "uniqueNameQueries": 2346
+  },
+  "rejections": {
+    "byReason": {
+      "ambiguous_pubchem_structure": 20,
+      "conflicting_labels_after_structure_deduplication": 75,
+      "missing_name_or_label": 27,
+      "structure_unresolved": 350
+    },
+    "file": "data/fda_safety_unresolved.tab",
+    "records": 472
+  },
+  "schemaVersion": 1,
+  "sources": {
+    "dictrank": {
+      "contentLength": 94888,
+      "downloadedAt": "2026-10-22T16:08:08.029722Z",
+      "filename": "dictrank.xlsx",
+      "landing_page": "https://www.fda.gov/science-research/bioinformatics-tools/drug-induced-cardiotoxicity-rank-dictrank-dataset",
+      "sha256": "c50e55f6de01233dca24df749a1bff4fe0745d791b4d97ba05ebd7d9d193eb92",
+      "url": "https://www.fda.gov/media/178811/download?attachment=",
+      "version": "2023 release"
+    },
+    "dilirank2": {
+      "contentLength": 110076,
+      "downloadedAt": "2026-10-22T16:08:07.824252Z",
+      "filename": "dilirank2.xlsx",
+      "landing_page": "https://www.fda.gov/science-research/liver-toxicity-knowledge-base-ltkb/drug-induced-liver-injury-rank-dilirank-20-dataset",
+      "sha256": "1ca1352ff727af68e68e250eae2ed775bca8492335140ac0afd2233248694993",
+      "url": "https://www.fda.gov/media/113052/download?attachment=",
+      "version": "2.0 (2025)"
+    },
+    "dilist": {
+      "contentLength": 49205,
+      "downloadedAt": "2026-10-22T16:08:07.874693Z",
+      "filename": "dilist.xlsx",
+      "landing_page": "https://www.fda.gov/science-research/liver-toxicity-knowledge-base-ltkb/drug-induced-liver-injury-severity-and-toxicity-dilist-dataset",
+      "sha256": "4331ee9d16ae7641488161e4dc2c603c29e06baa8667dd16e7f3d635366e7e5e",
+      "url": "https://www.fda.gov/media/160597/download?attachment=",
+      "version": "2020 release"
+    },
+    "diril": {
+      "contentLength": 21479271,
+      "downloadedAt": "2026-10-22T16:08:08.311927Z",
+      "filename": "diril.xlsx",
+      "landing_page": "https://www.fda.gov/science-research/bioinformatics-tools/drug-induced-renal-injury-list-diril-dataset",
+      "sha256": "602edfda3da6b62bb52f8a88cd8fff5783f0635608dd0f2b0eb44299195b50dc",
+      "url": "https://www.fda.gov/media/178824/download?attachment=",
+      "version": "2024 release"
+    }
+  },
+  "structurePolicy": "RDKit Cleanup and FragmentParent; retain stereochemistry"
+}

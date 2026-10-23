@@ -338,7 +338,7 @@ and resolve the exact state first.
 ### 6.7 Empty Compose volume
 
 On the first startup of a truly empty database volume, MariaDB executes the mounted
-`sql/v3` scripts in filename order. The current chain is V01 through V12. Docker
+`sql/v3` scripts in filename order. The current chain is V01 through V14. Docker
 entrypoint initialization never migrates an existing volume. An established volume
 therefore requires Flyway or the explicit client procedure above before application
 containers are replaced.
@@ -668,7 +668,7 @@ Run full canonical coverage only when needed:
 
 ### 11.1 Preconditions
 
-- All schema migrations through V12 are applied.
+- All schema migrations through V14 are applied.
 - The model definition points to a ready feature profile.
 - Dataset partial-state acknowledgement, when required, is present.
 - The release revision is immutable and supplied as `MOLCLASS_CODE_REVISION`.

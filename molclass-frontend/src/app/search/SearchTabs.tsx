@@ -38,10 +38,14 @@ export function SearchTabs() {
         {TABS.map((tab) => {
           const selected = tab.id === active;
           const Icon = tab.icon;
+          const nextParams = new URLSearchParams(params.toString());
+          if (tab.id === "structure") nextParams.delete("tab");
+          else nextParams.set("tab", tab.id);
+          const query = nextParams.toString();
           return (
             <Link
               key={tab.id}
-              href={tab.id === "structure" ? "/search" : `/search?tab=${tab.id}`}
+              href={query ? `/search?${query}` : "/search"}
               role="tab"
               aria-selected={selected}
               scroll={false}

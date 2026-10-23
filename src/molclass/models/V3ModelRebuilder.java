@@ -394,7 +394,19 @@ public final class V3ModelRebuilder {
                         config.jdbcUrl, config.user, config.password))) {
                 read.setAutoCommit(true);
                 write.setAutoCommit(false);
-                new Worker(config, read, write).run();
+                Worker worker = new Worker(config, read, write);
+                Thread shutdownHook = new Thread(worker::shutdown,
+                        "molclass-model-rebuild-shutdown");
+                Runtime.getRuntime().addShutdownHook(shutdownHook);
+                try {
+                    worker.run();
+                } finally {
+                    try {
+                        Runtime.getRuntime().removeShutdownHook(shutdownHook);
+                    } catch (IllegalStateException ignored) {
+                        // The JVM is already shutting down and the hook is running.
+                    }
+                }
             }
         } catch (Exception exception) {
             System.err.println("Model rebuild failed: " + rootMessage(exception));
@@ -409,14 +421,18 @@ public final class V3ModelRebuilder {
         return strategy == SplitStrategy.SCAFFOLD ? SCAFFOLD_SPLIT_STRATEGY_NAME : HASH_SPLIT_STRATEGY_NAME;
     }
 
-    private record Config(String jdbcUrl, String user, String password, String schema,
+    private record Config(String jdbcUrl, String user, String password,
+                          String passwordEnvironmentName, String schema,
                           Long modelDefinitionId, Integer limit, long seed, int threads,
-                          SplitStrategy splitStrategy, long parallelSmoteMinInstances) {
+                          SplitStrategy splitStrategy, long parallelSmoteMinInstances,
+                          Integer cvFolds, long modelTimeoutSeconds,
+                          boolean modelTimeoutExplicit, boolean workerChild) {
         static Config parse(String[] args, Map<String, String> environment) {
             Map<String, String> values = new LinkedHashMap<>();
             Set<String> allowed = Set.of("jdbc-url", "db-user", "password-env",
                     "target-schema", "model-id", "limit", "seed", "threads",
-                    "split-strategy", "parallel-smote-min-instances");
+                    "split-strategy", "parallel-smote-min-instances", "cv-folds",
+                    "model-timeout-seconds");
             for (int index = 0; index < args.length; index++) {
                 if ("--help".equals(args[index])) {
                     usage();
@@ -455,20 +471,38 @@ public final class V3ModelRebuilder {
             if (parallelSmoteMinInstances < 0) {
                 throw new IllegalArgumentException("parallel-smote-min-instances must not be negative");
             }
-            return new Config(jdbc, user, password, schema, modelId, limit, seed, threads,
-                    splitStrategy, parallelSmoteMinInstances);
+            Integer cvFolds = values.containsKey("cv-folds")
+                    ? Integer.valueOf(values.get("cv-folds")) : null;
+            if (cvFolds != null && (cvFolds < 2 || cvFolds > 10)) {
+                throw new IllegalArgumentException("cv-folds must be between 2 and 10");
+            }
+            String timeoutValue = first(values.get("model-timeout-seconds"),
+                    environment.get("MOLCLASS_MODEL_TIMEOUT_SECONDS"));
+            long modelTimeoutSeconds = timeoutValue == null ? 7200L : Long.parseLong(timeoutValue);
+            if (modelTimeoutSeconds != 0L
+                    && (modelTimeoutSeconds < 60L || modelTimeoutSeconds > 86400L)) {
+                throw new IllegalArgumentException(
+                        "model-timeout-seconds must be 0 or between 60 and 86400");
+            }
+            boolean workerChild = Boolean.parseBoolean(
+                    environment.getOrDefault("MOLCLASS_MODEL_WORKER_CHILD", "false"));
+            return new Config(jdbc, user, password, passwordName, schema, modelId, limit,
+                    seed, threads, splitStrategy, parallelSmoteMinInstances, cvFolds,
+                    modelTimeoutSeconds, timeoutValue != null, workerChild);
         }
     }
 
     private static void usage() {
         System.out.println("./gradlew rebuildV3Models -PmodelArgs=\"--model-id ID --limit N --seed N "
-                + "--split-strategy HASH|SCAFFOLD --parallel-smote-min-instances N\"");
+                + "--split-strategy HASH|SCAFFOLD --parallel-smote-min-instances N "
+                + "--cv-folds 2..10 --model-timeout-seconds 0|60..86400\"");
     }
 
     private record Definition(long id, long datasetId, long targetPropertyId,
                               String targetColumn, String modelName, String algorithm,
                               String featureSelection, String declaredClasses,
-                              long featureProfileId, String definitionStatus,
+                              long featureProfileId, Integer crossValidationFolds,
+                              long buildTimeoutSeconds, String definitionStatus,
                               String featureStatus) { }
     private record Component(int order, Long descriptorId, Long fingerprintId,
                              String code, int bitLength, List<String> descriptorNames) { }
@@ -570,10 +604,14 @@ public final class V3ModelRebuilder {
         return support;
     }
 
-    private static CrossValidationPlan crossValidationPlan(PreparedData data) {
-        boolean required = requiresCrossValidation(data.validation, data.holdout);
+    private static CrossValidationPlan crossValidationPlan(PreparedData data,
+            Integer forcedFolds, String forcedTrigger) {
         int usable = data.train.numInstances() + data.validation.numInstances()
                 + data.holdout.numInstances();
+        if (forcedFolds != null) {
+            return new CrossValidationPlan(true, Math.min(forcedFolds, usable), forcedTrigger);
+        }
+        boolean required = requiresCrossValidation(data.validation, data.holdout);
         return new CrossValidationPlan(required,
                 required ? crossValidationFoldCount(usable) : 0,
                 required ? "SPLIT_CLASS_SUPPORT_BELOW_10" : "NOT_REQUIRED");
@@ -664,14 +702,139 @@ public final class V3ModelRebuilder {
         private final Config config;
         private final Connection read;
         private final Connection write;
+        private volatile Process activeChild;
+        private volatile Long activeChildDefinitionId;
 
         Worker(Config config, Connection read, Connection write) {
             this.config = config; this.read = read; this.write = write;
         }
 
         void run() throws Exception {
+            if (!config.workerChild) {
+                reconcileOrphanedBuilds();
+            }
             for (long modelDefinitionId : candidateDefinitionIds()) {
-                processDefinition(modelDefinitionId);
+                if (!config.workerChild && config.modelTimeoutSeconds > 0L) {
+                    processDefinitionInChild(modelDefinitionId);
+                } else {
+                    processDefinition(modelDefinitionId);
+                }
+            }
+        }
+
+        void shutdown() {
+            Process child = activeChild;
+            Long modelDefinitionId = activeChildDefinitionId;
+            if (child == null || modelDefinitionId == null) return;
+            try {
+                if (child.isAlive()) {
+                    child.destroyForcibly();
+                    if (!child.waitFor(30L, java.util.concurrent.TimeUnit.SECONDS)) {
+                        System.err.println("Could not stop model rebuild child for definition "
+                                + modelDefinitionId + "; startup reconciliation will recover it.");
+                        return;
+                    }
+                }
+                reconcileInterruptedOnFreshConnection(modelDefinitionId);
+            } catch (Exception exception) {
+                System.err.println("Could not reconcile model definition " + modelDefinitionId
+                        + " during shutdown: " + rootMessage(exception));
+            }
+        }
+
+        private void processDefinitionInChild(long modelDefinitionId) throws Exception {
+            long timeoutSeconds = effectiveModelTimeoutSeconds(modelDefinitionId);
+            List<String> command = new ArrayList<>();
+            command.add(System.getProperty("java.home") + java.io.File.separator + "bin"
+                    + java.io.File.separator + "java");
+            command.add("-Xmx" + Runtime.getRuntime().maxMemory());
+            String wekaOffline = System.getProperty("weka.core.WekaPackageManager.offline");
+            if (wekaOffline != null) {
+                command.add("-Dweka.core.WekaPackageManager.offline=" + wekaOffline);
+            }
+            command.add("-cp");
+            command.add(System.getProperty("java.class.path"));
+            command.add(V3ModelRebuilder.class.getName());
+            addOption(command, "jdbc-url", config.jdbcUrl);
+            addOption(command, "db-user", config.user);
+            addOption(command, "password-env", config.passwordEnvironmentName);
+            addOption(command, "target-schema", config.schema);
+            addOption(command, "model-id", modelDefinitionId);
+            addOption(command, "seed", config.seed);
+            addOption(command, "threads", config.threads);
+            addOption(command, "split-strategy", config.splitStrategy.name());
+            addOption(command, "parallel-smote-min-instances", config.parallelSmoteMinInstances);
+            addOption(command, "model-timeout-seconds", timeoutSeconds);
+            if (config.cvFolds != null) addOption(command, "cv-folds", config.cvFolds);
+
+            ProcessBuilder processBuilder = new ProcessBuilder(command).inheritIO();
+            processBuilder.environment().put("MOLCLASS_MODEL_WORKER_CHILD", "true");
+            Process child = processBuilder.start();
+            activeChildDefinitionId = modelDefinitionId;
+            activeChild = child;
+            boolean finished = child.waitFor(timeoutSeconds,
+                    java.util.concurrent.TimeUnit.SECONDS);
+            if (!finished) {
+                child.destroyForcibly();
+                if (!child.waitFor(30L, java.util.concurrent.TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("model definition " + modelDefinitionId
+                            + " did not terminate after its timeout");
+                }
+                markTimedOutDefinition(modelDefinitionId, timeoutSeconds);
+                activeChild = null;
+                activeChildDefinitionId = null;
+                System.err.println("Model " + modelDefinitionId + " exceeded "
+                        + timeoutSeconds + " seconds; recorded BUILD_TIMEOUT.");
+                return;
+            }
+            int exitCode = child.exitValue();
+            activeChild = null;
+            activeChildDefinitionId = null;
+            if (exitCode != 0) {
+                reconcileDefinitionIfUnlocked(modelDefinitionId);
+                System.err.println("Model " + modelDefinitionId + " child exited with code "
+                        + exitCode + "; continuing rebuild queue.");
+            }
+        }
+
+        private static void addOption(List<String> command, String name, Object value) {
+            command.add("--" + name);
+            command.add(String.valueOf(value));
+        }
+
+        private long effectiveModelTimeoutSeconds(long modelDefinitionId) throws SQLException {
+            if (config.modelTimeoutExplicit) return config.modelTimeoutSeconds;
+            try (PreparedStatement statement = read.prepareStatement("SELECT build_timeout_seconds FROM "
+                    + t("model_definition") + " WHERE model_definition_id=?")) {
+                statement.setLong(1, modelDefinitionId);
+                try (ResultSet rows = statement.executeQuery()) {
+                    if (!rows.next()) {
+                        throw new SQLException("model definition " + modelDefinitionId
+                                + " disappeared before timeout policy lookup");
+                    }
+                    return rows.getLong(1);
+                }
+            }
+        }
+
+        private void reconcileOrphanedBuilds() throws SQLException {
+            List<Long> modelDefinitionIds = new ArrayList<>();
+            try (Statement statement = read.createStatement();
+                 ResultSet rows = statement.executeQuery("SELECT DISTINCT model_definition_id FROM "
+                         + t("model_build") + " WHERE status='RUNNING'")) {
+                while (rows.next()) modelDefinitionIds.add(rows.getLong(1));
+            }
+            for (long modelDefinitionId : modelDefinitionIds) {
+                reconcileDefinitionIfUnlocked(modelDefinitionId);
+            }
+        }
+
+        private void reconcileDefinitionIfUnlocked(long modelDefinitionId) throws SQLException {
+            if (!acquireDefinitionLock(modelDefinitionId)) return;
+            try {
+                recoverInterruptedAttempts(modelDefinitionId);
+            } finally {
+                releaseDefinitionLock(modelDefinitionId);
             }
         }
 
@@ -729,17 +892,102 @@ public final class V3ModelRebuilder {
         }
 
         private void recoverInterruptedAttempts(long modelDefinitionId) throws SQLException {
+            recoverInterruptedAttempts(write, config.schema, modelDefinitionId);
+        }
+
+        private static void recoverInterruptedAttempts(Connection connection, String schema,
+                long modelDefinitionId) throws SQLException {
             try {
-                for (String sql : interruptedRecoverySql(config.schema)) {
-                    try (PreparedStatement statement = write.prepareStatement(sql)) {
+                for (String sql : interruptedRecoverySql(schema)) {
+                    try (PreparedStatement statement = connection.prepareStatement(sql)) {
                         statement.setLong(1, modelDefinitionId);
                         statement.executeUpdate();
                     }
+                }
+                connection.commit();
+            } catch (SQLException exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+
+        private void reconcileInterruptedOnFreshConnection(long modelDefinitionId)
+                throws SQLException {
+            try (Connection connection = V3JdbcSession.configureUtc(DriverManager.getConnection(
+                    config.jdbcUrl, config.user, config.password))) {
+                connection.setAutoCommit(false);
+                boolean locked = false;
+                try (PreparedStatement statement = connection.prepareStatement("SELECT GET_LOCK(?,5)")) {
+                    statement.setString(1, definitionLockName(config.schema, modelDefinitionId));
+                    try (ResultSet rows = statement.executeQuery()) {
+                        locked = rows.next() && rows.getInt(1) == 1 && !rows.wasNull();
+                    }
+                }
+                if (!locked) return;
+                try {
+                    recoverInterruptedAttempts(connection, config.schema, modelDefinitionId);
+                } finally {
+                    try (PreparedStatement statement = connection.prepareStatement(
+                            "SELECT RELEASE_LOCK(?)")) {
+                        statement.setString(1, definitionLockName(config.schema, modelDefinitionId));
+                        statement.executeQuery();
+                    }
+                }
+            }
+        }
+
+        private void markTimedOutDefinition(long modelDefinitionId, long timeoutSeconds)
+                throws SQLException {
+            if (!acquireDefinitionLock(modelDefinitionId)) {
+                throw new SQLException("could not acquire model definition lock after timeout for "
+                        + modelDefinitionId);
+            }
+            String message = "model build exceeded " + timeoutSeconds + " seconds";
+            try {
+                try (PreparedStatement statement = write.prepareStatement("INSERT INTO "
+                        + t("audit_event")
+                        + " (actor,action_code,entity_type,entity_id,event_details_json,created_at)"
+                        + " SELECT 'model-rebuild-worker','MODEL_BUILD_TIMEOUT','MODEL_BUILD',"
+                        + " CAST(model_build_id AS CHAR),JSON_OBJECT('reason',?),NOW(6) FROM "
+                        + t("model_build")
+                        + " WHERE model_definition_id=? AND status='RUNNING'")) {
+                    statement.setString(1, message);
+                    statement.setLong(2, modelDefinitionId);
+                    statement.executeUpdate();
+                }
+                try (PreparedStatement statement = write.prepareStatement("UPDATE " + t("job")
+                        + " j JOIN " + t("model_build") + " mb ON mb.job_id=j.job_id"
+                        + " SET j.status='FAILED',j.runstep='COMPLETE',j.error_code='BUILD_TIMEOUT',"
+                        + " j.error_message=?,j.finished_at=NOW(6)"
+                        + " WHERE mb.model_definition_id=? AND mb.status='RUNNING'"
+                        + " AND j.status='RUNNING'")) {
+                    statement.setString(1, message);
+                    statement.setLong(2, modelDefinitionId);
+                    statement.executeUpdate();
+                }
+                try (PreparedStatement statement = write.prepareStatement("UPDATE "
+                        + t("model_definition") + " md JOIN " + t("model_build")
+                        + " mb ON mb.model_definition_id=md.model_definition_id"
+                        + " SET md.status='REBUILD_FAILED' WHERE mb.model_definition_id=?"
+                        + " AND mb.status='RUNNING' AND md.status='PENDING_REBUILD'")) {
+                    statement.setLong(1, modelDefinitionId);
+                    statement.executeUpdate();
+                }
+                try (PreparedStatement statement = write.prepareStatement("UPDATE "
+                        + t("model_build")
+                        + " SET status='REBUILD_FAILED',runstep='FAILED',"
+                        + " error_code='BUILD_TIMEOUT',error_message=?,finished_at=NOW(6)"
+                        + " WHERE model_definition_id=? AND status='RUNNING'")) {
+                    statement.setString(1, message);
+                    statement.setLong(2, modelDefinitionId);
+                    statement.executeUpdate();
                 }
                 write.commit();
             } catch (SQLException exception) {
                 write.rollback();
                 throw exception;
+            } finally {
+                releaseDefinitionLock(modelDefinitionId);
             }
         }
 
@@ -772,7 +1020,8 @@ public final class V3ModelRebuilder {
             String sql = "SELECT md.model_definition_id,md.dataset_id,md.target_property_id,"
                     + "p.physical_column_name,md.model_name,md.algorithm_code,"
                     + "md.feature_selection_code,md.declared_class_labels_json,"
-                    + "md.feature_profile_id,md.status,fp.status FROM " + t("model_definition")
+                    + "md.feature_profile_id,md.cross_validation_folds,"
+                    + "md.build_timeout_seconds,md.status,fp.status FROM " + t("model_definition")
                     + " md JOIN " + t("property_definition")
                     + " p ON p.property_id=md.target_property_id JOIN "
                     + t("feature_profile")
@@ -787,7 +1036,8 @@ public final class V3ModelRebuilder {
                     return new Definition(rows.getLong(1), rows.getLong(2), rows.getLong(3),
                             rows.getString(4), rows.getString(5), rows.getString(6),
                             rows.getString(7), rows.getString(8), rows.getLong(9),
-                            rows.getString(10), rows.getString(11));
+                            rows.getObject(10) == null ? null : rows.getInt(10),
+                            rows.getLong(11), rows.getString(12), rows.getString(13));
                 }
             }
         }
@@ -808,7 +1058,12 @@ public final class V3ModelRebuilder {
                 }
                 Algorithm algorithm = algorithm(definition.id, definition.algorithm,
                         definition.featureSelection, config.seed + definition.id, data.train);
-                CrossValidationPlan crossValidation = crossValidationPlan(data);
+                Integer effectiveCvFolds = config.cvFolds != null
+                        ? config.cvFolds : definition.crossValidationFolds;
+                String forcedCvTrigger = config.cvFolds != null
+                        ? "CLI_FORCED" : "DEFINITION_FORCED";
+                CrossValidationPlan crossValidation = crossValidationPlan(
+                        data, effectiveCvFolds, forcedCvTrigger);
                 Classifier crossValidationTemplate = crossValidation.required
                         ? AbstractClassifier.makeCopy(algorithm.classifier) : null;
                 persistMembership(context.buildId, data);
@@ -843,7 +1098,10 @@ public final class V3ModelRebuilder {
                         + ",\"crossValidation\":" + crossValidation.manifestJson()
                         + ",\"artifactFormat\":\"JAVA_SERIALIZATION_WEKA_3_8_7_GZIP\""
                         + ",\"smote\":" + algorithm.smoteExecution.manifestJson()
-                        + ",\"workerThreads\":" + config.threads + "}";
+                        + ",\"workerThreads\":" + config.threads
+                        + ",\"buildTimeoutSeconds\":"
+                        + (config.modelTimeoutExplicit
+                            ? config.modelTimeoutSeconds : definition.buildTimeoutSeconds) + "}";
                 completeBuild(context, definition, data, manifest);
                 System.out.println("Model definition " + definition.id + " rebuilt as build "
                         + context.buildId + "; awaiting approval.");
@@ -889,7 +1147,7 @@ public final class V3ModelRebuilder {
                 statement.setLong(i++,jobId);statement.setString(i++,GENERATION_LABEL);statement.setInt(i++,generationNumber);
                 statement.setString(i++,System.getProperty("java.version"));statement.setString(i++,CDK_VERSION);
                 statement.setString(i++,WEKA_VERSION);statement.setString(i++,first(System.getenv("MOLCLASS_CODE_REVISION"),"working-tree"));
-                statement.setString(i++,"V10");statement.setLong(i++,config.seed+definition.id);
+                statement.setString(i++,"V14");statement.setLong(i++,config.seed+definition.id);
                 statement.setString(i++,splitStrategyName(config.splitStrategy));statement.setString(i,splitConfigurationJson);
                 statement.executeUpdate();buildId=key(statement);
             }

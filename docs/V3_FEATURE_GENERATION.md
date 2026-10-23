@@ -79,3 +79,10 @@ Full canonical coverage:
 ./gradlew generateV3Features \
   -PfeatureArgs="--scope ALL --threads 12 --batch-size 200"
 ```
+# Immutable profile revisions (V14)
+
+Feature profiles are sealed by canonical manifest, SHA-256 digest, component
+versions, transformations, and raw feature count. The generator reuses an exact
+sealed contract and creates a new revision when composition changes; it never
+deletes and recreates components of a referenced profile. Readiness and coverage
+are recorded per profile. See `docs/V3_FEATURE_CONTRACTS.md`.
