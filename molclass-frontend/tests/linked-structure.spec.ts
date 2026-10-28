@@ -1,5 +1,5 @@
-import { test, expect } from "@playwright/test";
-import { routes, stubBackend, stubEndpoint } from "./fixtures/backend";
+import { test, expect } from "./fixtures/ui";
+import { moleculeDetail, routes, stubBackend, stubEndpoint } from "./fixtures/backend";
 
 /**
  * A chemgrid.org compound page links here with ?smiles=...&scaffold=..., which renders the
@@ -15,6 +15,7 @@ const LINKED_URL = "/search?smiles=CCOc1ccccc1&scaffold=c1ccccc1";
 
 test.beforeEach(async ({ page }) => {
   await stubBackend(page);
+  await stubEndpoint(page, routes.moleculePredictions, []);
 });
 
 test("a linked structure from ChemGrid can be cleared back to the native search state", async ({ page }) => {
@@ -42,6 +43,7 @@ test("clicking the linked molecule searches for it", async ({ page }) => {
 
 test("a new structure with no exact match can be registered and predicted", async ({ page }) => {
   await stubEndpoint(page, routes.moleculeSearch, []);
+  await stubEndpoint(page, routes.moleculeDetail, { ...moleculeDetail, moleculeId: 999 });
   let submitted: Record<string, unknown> | null = null;
   await page.route(routes.adhocMoleculePredict, (route) => {
     submitted = route.request().postDataJSON() as Record<string, unknown>;
@@ -74,5 +76,7 @@ test("a new structure with no exact match can be registered and predicted", asyn
   await page.getByRole("button", { name: "Register this structure and predict" }).click();
 
   await expect(page).toHaveURL(/\/search\?tab=models&molecules=999$/);
+  await expect(page.getByRole("heading", { name: "Classification models", exact: true })).toBeVisible();
+  await expect(page.getByText("1 selected", { exact: true })).toBeVisible();
   expect(submitted).toMatchObject({ smiles: "CCOc1ccccc1", model_definition_id: expect.any(Number) });
 });

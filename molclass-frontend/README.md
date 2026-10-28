@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MolClass frontend
 
-## Getting Started
+Next.js frontend for registry search, molecule registration, saved predictions,
+model selection, and model review. Production runs the standalone build in Docker
+at `https://molclass.chemgrid.org`.
 
-First, run the development server:
+## Development and builds
 
-```bash
+```sh
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The development server defaults to port 3000. `npm run typecheck` checks application
+types; `npm run typecheck:tests` checks browser-test code. API rewrites use
+`API_URL` and `PREDICTOR_API_URL` at build time; production Docker Compose supplies
+the container addresses. Preserve those settings when rebuilding.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`npm run build` creates `.next/standalone/server.js`; its postbuild step stages the
+public assets and client chunks. Start that deployment with
+`HOSTNAME=127.0.0.1 PORT=3000 node .next/standalone/server.js`.
+Use `../tools/build-frontend.sh` for a build with the UI regression gate.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+For current behavior, API contracts, and the 2026-10-28 frontend deployment record,
+see [search UI](../docs/V3_SEARCH_UI.md) and
+[prediction API](../docs/V3_PREDICTION_API.md).
 
-## Learn More
+## UI regression gate
 
-To learn more about Next.js, take a look at the following resources:
+Before deploying frontend changes, run:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```sh
+npm ci
+npx playwright install --with-deps
+npm run test:ui
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This builds and tests the production app on an isolated local port (3101), using
+Chromium, Firefox, WebKit, Android Chrome, and iPhone Safari emulation. All API
+responses are fixtures; an unmocked API call or browser exception fails the test.
+No production predictions or registrations are submitted. An existing server is
+never reused, and failures are not retried away.
 
-## Deploy on Vercel
+The gate covers:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Registry search, selection, model handoff, deep links, and browser Back.
+- Clearing results, selection, and linked structures; typing another query;
+  delayed responses after clearing; starting over from predictions.
+- Registration followed by model selection.
+- Saved predictions on arrival and reload, missing-only submissions, model build
+  changes, history errors/retry, and multiple molecules.
+- Incremental model results, pending/error cards, progress, desktop grids, mobile
+  stacking and overflow, and keyboard search/selection.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`tools/build-frontend.sh` runs this gate before reporting a deployable build.
+GitHub Actions also runs it for pull requests and pushes to `main` or `master`.
+Make **Production UI regression gate** a required branch-protection check before
+merging; repository files alone cannot enforce that server-side setting.
+Direct Docker builds bypass the wrapper, so run the gate before deploying those.
+
+On failure, inspect `playwright-report/ui/index.html` (or run
+`npx playwright show-report playwright-report/ui`). Screenshots, traces, and videos
+are retained in `test-results/ui/` and uploaded by CI. To diagnose one scenario:
+
+```sh
+npm run test:ui -- --project=desktop-chromium --grep "search, reuse results"
+```
+
+These checks protect the listed interactions; they do not replace a read-only
+post-deployment check of production API connectivity and real saved results.

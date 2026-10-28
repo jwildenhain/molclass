@@ -144,12 +144,25 @@ interface Prediction {
   responseStrength: number;
   applicabilityScore: number | null;
   inApplicabilityDomain: boolean | null;
-  trainingScaffoldCount: number;
+  trainingScaffoldCount: number | null;
+}
+
+type OutcomeModel = Pick<PublishedModel, "modelDefinitionId" | "modelBuildId" | "name" | "algorithm">;
+type SavedPrediction = Omit<Prediction, "moleculeId" | "responseStrength" | "trainingScaffoldCount"> & {
+  modelName: string | null;
+  algorithm: string;
+  confidenceScore: number;
+};
+type HistoryState = { status: "ready"; predictions: SavedPrediction[] } | { status: "error"; message: string };
+
+function outcomeKey(model: OutcomeModel, moleculeId: number) {
+  return `${moleculeId}:${model.modelBuildId}`;
 }
 
 type PredictionOutcome =
-  | { status: "success"; model: PublishedModel; molecule: Molecule; prediction: Prediction }
-  | { status: "error"; model: PublishedModel; molecule: Molecule; message: string };
+  | { status: "pending"; model: OutcomeModel; molecule: Molecule }
+  | { status: "success"; model: OutcomeModel; molecule: Molecule; prediction: Prediction; saved?: boolean }
+  | { status: "error"; model: OutcomeModel; molecule: Molecule; message: string };
 
 function extractMolecules(payload: unknown): Molecule[] {
   if (Array.isArray(payload)) return payload as Molecule[];
@@ -171,6 +184,25 @@ export function ModelMoleculeSearchPanel() {
   const [selectedMoleculeIds, setSelectedMoleculeIds] = useState<Set<number>>(new Set());
   const [moleculeCache, setMoleculeCache] = useState<Map<number, Molecule>>(new Map());
   const [outcomes, setOutcomes] = useState<PredictionOutcome[]>([]);
+  const [history, setHistory] = useState<Map<number, HistoryState>>(new Map());
+  const [historyRetry, setHistoryRetry] = useState(0);
+  const historyIds = Array.from(selectedMoleculeIds).sort((a, b) => a - b).join(",");
+  useEffect(() => {
+    let cancelled = false;
+    const ids = historyIds ? historyIds.split(",").map(Number) : [];
+    void Promise.all(ids.map(async (id) => {
+      try {
+        const response = await fetchWithTimeout(`/api/v3/molecules/${id}/predictions?limit=200`, { cache: "no-store" });
+        if (!response.ok) throw new Error("Could not load saved predictions. Retry before running more predictions.");
+        const predictions = await response.json() as SavedPrediction[];
+        if (!Array.isArray(predictions)) throw new Error("Invalid prediction history response.");
+        if (!cancelled) setHistory((current) => new Map(current).set(id, { status: "ready", predictions }));
+      } catch (cause) {
+        if (!cancelled) setHistory((current) => new Map(current).set(id, { status: "error", message: cause instanceof Error ? cause.message : "Could not load saved predictions." }));
+      }
+    }));
+    return () => { cancelled = true; };
+  }, [historyIds, historyRetry]);
   const [loadingModels, setLoadingModels] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -285,39 +317,76 @@ export function ModelMoleculeSearchPanel() {
   }
 
   function toggleModel(modelDefinitionId: number) {
+    if (busy || !eligibleModels.some((model) => model.modelDefinitionId === modelDefinitionId)) return;
     setSelectedModelIds((current) => {
       const next = new Set(current);
       if (next.has(modelDefinitionId)) next.delete(modelDefinitionId);
       else next.add(modelDefinitionId);
       return next;
     });
-    setOutcomes([]);
+
   }
 
   function toggleSelectAll() {
+    if (busy) return;
     setSelectedModelIds((current) =>
-      current.size === models.length ? new Set() : new Set(models.map((m) => m.modelDefinitionId)),
+      eligibleModels.every((model) => current.has(model.modelDefinitionId)) ? new Set() : new Set(eligibleModels.map((m) => m.modelDefinitionId)),
     );
-    setOutcomes([]);
+
   }
 
   function removeMolecule(moleculeId: number) {
+    if (busy) return;
     setSelectedMoleculeIds((current) => {
       const next = new Set(current);
       next.delete(moleculeId);
       return next;
     });
-    setOutcomes([]);
+
   }
 
   type ModelSortKey = "model" | "algorithm" | "features" | "split" | "holdout" | "auc" | "f1";
   const [modelSort, setModelSort] = useState<{ key: ModelSortKey; direction: SortDirection } | null>(null);
   const toggleModelSort = (key: ModelSortKey) => setModelSort((current) => nextSort(key, current));
 
+  const selectedMolecules = Array.from(selectedMoleculeIds)
+    .map((id) => moleculeCache.get(id))
+    .filter((m): m is Molecule => m !== undefined);
+  const historyReady = Array.from(selectedMoleculeIds).every((id) => history.get(id)?.status === "ready");
+  const historyComplete = historyReady && Array.from(selectedMoleculeIds).every((id) => {
+    const entry = history.get(id);
+    return entry?.status === "ready" && entry.predictions.length < 200;
+  });
+  const savedOutcomes: PredictionOutcome[] = [];
+  for (const molecule of selectedMolecules) {
+    const entry = history.get(molecule.moleculeId);
+    if (entry?.status !== "ready") continue;
+    const seen = new Set<number>();
+    for (const prediction of entry.predictions) {
+      if (seen.has(prediction.modelBuildId)) continue;
+      seen.add(prediction.modelBuildId);
+      savedOutcomes.push({
+        status: "success", saved: true, molecule,
+        model: { modelDefinitionId: prediction.modelDefinitionId, modelBuildId: prediction.modelBuildId, name: prediction.modelName, algorithm: prediction.algorithm },
+        prediction: { ...prediction, moleculeId: molecule.moleculeId, responseStrength: prediction.confidenceScore, trainingScaffoldCount: null },
+      });
+    }
+  }
+  const mergedOutcomes = new Map(savedOutcomes.map((item) => [outcomeKey(item.model, item.molecule.moleculeId), item]));
+  for (const item of outcomes) {
+    if (selectedMoleculeIds.has(item.molecule.moleculeId)) mergedOutcomes.set(outcomeKey(item.model, item.molecule.moleculeId), item);
+  }
+  const visibleOutcomes = Array.from(mergedOutcomes.values());
+  const hasPrediction = (model: OutcomeModel, moleculeId: number) =>
+    mergedOutcomes.get(outcomeKey(model, moleculeId))?.status === "success";
+  const eligibleModels = models.filter((model) => selectedMoleculeIds.size === 0 ||
+    (historyComplete && selectedMolecules.some((molecule) => !hasPrediction(model, molecule.moleculeId))));
+  const selectedModels = eligibleModels.filter((model) => selectedModelIds.has(model.modelDefinitionId));
+
   const sortedModels = useMemo(() => {
-    if (!modelSort) return models;
+    if (!modelSort) return eligibleModels;
     const dir = modelSort.direction === "asc" ? 1 : -1;
-    return [...models].sort((a, b) => {
+    return [...eligibleModels].sort((a, b) => {
       switch (modelSort.key) {
         case "model":
           return (a.name || `Model ${a.modelDefinitionId}`).localeCompare(b.name || `Model ${b.modelDefinitionId}`) * dir;
@@ -335,49 +404,51 @@ export function ModelMoleculeSearchPanel() {
           return compareNullableNumber(a.holdoutF1, b.holdoutF1, dir as 1 | -1);
       }
     });
-  }, [models, modelSort]);
+  }, [eligibleModels, modelSort]);
 
-  const selectedModels = models.filter((model) => selectedModelIds.has(model.modelDefinitionId));
-  const selectedMolecules = Array.from(selectedMoleculeIds)
-    .map((id) => moleculeCache.get(id))
-    .filter((m): m is Molecule => m !== undefined);
-
-  const groupedOutcomes = useMemo(() => {
+  const groupedOutcomes = (() => {
     const groups = new Map<number, { molecule: Molecule; items: PredictionOutcome[] }>();
-    for (const outcome of outcomes) {
+    for (const outcome of visibleOutcomes) {
       const existing = groups.get(outcome.molecule.moleculeId);
       if (existing) existing.items.push(outcome);
       else groups.set(outcome.molecule.moleculeId, { molecule: outcome.molecule, items: [outcome] });
     }
     return Array.from(groups.values());
-  }, [outcomes]);
+  })();
+
+  const completedCount = outcomes.filter((item) => item.status !== "pending").length;
+  const failedCount = outcomes.filter((item) => item.status === "error").length;
 
   const runPredictions = async () => {
-    if (selectedModels.length === 0 || selectedMolecules.length === 0) return;
+    if (busy || !historyComplete || selectedModels.length === 0 || selectedMolecules.length === 0) return;
     setBusy(true);
     setError(null);
-    setOutcomes([]);
-    const pairs = selectedMolecules.flatMap((molecule) => selectedModels.map((model) => ({ model, molecule })));
-    const results = await Promise.all(
-      pairs.map(async ({ model, molecule }): Promise<PredictionOutcome> => {
+    const pairs = selectedMolecules.flatMap((molecule) => selectedModels.filter((model) => !hasPrediction(model, molecule.moleculeId)).map((model) => ({ model, molecule })));
+    setOutcomes((current) => [...current.filter((item) => item.status === "success"), ...pairs.map(({ model, molecule }): PredictionOutcome => ({ status: "pending", model, molecule }))]);
+    await Promise.all(
+      pairs.map(async ({ model, molecule }) => {
+        let outcome: PredictionOutcome;
         try {
           const response = await fetch(
             `/api/v3/models/${model.modelDefinitionId}/molecules/${molecule.moleculeId}/predict`,
             { method: "POST" },
           );
           if (!response.ok) throw new Error(await response.text());
-          return { status: "success", model, molecule, prediction: (await response.json()) as Prediction };
+          outcome = { status: "success", model, molecule, prediction: (await response.json()) as Prediction };
         } catch (cause) {
-          return {
+          outcome = {
             status: "error",
             model,
             molecule,
             message: cause instanceof Error ? cause.message : "Prediction failed",
           };
         }
+        setOutcomes((current) => current.map((item) =>
+          item.model.modelBuildId === model.modelBuildId && item.molecule.moleculeId === molecule.moleculeId
+            ? outcome : item,
+        ));
       }),
     );
-    setOutcomes(results);
     setBusy(false);
   };
 
@@ -429,6 +500,22 @@ export function ModelMoleculeSearchPanel() {
         </div>
       </form>
 
+      {selectedMoleculeIds.size > 0 && !historyReady && (
+        <div className="rounded-xl border border-border p-4 text-sm">
+          {Array.from(selectedMoleculeIds).some((id) => history.get(id)?.status === "error") ? (
+            <div role="alert">Could not load saved predictions. Please retry before running more predictions.
+              <button type="button" onClick={() => setHistoryRetry((value) => value + 1)} className="ml-3 font-semibold text-blue-500">Retry saved predictions</button>
+            </div>
+          ) : <p role="status">Loading saved predictions…</p>}
+        </div>
+      )}
+      {selectedMoleculeIds.size > 0 && historyReady && !historyComplete && (
+        <p role="alert" className="text-sm text-amber-700">This molecule has more history than can be checked here. Showing the latest saved results; new predictions are disabled to avoid repeating an existing result.</p>
+      )}
+      {selectedMoleculeIds.size > 0 && historyComplete && eligibleModels.length === 0 && models.length > 0 && (
+        <p className="text-sm text-emerald-700">All listed models already have predictions for the selected molecules. Saved results are shown below.</p>
+      )}
+
       <section className="bg-card/50 backdrop-blur-md rounded-2xl border border-border shadow-2xl overflow-hidden">
         {loadingModels ? (
           <div className="p-12 text-center text-muted-foreground animate-pulse">Loading published models...</div>
@@ -443,15 +530,16 @@ export function ModelMoleculeSearchPanel() {
             <div className="flex items-center justify-between gap-3 border-b border-border/50 bg-muted/30 px-4 py-3">
               <label className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
                 <input
+                  disabled={busy || eligibleModels.length === 0}
                   type="checkbox"
-                  checked={selectedModelIds.size === models.length && models.length > 0}
+                  checked={selectedModels.length === eligibleModels.length && eligibleModels.length > 0}
                   onChange={toggleSelectAll}
                   className="h-4 w-4 rounded border-border accent-blue-600"
                 />
                 Select all
               </label>
               <span className="text-sm text-muted-foreground">
-                {selectedModelIds.size} of {models.length} selected
+                {selectedModels.length} of {eligibleModels.length} selected
               </span>
             </div>
             <table className="w-full text-left border-collapse">
@@ -478,6 +566,7 @@ export function ModelMoleculeSearchPanel() {
                     >
                       <td className="p-4">
                         <input
+                          disabled={busy}
                           type="checkbox"
                           checked={checked}
                           onChange={() => toggleModel(model.modelDefinitionId)}
@@ -520,6 +609,9 @@ export function ModelMoleculeSearchPanel() {
           <div className="flex items-center gap-3">
             <Activity className="h-6 w-6 text-blue-500" />
             <h2 className="text-xl font-bold text-foreground">Prediction</h2>
+            <button type="button" onClick={() => { window.history.pushState(null, "", "/search"); window.scrollTo({ top: 0, behavior: "instant" }); }} className="ml-auto rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted/30">
+              Search another molecule
+            </button>
           </div>
 
           {linkedMoleculeStatus === "loading" && (
@@ -568,6 +660,7 @@ export function ModelMoleculeSearchPanel() {
                   <button
                     onClick={() => removeMolecule(molecule.moleculeId)}
                     className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition hover:bg-red-500/10 hover:text-red-500"
+                    disabled={busy}
                     aria-label={`Remove molecule ${molecule.moleculeId}`}
                   >
                     <X className="h-4 w-4" />
@@ -593,7 +686,7 @@ export function ModelMoleculeSearchPanel() {
           </dl>
           <button
             onClick={runPredictions}
-            disabled={busy || selectedModels.length === 0 || selectedMolecules.length === 0}
+            disabled={busy || !historyComplete || selectedModels.length === 0 || selectedMolecules.length === 0}
             className="mt-6 w-full rounded-xl bg-emerald-600 px-5 py-3 font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {busy
@@ -603,8 +696,24 @@ export function ModelMoleculeSearchPanel() {
                 : "Run approved model"}
           </button>
 
+          {outcomes.length > 0 && (
+            <div className="mt-6" role="status" aria-live="polite">
+              <p className="text-sm font-medium text-foreground">
+                {completedCount} of {outcomes.length} predictions completed
+                {busy ? " — receiving results…" : ""}
+                {failedCount > 0 && ` · ${failedCount} failed`}
+              </p>
+              <progress
+                aria-label="Prediction progress"
+                max={outcomes.length}
+                value={completedCount}
+                className="mt-2 h-2 w-full accent-emerald-600"
+              />
+            </div>
+          )}
+
           {groupedOutcomes.length > 0 && (
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className={`mt-6 grid grid-cols-1 gap-4 ${groupedOutcomes.length > 1 ? "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : ""}`}>
               {groupedOutcomes.map(({ molecule, items }) => (
                 <div key={molecule.moleculeId} className="rounded-2xl border border-border bg-background/40 p-4">
                   <div className="flex items-start gap-3">
@@ -625,24 +734,29 @@ export function ModelMoleculeSearchPanel() {
                     </div>
                   </div>
 
-                  <div className="mt-3 space-y-3">
+                  <div className={groupedOutcomes.length === 1 ? "mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "mt-3 space-y-3"}>
                     {items.map((outcome) => (
                       <div
-                        key={outcome.model.modelDefinitionId}
-                        className={`rounded-xl border p-4 ${outcome.status === "success" ? "border-emerald-500/30 bg-background/70" : "border-red-500/30 bg-red-500/10"}`}
+                        role="group"
+                        aria-label={`Prediction for ${outcome.model.name || `Model ${outcome.model.modelDefinitionId}`}`}
+                        key={outcome.model.modelBuildId}
+                        className={`rounded-xl border p-4 ${outcome.status === "success" ? "border-emerald-500/30 bg-background/70" : outcome.status === "error" ? "border-red-500/30 bg-red-500/10" : "border-border bg-background/50"}`}
                       >
                         <p className="text-xs uppercase tracking-widest text-muted-foreground">
                           {outcome.model.name || `Model ${outcome.model.modelDefinitionId}`} · {outcome.model.algorithm}
                         </p>
-                        {outcome.status === "error" ? (
+                        {outcome.status === "success" && outcome.saved && <p className="mt-1 text-xs text-muted-foreground">Saved prediction · build #{outcome.model.modelBuildId}</p>}
+                        {outcome.status === "pending" ? (
+                          <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />Predicting…</p>
+                        ) : outcome.status === "error" ? (
                           <p className="mt-1 text-sm text-red-500">{outcome.message}</p>
                         ) : (
                           <>
-                            <div className="mt-1 flex items-baseline justify-between gap-3">
+                            <div className="mt-1 flex flex-wrap items-baseline justify-between gap-3">
                               <p className="text-xl font-bold text-foreground">{outcome.prediction.predictedClass}</p>
                               <p className="text-xs text-muted-foreground">{(outcome.prediction.responseStrength * 100).toFixed(1)}% confidence</p>
                             </div>
-                            <div className="mt-2 flex items-center gap-2 text-xs">
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                               {outcome.prediction.applicabilityScore == null ? (
                                 <span className="text-muted-foreground">Applicability domain: undetermined (no scaffold data)</span>
                               ) : (
@@ -658,8 +772,7 @@ export function ModelMoleculeSearchPanel() {
                                   </span>
                                   <span className="text-muted-foreground">
                                     scaffold similarity {(outcome.prediction.applicabilityScore * 100).toFixed(0)}%
-                                    {" · "}
-                                    {outcome.prediction.trainingScaffoldCount} known scaffolds
+                                    {outcome.prediction.trainingScaffoldCount != null && ` · ${outcome.prediction.trainingScaffoldCount} known scaffolds`}
                                   </span>
                                 </>
                               )}

@@ -13,8 +13,9 @@ frontend="$repo_root/molclass-frontend"
 
 cd "$frontend"
 
-npm run build
+npm run test:ui
 
+# test:ui builds the production app and must pass before this script succeeds.
 # npm's postbuild lifecycle stages public/ and .next/static/ even when operators
 # invoke `npm run build` directly. Keep this wrapper as the documented entry point.
 

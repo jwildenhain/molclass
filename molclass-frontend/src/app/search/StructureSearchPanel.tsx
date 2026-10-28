@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Activity, Beaker, Info, PencilRuler, Search } from "lucide-react";
 import type { SketcherHandle } from "./MoleculeSketcher";
 
@@ -80,7 +80,6 @@ async function errorDetail(response: Response, fallback: string) {
 }
 
 export function StructureSearchPanel() {
-  const router = useRouter();
   const params = useSearchParams();
   const linkedSmiles = (params.get("smiles") || "").slice(0, 10000);
   const linkedScaffold = (params.get("scaffold") || "").slice(0, 10000);
@@ -98,20 +97,37 @@ export function StructureSearchPanel() {
   const [adhocError, setAdhocError] = useState<string | null>(null);
   const sketcherRef = useRef<SketcherHandle>(null);
 
-  function clearLinkedStructure() {
-    setQuery("");
+  const queryRef = useRef<HTMLInputElement>(null);
+  const operationVersion = useRef(0);
+  useEffect(() => () => { operationVersion.current += 1; }, []);
+
+  function resetSearch(value: string) {
+    operationVersion.current += 1;
+    setQuery(value);
+    setLoading(false);
+    setSelectedIds(new Set());
     setResults([]);
     setMeta(null);
     setSearched(false);
     setError(null);
     setAdhocStatus("idle");
     setAdhocError(null);
-    router.replace("/search");
+  }
+
+  function clearLinkedStructure() {
+    resetSearch("");
+    setMatchMode("exact");
+    setSketcherError(null);
+    sketcherRef.current?.clear();
+    setShowSketcher(false);
+    window.history.replaceState(null, "", "/search");
+    queryRef.current?.focus();
   }
 
   async function predictNewStructure() {
     const smiles = query.trim();
     if (!smiles) return;
+    const version = ++operationVersion.current;
     setAdhocStatus("submitting");
     setAdhocError(null);
 
@@ -120,12 +136,14 @@ export function StructureSearchPanel() {
       if (!modelsResponse.ok) {
         throw new Error(await errorDetail(modelsResponse, "Could not load published models."));
       }
+      if (version !== operationVersion.current) return;
       const models = (await modelsResponse.json()) as { modelDefinitionId: number }[];
       const seedModelId = models[0]?.modelDefinitionId;
       if (!seedModelId) {
         throw new Error("No published models are available to predict against.");
       }
 
+      if (version !== operationVersion.current) return;
       const submitResponse = await fetchWithTimeout("/api/v1/molecules/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -139,6 +157,7 @@ export function StructureSearchPanel() {
       const deadline = Date.now() + 30000;
       let moleculeId: number | null = null;
       while (Date.now() < deadline) {
+        if (version !== operationVersion.current) return;
         const jobResponse = await fetchWithTimeout(`/api/v1/jobs/${jobId}`, { cache: "no-store" });
         if (!jobResponse.ok) {
           throw new Error(await errorDetail(jobResponse, "Could not check prediction status."));
@@ -158,11 +177,13 @@ export function StructureSearchPanel() {
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }
 
+      if (version !== operationVersion.current) return;
       if (moleculeId == null) {
         throw new Error("Registering this structure is taking longer than expected. Try again shortly.");
       }
-      router.push(`/search?tab=models&molecules=${moleculeId}`);
+      openModelSelection([moleculeId]);
     } catch (submitError) {
+      if (version !== operationVersion.current) return;
       setAdhocStatus("error");
       setAdhocError(submitError instanceof Error ? submitError.message : "Could not predict this structure.");
     }
@@ -183,12 +204,21 @@ export function StructureSearchPanel() {
     );
   }
 
+  function openModelSelection(moleculeIds: number[]) {
+    // Both panels are client-side on this page. Update the URL immediately
+    // instead of waiting for a server navigation before showing model selection.
+    window.history.pushState(null, "", `/search?tab=models&molecules=${moleculeIds.join(",")}`);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+
   function predictSelected() {
     if (selectedIds.size === 0) return;
-    router.push(`/search?tab=models&molecules=${Array.from(selectedIds).join(",")}`);
+    openModelSelection(Array.from(selectedIds));
   }
 
   async function runSearch(rawQuery: string, mode: MatchMode) {
+    resetSearch(rawQuery);
+    const version = operationVersion.current;
     setLoading(true);
     setError(null);
     setSelectedIds(new Set());
@@ -210,10 +240,12 @@ export function StructureSearchPanel() {
       }
 
       const payload = await response.json();
+      if (version !== operationVersion.current) return;
       setResults(extractMolecules(payload));
       setMeta(extractMeta(payload));
       setSearched(true);
     } catch (searchError) {
+      if (version !== operationVersion.current) return;
       setResults([]);
       setMeta(null);
       setSearched(true);
@@ -223,7 +255,7 @@ export function StructureSearchPanel() {
           : "Molecule search failed.",
       );
     } finally {
-      setLoading(false);
+      if (version === operationVersion.current) setLoading(false);
     }
   }
 
@@ -234,12 +266,14 @@ export function StructureSearchPanel() {
 
   async function searchDrawnStructure() {
     setSketcherError(null);
+    const version = operationVersion.current;
     try {
       const smiles = await sketcherRef.current?.getSmiles();
-      if (!smiles) return;
+      if (!smiles || version !== operationVersion.current) return;
       setQuery(smiles);
       await runSearch(smiles, matchMode);
     } catch (drawError) {
+      if (version !== operationVersion.current) return;
       setSketcherError(
         drawError instanceof Error ? drawError.message : "Could not read the drawn structure.",
       );
@@ -295,23 +329,22 @@ export function StructureSearchPanel() {
             Substructure
           </button>
         </div>
-        {linkedSmiles && (
-          <button
+        <button
             type="button"
             onClick={clearLinkedStructure}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
           >
-            Clear, back to search
+            {linkedSmiles ? "Clear, back to search" : "Clear search"}
           </button>
-        )}
       </div>
 
       <form onSubmit={search} className="grid gap-3 rounded-2xl border border-border bg-card/60 p-5 shadow-lg backdrop-blur-md sm:grid-cols-[1fr_auto_auto] sm:p-6">
         <label className="sr-only" htmlFor="molecule-query">Molecule search</label>
         <input
+          ref={queryRef}
           id="molecule-query"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => resetSearch(event.target.value)}
           placeholder={
             matchMode === "substructure"
               ? "Fragment SMILES, e.g. c1ccccc1 for any benzene ring"

@@ -34,3 +34,31 @@ jobs:
         name: playwright-report
         path: molclass-frontend/playwright-report/
         retention-days: 30
+
+  ui-regression:
+    name: Production UI regression gate
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: molclass-frontend
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: molclass-frontend/package-lock.json
+    - run: npm ci
+    - run: npm run typecheck:tests
+    - run: npx playwright install --with-deps
+    - name: Build production app and test critical desktop/mobile journeys
+      run: npm run test:ui
+    - uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: production-ui-regression-report
+        path: |
+          molclass-frontend/playwright-report/ui/
+          molclass-frontend/test-results/ui/
+        retention-days: 30
