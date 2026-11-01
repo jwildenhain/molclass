@@ -226,6 +226,7 @@ public final class V3MoleculePredictWorker {
                 },
                 heartbeatPeriod, heartbeatPeriod, TimeUnit.SECONDS);
         try {
+            reportProgress(claim.jobId, "REGISTER_MOLECULE", 0, 1, "Registering structure", 0);
             long moleculeId;
             byte[] structure;
             String canonicalSmiles;
@@ -243,11 +244,19 @@ public final class V3MoleculePredictWorker {
             try (Connection connection = connection()) {
                 connection.setAutoCommit(false);
                 V3FeatureGenerator.registerFeaturesForMolecule(
-                        connection, config.schema, claim.jobId, moleculeId, structure, canonicalSmiles);
+                        connection, config.schema, claim.jobId, moleculeId, structure, canonicalSmiles,
+                        progress -> {
+                            int base = progress.stage().equals("COMPUTE_DESCRIPTORS") ? 10 : 50;
+                            int weight = progress.stage().equals("COMPUTE_DESCRIPTORS") ? 40 : 35;
+                            int percent = progress.stage().equals("SAVE_FEATURES") ? 85
+                                    : base + weight * progress.completed() / Math.max(1, progress.total());
+                            reportProgress(claim.jobId, progress.stage(), progress.completed(), progress.total(), progress.detail(), percent);
+                        });
                 connection.commit();
             }
             if (leaseLost.get()) throw new IllegalStateException("worker lease was lost");
             transition(claim.jobId, "PREDICT");
+            reportProgress(claim.jobId, "PREDICT", 0, 1, "Running prediction", 90);
             if (claim.predictAllMissing) {
                 completeAllMissing(claim, moleculeId);
                 System.out.println("Molecule predict job " + claim.jobId
@@ -301,12 +310,16 @@ public final class V3MoleculePredictWorker {
 
         List<String> predictions = new ArrayList<>();
         List<String> errors = new ArrayList<>();
+        reportProgress(claim.jobId, "PREDICT", 0, missing.size(), "Running missing models", 90);
         for (Long modelId : missing) {
             try {
                 predictions.add(predict(modelId, moleculeId));
             } catch (Exception exception) {
                 errors.add("Model " + modelId + ": " + safeMessage(exception));
             }
+            int done = predictions.size() + errors.size();
+            reportProgress(claim.jobId, "PREDICT", done, missing.size(), "Model " + modelId,
+                    90 + 9 * done / Math.max(1, missing.size()));
         }
 
         JSONObject result = new JSONObject();
@@ -360,6 +373,30 @@ public final class V3MoleculePredictWorker {
             if (!predictedBuildIds.contains(model.getValue())) missing.add(model.getKey());
         }
         return missing;
+    }
+
+    private void reportProgress(long jobId, String stage, int completed, int total, String detail, int percent) {
+        JSONObject progress = new JSONObject();
+        progress.put("stage", stage);
+        progress.put("completed", completed);
+        progress.put("total", total);
+        progress.put("detail", detail);
+        progress.put("percent", Math.max(0, Math.min(99, percent)));
+        try (Connection connection = connection()) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement check = connection.prepareStatement(
+                    "SELECT job_id FROM " + t("job") + " WHERE job_id=? AND status='RUNNING' AND lease_owner=? FOR UPDATE")) {
+                check.setLong(1, jobId);
+                check.setString(2, workerId);
+                try (ResultSet row = check.executeQuery()) {
+                    if (!row.next()) throw new SQLException("worker lease was lost");
+                }
+            }
+            event(connection, jobId, "JOB_PROGRESS", stage, detail, progress.toString());
+            connection.commit();
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Could not record job progress", exception);
+        }
     }
 
     private void transition(long jobId, String runstep) throws SQLException {

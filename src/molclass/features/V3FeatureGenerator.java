@@ -956,14 +956,24 @@ public final class V3FeatureGenerator {
      * catalog rows this reads -- there is deliberately no fallback that would create them here,
      * since that is exactly the shared, lock-guarded mutation this method exists to avoid.
      */
+    public record FeatureProgress(String stage, int completed, int total, String detail) { }
+
     public static void registerFeaturesForMolecule(
             Connection connection, String schema, long jobId,
             long moleculeId, byte[] structure, String canonicalSmiles) throws Exception {
+        registerFeaturesForMolecule(connection, schema, jobId, moleculeId, structure, canonicalSmiles, progress -> { });
+    }
+
+    public static void registerFeaturesForMolecule(
+            Connection connection, String schema, long jobId,
+            long moleculeId, byte[] structure, String canonicalSmiles,
+            java.util.function.Consumer<FeatureProgress> progress) throws Exception {
         long descriptorGenerationId = requireDescriptorGenerationId(connection, schema);
         List<FingerprintDefinition> definitions = requireFingerprintDefinitions(connection, schema);
         DescriptorCatalog catalog = DescriptorCatalog.create();
         FeatureCalculator calculator = new FeatureCalculator(catalog, definitions);
-        FeatureResult result = calculator.calculate(moleculeId, structure, canonicalSmiles);
+        FeatureResult result = calculator.calculate(moleculeId, structure, canonicalSmiles, progress);
+        progress.accept(new FeatureProgress("SAVE_FEATURES", 0, 1, "Saving calculated features"));
         try (FeatureWriter writer = new FeatureWriter(
                 connection, schema, descriptorGenerationId, definitions, jobId, 1)) {
             writer.write(result);
@@ -1052,13 +1062,22 @@ public final class V3FeatureGenerator {
         }
 
         FeatureResult calculate(long moleculeId, byte[] structure, String canonicalSmiles) {
+            return calculate(moleculeId, structure, canonicalSmiles, progress -> { });
+        }
+
+        FeatureResult calculate(long moleculeId, byte[] structure, String canonicalSmiles,
+                java.util.function.Consumer<FeatureProgress> progress) {
             try {
                 IAtomContainer molecule = parseMolecule(structure, canonicalSmiles);
-                DescriptorPayload descriptor = calculateDescriptors(molecule);
+                DescriptorPayload descriptor = calculateDescriptors(molecule, progress);
+                progress.accept(new FeatureProgress("COMPUTE_FINGERPRINTS", 0, fingerprints.size(), "Creating fingerprints"));
+                int fingerprintCount = 0;
                 Map<String, FingerprintPayload> fingerprintResults = new LinkedHashMap<>();
                 for (FingerprintCalculator calculator : fingerprints) {
                     fingerprintResults.put(calculator.definition.spec().code(),
                             calculator.calculate(molecule));
+                    progress.accept(new FeatureProgress("COMPUTE_FINGERPRINTS", ++fingerprintCount,
+                            fingerprints.size(), calculator.definition.spec().code()));
                 }
                 return new FeatureResult(moleculeId, descriptor, fingerprintResults);
             } catch (Throwable throwable) {
@@ -1067,7 +1086,10 @@ public final class V3FeatureGenerator {
             }
         }
 
-        private DescriptorPayload calculateDescriptors(IAtomContainer molecule) {
+        private DescriptorPayload calculateDescriptors(IAtomContainer molecule,
+                java.util.function.Consumer<FeatureProgress> progress) {
+            progress.accept(new FeatureProgress("COMPUTE_DESCRIPTORS", 0, descriptors.size(), "Calculating molecular properties"));
+            int completed = 0;
             double[] values = new double[descriptorNames.size()];
             BitSet missing = new BitSet(values.length);
             int offset = 0;
@@ -1095,6 +1117,8 @@ public final class V3FeatureGenerator {
                     }
                 }
                 offset += expected;
+                progress.accept(new FeatureProgress("COMPUTE_DESCRIPTORS", ++completed, descriptors.size(),
+                        descriptor.getClass().getSimpleName()));
             }
             byte[] encoded = encodeDoubles(values);
             return new DescriptorPayload(missing.isEmpty()

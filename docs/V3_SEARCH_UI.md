@@ -75,6 +75,33 @@ navigates to `/search?tab=models&molecules=<newMoleculeId>` with the new molecul
 This is the only place in the frontend that calls the ad-hoc endpoint; everywhere else predicts
 against molecules already in the registry.
 
+## Registration action monitoring
+
+Registration stores its job ID in `/search?registrationJob=<id>` (alongside the
+linked SMILES), so refreshing resumes monitoring without submitting another job.
+`RegistrationProgress` polls `GET /api/v1/jobs/{id}` every 1.5 seconds until a
+terminal state. Queue waits no longer fail after 30 seconds. Connection failures
+retry the same job; clearing the search removes the monitor but does not cancel
+the backend work. Successful completion opens model selection automatically.
+
+The worker records `JOB_PROGRESS` events after each property calculator and
+fingerprint completes. The API returns the latest event from the current attempt
+as `progress: {stage, percent, completed, total, detail}`. Queued jobs report 0%;
+successful jobs report 100%. For molecule jobs, `result` is null until success,
+then contains the existing molecule/prediction result. Other job types retain
+their existing result contract. This polling API also supplies integration clients.
+
+The UI displays stage counts and an overall weighted percentage: registration
+0–10%, property calculators 10–50%, fingerprints 50–85%, saving 85–90%, and
+prediction 90–99%. Only persisted success reaches 100%. These percentages measure
+completed steps, not elapsed or remaining time. Property counts include calculators
+that return unavailable values; completion does not imply every property exists.
+
+Regression coverage includes a queue wait exceeding 30 seconds, refresh/resume,
+property and fingerprint updates, completion, connection recovery, terminal errors,
+and clearing the monitor. API tests cover progress/result separation and retry
+attempts; Java tests verify the feature-calculation progress counts.
+
 ## Model + molecule prediction
 
 - The classification-models table adds **AUC** and **F1** columns (`holdoutAuc`/`holdoutF1` from
@@ -128,6 +155,30 @@ installation; compare deployed files before applying further patches.
 
 ChemGrid's separate MolClass-tab implementation is managed in its own task.
 Changes to this MolClass frontend do not automatically update that integration.
+
+### Registration monitor deployment — 2026-11-01
+
+Deployed the registration monitor, job-progress API, and molecule-worker callbacks.
+The source backup and rollback images use `action-progress-20261101`. No schema
+migration is required. Unrelated pending feature-contract changes were excluded.
+
+The first concurrent image build exhausted available host resources and temporarily
+made the API unresponsive; cancelling it restored service without replacing running
+containers. The final deployment compiled off-host and added small layers to the
+exact previously running images. Keep future compilation off this 8 GB host.
+
+Production remains on Next.js 16.2.9: its patched source and locked dependencies
+were built in isolation, with all 135 UI checks passing before deployment. The
+frontend layer contains `.next` and `server.js`, retaining the existing runtime,
+public assets, and analytics script. The worker layer replaces its application JAR
+with only the two patched Java classes (and their nested classes), compiled against
+the deployed dependencies; the progress regression passed against this JAR. The
+API layer replaces only `app/v3_uploads.py`; four API unit tests passed, and a
+read-only check against an existing production job returned completion at 100%.
+
+Live browser verification reopened job 147017, automatically selected molecule
+155686 and displayed its saved prediction without creating another job. Slow,
+interrupted, and incremental states are covered by local fixtures.
 
 ## Upload progress reporter
 

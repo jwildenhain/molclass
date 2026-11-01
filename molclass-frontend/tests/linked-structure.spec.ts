@@ -80,3 +80,46 @@ test("a new structure with no exact match can be registered and predicted", asyn
   await expect(page.getByText("1 selected", { exact: true })).toBeVisible();
   expect(submitted).toMatchObject({ smiles: "CCOc1ccccc1", model_definition_id: expect.any(Number) });
 });
+
+test("registration monitoring survives thirty seconds, refresh and progresses to completion", async ({ page }) => {
+  await page.clock.install();
+  let state = { status: "QUEUED", progress: { stage: "QUEUED", percent: 0, completed: 0, total: 1, detail: "Waiting for a worker" }, result: null as null | { moleculeId: number } };
+  let posts = 0;
+  page.on("request", (request) => { if (request.method() === "POST") posts++; });
+  await page.route(routes.adhocJob, (route) => route.fulfill({ json: state }));
+  await page.goto("/search?registrationJob=555");
+  const progress = page.getByRole("progressbar", { name: "Registration completion" });
+  await expect(progress).toHaveAttribute("value", "0");
+  await page.clock.fastForward(31000);
+  await expect(page.getByText(/No need to submit again/)).toBeVisible();
+  // Let Next navigation prefetches settle before deliberately unloading WebKit.
+  await page.waitForLoadState("networkidle");
+  await page.reload();
+  await expect(progress).toHaveAttribute("value", "0");
+  state = { ...state, status: "RUNNING", progress: { stage: "COMPUTE_DESCRIPTORS", percent: 30, completed: 20, total: 40, detail: "Calculating properties" } };
+  await page.clock.runFor(1600);
+  await expect(progress).toHaveAttribute("value", "30");
+  await expect(page.getByText("20 / 40", { exact: true })).toBeVisible();
+  state = { ...state, progress: { stage: "COMPUTE_FINGERPRINTS", percent: 70, completed: 6, total: 10, detail: "MACCS" } };
+  await page.clock.runFor(1600);
+  await expect(progress).toHaveAttribute("value", "70");
+  await expect(page.getByText("6 / 10", { exact: true })).toBeVisible();
+  state = { ...state, status: "SUCCEEDED", result: { moleculeId: 4711 }, progress: { ...state.progress, percent: 100 } };
+  await page.clock.runFor(1600);
+  await expect(progress).toHaveAttribute("value", "100");
+  await page.clock.runFor(700);
+  await expect(page).toHaveURL(/tab=models&molecules=4711$/);
+  expect(posts).toBe(0);
+});
+
+test("registration monitor retries connection failures without resubmitting", async ({ page }) => {
+  let unavailable = true;
+  await page.route(routes.adhocJob, (route) => route.fulfill(unavailable ? { status: 503, json: {} } : { json: { status: "FAILED", error_message: "Invalid structure", progress: { stage: "REGISTER_MOLECULE", percent: 0, completed: 0, total: 1 } } }));
+  await page.goto("/search?registrationJob=555");
+  await expect(page.getByText(/Connection interrupted/)).toBeVisible();
+  unavailable = false;
+  await expect(page.getByText("Invalid structure", { exact: true })).toBeVisible();
+  await expect(page.getByRole("progressbar", { name: "Registration completion" })).toHaveAttribute("value", "0");
+  await page.getByRole("button", { name: "Clear search", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Registration progress" })).toHaveCount(0);
+});

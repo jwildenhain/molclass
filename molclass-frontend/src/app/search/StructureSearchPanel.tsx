@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { Activity, Beaker, Info, PencilRuler, Search } from "lucide-react";
+import { RegistrationProgress } from "./RegistrationProgress";
 import type { SketcherHandle } from "./MoleculeSketcher";
 
 import { MoleculeStructure } from "@/components/MoleculeStructure";
@@ -95,6 +96,10 @@ export function StructureSearchPanel() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [adhocStatus, setAdhocStatus] = useState<"idle" | "submitting" | "error">("idle");
   const [adhocError, setAdhocError] = useState<string | null>(null);
+  const [registrationJobId, setRegistrationJobId] = useState<number | null>(() => {
+    const id = Number(params.get("registrationJob"));
+    return Number.isSafeInteger(id) && id > 0 ? id : null;
+  });
   const sketcherRef = useRef<SketcherHandle>(null);
 
   const queryRef = useRef<HTMLInputElement>(null);
@@ -112,6 +117,10 @@ export function StructureSearchPanel() {
     setError(null);
     setAdhocStatus("idle");
     setAdhocError(null);
+    setRegistrationJobId(null);
+    const next = new URL(window.location.href);
+    next.searchParams.delete("registrationJob");
+    window.history.replaceState(null, "", next.pathname + next.search);
   }
 
   function clearLinkedStructure() {
@@ -154,34 +163,10 @@ export function StructureSearchPanel() {
       }
       const { jobId } = (await submitResponse.json()) as { jobId: number };
 
-      const deadline = Date.now() + 30000;
-      let moleculeId: number | null = null;
-      while (Date.now() < deadline) {
-        if (version !== operationVersion.current) return;
-        const jobResponse = await fetchWithTimeout(`/api/v1/jobs/${jobId}`, { cache: "no-store" });
-        if (!jobResponse.ok) {
-          throw new Error(await errorDetail(jobResponse, "Could not check prediction status."));
-        }
-        const job = (await jobResponse.json()) as {
-          status: string;
-          error_message: string | null;
-          result: { moleculeId: number } | null;
-        };
-        if (job.status === "SUCCEEDED") {
-          moleculeId = job.result?.moleculeId ?? null;
-          break;
-        }
-        if (job.status === "FAILED") {
-          throw new Error(job.error_message || "MolClass could not process this structure.");
-        }
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-      }
-
       if (version !== operationVersion.current) return;
-      if (moleculeId == null) {
-        throw new Error("Registering this structure is taking longer than expected. Try again shortly.");
-      }
-      openModelSelection([moleculeId]);
+      setRegistrationJobId(jobId);
+      const next = new URLSearchParams({ smiles, registrationJob: String(jobId) });
+      window.history.replaceState(null, "", `/search?${next}`);
     } catch (submitError) {
       if (version !== operationVersion.current) return;
       setAdhocStatus("error");
@@ -430,6 +415,8 @@ export function StructureSearchPanel() {
         </section>
       )}
 
+      {registrationJobId !== null && <RegistrationProgress jobId={registrationJobId} onComplete={(id) => openModelSelection([id])} />}
+
       {error && (
         <div role="alert" className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm text-red-700 dark:text-red-200">
           {error}
@@ -466,7 +453,7 @@ export function StructureSearchPanel() {
               <button
                 type="button"
                 onClick={() => void predictNewStructure()}
-                disabled={adhocStatus === "submitting"}
+                disabled={adhocStatus === "submitting" || registrationJobId !== null}
                 className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-60"
               >
                 <Activity className="h-4 w-4" />

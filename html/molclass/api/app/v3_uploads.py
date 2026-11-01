@@ -247,6 +247,12 @@ def get_job(job_id: int, db: Session = Depends(get_v3_db)):
             SELECT j.job_id,j.job_type,j.status,j.runstep,j.attempt_count,j.maximum_attempts,
                    j.cancel_requested_at,j.error_code,j.error_message,j.created_at,
                    j.started_at,j.heartbeat_at,j.finished_at,
+                   (SELECT pe.event_details_json FROM job_event pe
+                     WHERE pe.job_id=j.job_id AND pe.event_type='JOB_PROGRESS'
+                       AND pe.job_event_id > COALESCE(
+                           (SELECT MAX(se.job_event_id) FROM job_event se
+                             WHERE se.job_id=j.job_id AND se.event_type='JOB_STARTED'), 0)
+                     ORDER BY pe.job_event_id DESC LIMIT 1) AS progress,
                    ir.import_run_id,ir.dataset_id,ir.total_records,ir.success_records,
                    ir.failed_records,ir.not_processed_records,
                    (SELECT je.event_details_json FROM job_event je
@@ -263,6 +269,15 @@ def get_job(job_id: int, db: Session = Depends(get_v3_db)):
     job = dict(row)
     if job["result"]:
         job["result"] = _analysis(job["result"])
+    if job.get("progress"):
+        job["progress"] = _analysis(job["progress"])
+    if job.get("job_type") == "MOLECULE_PREDICT_REQUEST":
+        if job["status"] == "SUCCEEDED":
+            job["progress"] = {"stage": "COMPLETE", "percent": 100, "completed": 1, "total": 1, "detail": "Completed"}
+        elif job["status"] == "QUEUED":
+            job["progress"] = {"stage": "QUEUED", "percent": 0, "completed": 0, "total": 1, "detail": "Waiting for a worker"}
+        if job["status"] != "SUCCEEDED":
+            job["result"] = None
     return job
 
 

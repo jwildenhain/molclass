@@ -41,3 +41,37 @@ quota. For a structure not yet indexed, use the authenticated registration and
 missing-model workflow documented in [ad-hoc prediction](V3_ADHOC_PREDICTION.md).
 The ChemGrid tab is a separate consumer; its cache/display logic must explicitly
 fetch or synchronize these results.
+
+## Registration progress API
+
+After `POST /api/v1/molecules/predict` returns a `jobId`, poll the FastAPI endpoint
+`GET /api/v1/jobs/{jobId}`. Molecule registration jobs now include a `progress`
+object separately from the final `result`, for example:
+
+```json
+{
+  "status": "RUNNING",
+  "progress": {
+    "stage": "COMPUTE_FINGERPRINTS",
+    "percent": 71,
+    "completed": 6,
+    "total": 10,
+    "detail": "MACCS"
+  },
+  "result": null
+}
+```
+
+Stages cover registration, property calculators, fingerprints, feature persistence,
+and prediction. Progress reflects completed steps rather than estimated time;
+property counts include calculators that return unavailable values. Queued jobs
+report 0%, and only `SUCCEEDED` reports 100% with the existing molecule/prediction
+`result`. Running progress may be null before the first event or for older workers.
+Events from previous attempts are excluded. Stop polling on `SUCCEEDED`, `FAILED`,
+or `CANCELLED`; inspect `error_message` for failures. Retry transient connection
+errors against the same job ID rather than submitting another registration.
+
+The MolClass UI polls every 1.5 seconds and retains the job ID in the search URL
+so refresh resumes monitoring. ChemGrid can consume the same endpoint; adding the
+API does not automatically change its tab. See [registration action monitoring](V3_SEARCH_UI.md#registration-action-monitoring)
+for stage weighting, UI behavior, validation, and deployment details.
