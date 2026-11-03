@@ -49,7 +49,7 @@ docker compose up -d
 
 The first build compiles the Java pipeline and both the API and frontend
 images — expect it to take a few minutes. `docker compose up -d` starts all
-six services (`db`, `api`, `sdf-worker`, `model-worker`, `molecule-worker`,
+seven services (`db`, `api`, `sdf-worker`, `model-worker`, `molecule-worker`,
 `predictor`, `frontend`) and creates the database schema automatically from
 `sql/v3/` on first boot.
 
@@ -59,8 +59,8 @@ six services (`db`, `api`, `sdf-worker`, `model-worker`, `molecule-worker`,
 docker compose ps
 ```
 
-All services should show `healthy` (or, for the two workers, just running —
-they don't have HTTP health checks). Then:
+The database, API, and predictor should show `healthy`; the frontend and three
+workers should be running (they do not define HTTP health checks). Then:
 
 ```bash
 curl http://127.0.0.1:8000/api/v1/health/readiness   # API
