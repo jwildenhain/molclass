@@ -101,7 +101,7 @@ function ConfigureModelForm() {
   const [crossValidationFolds, setCrossValidationFolds] = useState("auto");
   const [buildTimeoutSeconds, setBuildTimeoutSeconds] = useState("7200");
   const [positiveClass, setPositiveClass] = useState("");
-  const [modelName, setModelName] = useState("");
+  const [editedModelName, setModelName] = useState("");
   const [modelNameEdited, setModelNameEdited] = useState(false);
   const [createdBy, setCreatedBy] = useState("web-operator");
   const [partialAcknowledged, setPartialAcknowledged] = useState(false);
@@ -176,16 +176,15 @@ function ConfigureModelForm() {
     [options, featureSelectionCode],
   );
 
-  useEffect(() => {
-    if (!dataset || !selectedTarget || !selectedProfile || modelNameEdited) return;
-    setModelName(generatedModelName(
+  const modelName = !modelNameEdited && dataset && selectedTarget && selectedProfile
+    ? generatedModelName(
       dataset.name,
       selectedTarget.name,
       algorithmCode,
       selectedProfile.code,
       featureSelectionCode,
-    ));
-  }, [algorithmCode, dataset, featureSelectionCode, modelNameEdited, selectedProfile, selectedTarget]);
+    )
+    : editedModelName;
 
   const changeTarget = (value: string) => {
     setTargetPropertyId(value);

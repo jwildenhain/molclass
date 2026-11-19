@@ -47,13 +47,15 @@ UPDATE feature_profile
 CREATE TEMPORARY TABLE feature_profile_contract_backfill (
     feature_profile_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
     component_json JSON NOT NULL,
+    contract_manifest_json JSON NULL,
+    contract_sha256 BINARY(32) NULL,
     raw_feature_count INT UNSIGNED NOT NULL
 ) ENGINE=InnoDB;
 
 INSERT INTO feature_profile_contract_backfill
     (feature_profile_id, component_json, raw_feature_count)
 SELECT fpc.feature_profile_id,
-       CAST(CONCAT('[', GROUP_CONCAT(
+       CONCAT('[', GROUP_CONCAT(
            JSON_OBJECT(
                'order', fpc.component_order,
                'sourceType', IF(fpc.descriptor_generation_id IS NULL,
@@ -64,7 +66,7 @@ SELECT fpc.feature_profile_id,
                'width', COALESCE(fd.bit_length, ds.descriptor_count),
                'transformation', fpc.transformation_json
            ) ORDER BY fpc.component_order SEPARATOR ','
-       ), ']') AS JSON),
+       ), ']'),
        SUM(COALESCE(fd.bit_length, ds.descriptor_count))
   FROM feature_profile_component fpc
   LEFT JOIN descriptor_generation dg
@@ -75,19 +77,26 @@ SELECT fpc.feature_profile_id,
     ON fd.fingerprint_definition_id=fpc.fingerprint_definition_id
  GROUP BY fpc.feature_profile_id;
 
-UPDATE feature_profile fp
-JOIN feature_profile_contract_backfill b
-  ON b.feature_profile_id=fp.feature_profile_id
-   SET fp.contract_manifest_json=JSON_OBJECT(
+UPDATE feature_profile_contract_backfill b
+JOIN feature_profile fp
+  ON fp.feature_profile_id=b.feature_profile_id
+   SET b.contract_manifest_json=JSON_OBJECT(
            'contractFormat','MOLCLASS_FEATURE_PROFILE_V1_MIGRATED',
            'profileCode',fp.profile_code,
            'components',JSON_EXTRACT(b.component_json,'$'),
-           'rawFeatureCount',b.raw_feature_count),
-       fp.raw_feature_count=b.raw_feature_count;
+           'rawFeatureCount',b.raw_feature_count);
 
-UPDATE feature_profile
-   SET contract_sha256=UNHEX(SHA2(CAST(contract_manifest_json AS CHAR CHARACTER SET utf8mb4),256))
+UPDATE feature_profile_contract_backfill
+   SET contract_sha256=UNHEX(SHA2(
+       CAST(contract_manifest_json AS CHAR CHARACTER SET utf8mb4),256))
  WHERE contract_manifest_json IS NOT NULL;
+
+UPDATE feature_profile fp
+JOIN feature_profile_contract_backfill b
+  ON b.feature_profile_id=fp.feature_profile_id
+   SET fp.contract_manifest_json=b.contract_manifest_json,
+       fp.contract_sha256=b.contract_sha256,
+       fp.raw_feature_count=b.raw_feature_count;
 
 DROP TEMPORARY TABLE feature_profile_contract_backfill;
 
@@ -116,13 +125,14 @@ CREATE TRIGGER bi_model_definition_feature_contract
 BEFORE INSERT ON model_definition
 FOR EACH ROW
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM feature_profile fp
-         WHERE fp.feature_profile_id=NEW.feature_profile_id
-           AND fp.contract_sha256 IS NOT NULL
-           AND fp.superseded_by_feature_profile_id IS NULL
-           AND fp.status LIKE 'READY%'
-    ) THEN
+    DECLARE v_ready_profile_count INT UNSIGNED DEFAULT 0;
+    SELECT COUNT(*) INTO v_ready_profile_count
+      FROM feature_profile fp
+     WHERE fp.feature_profile_id=NEW.feature_profile_id
+       AND fp.contract_sha256 IS NOT NULL
+       AND fp.superseded_by_feature_profile_id IS NULL
+       AND fp.status LIKE 'READY%';
+    IF v_ready_profile_count=0 THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT='model definition requires an active sealed READY feature profile';
     END IF;
@@ -132,13 +142,15 @@ CREATE TRIGGER bu_model_definition_feature_contract
 BEFORE UPDATE ON model_definition
 FOR EACH ROW
 BEGIN
-    IF NOT (NEW.feature_profile_id <=> OLD.feature_profile_id) AND NOT EXISTS (
-        SELECT 1 FROM feature_profile fp
-         WHERE fp.feature_profile_id=NEW.feature_profile_id
-           AND fp.contract_sha256 IS NOT NULL
-           AND fp.superseded_by_feature_profile_id IS NULL
-           AND fp.status LIKE 'READY%'
-    ) THEN
+    DECLARE v_ready_profile_count INT UNSIGNED DEFAULT 0;
+    SELECT COUNT(*) INTO v_ready_profile_count
+      FROM feature_profile fp
+     WHERE fp.feature_profile_id=NEW.feature_profile_id
+       AND fp.contract_sha256 IS NOT NULL
+       AND fp.superseded_by_feature_profile_id IS NULL
+       AND fp.status LIKE 'READY%';
+    IF NOT (NEW.feature_profile_id <=> OLD.feature_profile_id)
+       AND v_ready_profile_count=0 THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT='model definition requires an active sealed READY feature profile';
     END IF;
@@ -149,7 +161,7 @@ BEFORE INSERT ON model_build
 FOR EACH ROW
 BEGIN
     DECLARE v_profile_id BIGINT UNSIGNED;
-    DECLARE v_manifest JSON;
+    DECLARE v_manifest LONGTEXT;
     DECLARE v_hash BINARY(32);
     DECLARE v_count INT UNSIGNED;
 
@@ -198,9 +210,12 @@ CREATE TRIGGER bi_feature_profile_component_sealed
 BEFORE INSERT ON feature_profile_component
 FOR EACH ROW
 BEGIN
-    IF EXISTS (SELECT 1 FROM feature_profile fp
-                WHERE fp.feature_profile_id=NEW.feature_profile_id
-                  AND fp.contract_sha256 IS NOT NULL) THEN
+    DECLARE v_sealed_profile_count INT UNSIGNED DEFAULT 0;
+    SELECT COUNT(*) INTO v_sealed_profile_count
+      FROM feature_profile fp
+     WHERE fp.feature_profile_id=NEW.feature_profile_id
+       AND fp.contract_sha256 IS NOT NULL;
+    IF v_sealed_profile_count>0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='sealed feature profile is immutable';
     END IF;
 END$$
@@ -209,9 +224,12 @@ CREATE TRIGGER bu_feature_profile_component_sealed
 BEFORE UPDATE ON feature_profile_component
 FOR EACH ROW
 BEGIN
-    IF EXISTS (SELECT 1 FROM feature_profile fp
-                WHERE fp.feature_profile_id=OLD.feature_profile_id
-                  AND fp.contract_sha256 IS NOT NULL) THEN
+    DECLARE v_sealed_profile_count INT UNSIGNED DEFAULT 0;
+    SELECT COUNT(*) INTO v_sealed_profile_count
+      FROM feature_profile fp
+     WHERE fp.feature_profile_id=OLD.feature_profile_id
+       AND fp.contract_sha256 IS NOT NULL;
+    IF v_sealed_profile_count>0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='sealed feature profile is immutable';
     END IF;
 END$$
@@ -220,9 +238,12 @@ CREATE TRIGGER bd_feature_profile_component_sealed
 BEFORE DELETE ON feature_profile_component
 FOR EACH ROW
 BEGIN
-    IF EXISTS (SELECT 1 FROM feature_profile fp
-                WHERE fp.feature_profile_id=OLD.feature_profile_id
-                  AND fp.contract_sha256 IS NOT NULL) THEN
+    DECLARE v_sealed_profile_count INT UNSIGNED DEFAULT 0;
+    SELECT COUNT(*) INTO v_sealed_profile_count
+      FROM feature_profile fp
+     WHERE fp.feature_profile_id=OLD.feature_profile_id
+       AND fp.contract_sha256 IS NOT NULL;
+    IF v_sealed_profile_count>0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='sealed feature profile is immutable';
     END IF;
 END$$

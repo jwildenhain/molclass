@@ -1,5 +1,5 @@
-import { test, expect } from "@playwright/test";
-import { routes, stubBackend, stubEndpoint, modelReview } from "./fixtures/backend";
+import { test, expect } from "./fixtures/ui";
+import { routes, stubBackend, stubEndpoint, modelReview, modelReviewItems } from "./fixtures/backend";
 
 /**
  * The human release gate. Approve/Reject controls always render, but stay
@@ -121,4 +121,33 @@ test("shows a review registry outage as an error", async ({ page }) => {
   await page.goto("/model-review");
 
   await expect(page.getByText("Model review registry failed (503).")).toBeVisible();
+});
+
+
+test("opens a deep-linked definition outside the default status filter", async ({ page }) => {
+  await stubEndpoint(page, routes.modelReviews, {
+    items: [{ ...modelReviewItems[0], status: "PUBLISHED" }],
+  });
+  await page.goto("/model-review?definition_id=39");
+  await expect(page.getByRole("heading", { level: 3, name: "Build 512" })).toBeVisible();
+  await expect(page.getByLabel("Search definitions")).toHaveValue("39");
+  await expect(page.getByLabel("Definition state")).toHaveValue("ALL");
+  await page.getByLabel("Definition state").selectOption("AWAITING_APPROVAL");
+  await expect(page).not.toHaveURL(/definition_id/);
+  await expect(page.getByRole("heading", { level: 2, name: "Choose a definition to inspect its evidence." })).toBeVisible();
+});
+
+test("search resets pagination even when the new result has multiple pages", async ({ page }) => {
+  await stubEndpoint(page, routes.modelReviews, {
+    items: Array.from({ length: 60 }, (_, index) => ({
+      ...modelReviewItems[0], modelDefinitionId: index + 1,
+      modelName: `${index < 30 ? "Alpha" : "Beta"} model ${index + 1}`,
+    })),
+  });
+  await page.goto("/model-review");
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByRole("button", { name: /Alpha model 26/ })).toBeVisible();
+  await page.getByLabel("Search definitions").fill("Beta");
+  await expect(page.getByRole("button", { name: /Beta model 31/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Previous", exact: true })).toBeDisabled();
 });
