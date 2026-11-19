@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { Activity, Beaker, Info, PencilRuler, Search } from "lucide-react";
@@ -80,7 +80,12 @@ async function errorDetail(response: Response, fallback: string) {
   return payload?.message || fallback;
 }
 
+// The server-rendered field must not accept input before React attaches its
+// handlers: early typing can otherwise be discarded during hydration.
+const subscribeToHydration = () => () => {};
+
 export function StructureSearchPanel() {
+  const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const params = useSearchParams();
   const linkedSmiles = (params.get("smiles") || "").slice(0, 10000);
   const linkedScaffold = (params.get("scaffold") || "").slice(0, 10000);
@@ -328,6 +333,7 @@ export function StructureSearchPanel() {
         <input
           ref={queryRef}
           id="molecule-query"
+          disabled={!hydrated}
           value={query}
           onChange={(event) => resetSearch(event.target.value)}
           placeholder={
@@ -339,7 +345,7 @@ export function StructureSearchPanel() {
         />
         <button
           type="submit"
-          disabled={loading}
+          disabled={!hydrated || loading}
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-500 disabled:cursor-wait disabled:opacity-60"
         >
           <Search className="h-4 w-4" />
