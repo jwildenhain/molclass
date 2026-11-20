@@ -258,7 +258,7 @@ export default function ModelReviewPage() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [pendingDeepLinkId, setPendingDeepLinkId] = useState<number | null>(null);
+  const deepLinkHandled = useRef(false);
   const [review, setReview] = useState<ModelReview | null>(null);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingReview, setLoadingReview] = useState(false);
@@ -277,45 +277,6 @@ export default function ModelReviewPage() {
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
   const detailRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    const raw = new URLSearchParams(window.location.search).get("definition_id");
-    const definitionId = Number(raw);
-    if (Number.isSafeInteger(definitionId) && definitionId > 0) setPendingDeepLinkId(definitionId);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setLoadingList(true);
-      setError(null);
-      setErrorSource(null);
-      try {
-        const response = await fetchWithTimeout("/api/v1/model-reviews?limit=250", {
-          cache: "no-store",
-          headers: { Accept: "application/json" },
-        });
-        if (!response.ok) {
-          throw new Error(`Model review registry failed (${response.status}).`);
-        }
-        const payload = (await response.json()) as { items?: ReviewListItem[] };
-        if (!cancelled) setItems(Array.isArray(payload.items) ? payload.items : []);
-      } catch (loadError) {
-        if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : "Model reviews could not be loaded.");
-          setErrorSource("list");
-        }
-      } finally {
-        if (!cancelled) setLoadingList(false);
-      }
-    }
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [listRetryToken]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -342,10 +303,6 @@ export default function ModelReviewPage() {
     [currentPage, filteredItems],
   );
 
-  useEffect(() => {
-    setPage(1);
-  }, [query, statusFilter]);
-
   const awaitingCount = useMemo(
     () => items.filter((item) => item.status === "AWAITING_APPROVAL").length,
     [items],
@@ -358,7 +315,7 @@ export default function ModelReviewPage() {
     setReview(null);
     setError(null);
     setErrorSource(null);
-    setPendingDeepLinkId(null);
+    deepLinkHandled.current = true;
     const url = new URL(window.location.href);
     url.searchParams.delete("definition_id");
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
@@ -400,15 +357,50 @@ export default function ModelReviewPage() {
   }, []);
 
   useEffect(() => {
-    if (loadingList || pendingDeepLinkId === null) return;
-    const definitionId = pendingDeepLinkId;
-    const linkedItem = items.find((item) => item.modelDefinitionId === definitionId);
-    setPendingDeepLinkId(null);
-    setQuery(String(definitionId));
-    setPage(1);
-    if (linkedItem && linkedItem.status !== statusFilter) setStatusFilter("ALL");
-    void selectReview(definitionId);
-  }, [items, loadingList, pendingDeepLinkId, selectReview, statusFilter]);
+    let cancelled = false;
+
+    async function load() {
+      setLoadingList(true);
+      setError(null);
+      setErrorSource(null);
+      try {
+        const response = await fetchWithTimeout("/api/v1/model-reviews?limit=250", {
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) {
+          throw new Error(`Model review registry failed (${response.status}).`);
+        }
+        const payload = (await response.json()) as { items?: ReviewListItem[] };
+        if (cancelled) return;
+        const nextItems = Array.isArray(payload.items) ? payload.items : [];
+        setItems(nextItems);
+        if (!deepLinkHandled.current) {
+          deepLinkHandled.current = true;
+          const definitionId = Number(new URLSearchParams(window.location.search).get("definition_id"));
+          if (Number.isSafeInteger(definitionId) && definitionId > 0) {
+            const linkedItem = nextItems.find((item) => item.modelDefinitionId === definitionId);
+            setQuery(String(definitionId));
+            setPage(1);
+            if (linkedItem && linkedItem.status !== "AWAITING_APPROVAL") setStatusFilter("ALL");
+            void selectReview(definitionId);
+          }
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : "Model reviews could not be loaded.");
+          setErrorSource("list");
+        }
+      } finally {
+        if (!cancelled) setLoadingList(false);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [listRetryToken, selectReview]);
 
   const setSummaries = useMemo(() => buildSetSummaries(review?.evaluations ?? []), [review]);
   const foldRows = useMemo(() => buildFoldRows(review?.evaluations ?? []), [review]);
@@ -544,7 +536,7 @@ export default function ModelReviewPage() {
               Search definitions
               <input
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => { setQuery(event.target.value); setPage(1); }}
                 placeholder="ID, model, dataset, algorithm"
                 className="mt-2 w-full rounded-xl border border-border bg-background/70 px-4 py-3 font-normal text-foreground outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
               />

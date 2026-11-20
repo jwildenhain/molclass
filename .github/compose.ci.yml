@@ -1,0 +1,5 @@
+# Never restart past a failed first-boot migration: MariaDB otherwise skips
+# init scripts on its next start and can appear healthy with a partial schema.
+services:
+  db:
+    restart: "no"

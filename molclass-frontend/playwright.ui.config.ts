@@ -6,7 +6,7 @@ const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: ['search.spec.ts', 'linked-structure.spec.ts', 'prediction-models.spec.ts', 'molecule-journey.spec.ts'],
+  testMatch: ['search.spec.ts', 'linked-structure.spec.ts', 'prediction-models.spec.ts', 'molecule-journey.spec.ts', 'model-review.spec.ts', 'model-creation-configure.spec.ts'],
   fullyParallel: true,
   forbidOnly: true,
   retries: 0,
